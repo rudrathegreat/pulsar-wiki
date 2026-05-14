@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PulsarWiki</title>
+  <meta name="description" content="A visual interface for the PulsarWiki knowledge base — browse, search, chat and explore the pulsar astronomy graph."/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div id="app">
+
+  <!-- Icon bar -->
+  <nav id="iconbar">
+    <button class="icon-btn active" id="ib-wiki" title="Wiki" data-panel="wiki">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </button>
+    <button class="icon-btn" id="ib-chat" title="Chat" data-panel="chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    </button>
+    <button class="icon-btn" id="ib-graph" title="Graph" data-panel="graph">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><circle cx="12" cy="12" r="2"/><line x1="7" y1="12" x2="10" y2="12"/><line x1="14" y1="12" x2="17.2" y2="6.8"/><line x1="14.2" y1="12.8" x2="17.2" y2="17.5"/></svg>
+    </button>
+    <button class="icon-btn" id="ib-files" title="Source Files" data-panel="files">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+    </button>
+    <div class="icon-spacer"></div>
+    <button class="icon-btn" id="ib-theme" title="Toggle theme">
+      <svg id="theme-icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg id="theme-icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    </button>
+  </nav>
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">PulsarWiki</div>
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="search-input" type="text" placeholder="Search wiki…" autocomplete="off"/>
+      </div>
+    </div>
+    <div class="sidebar-body" id="sidebar-body">
+      <!-- Populated by JS -->
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div id="main">
+    <!-- Topbar -->
+    <header id="topbar">
+      <div class="topbar-logo">
+        🔭 <span>PulsarWiki</span>
+      </div>
+      <div class="topbar-tabs">
+        <button class="tab-btn active" data-panel="wiki">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Wiki
+        </button>
+        <button class="tab-btn" data-panel="chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Chat
+        </button>
+        <button class="tab-btn" data-panel="graph">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><circle cx="12" cy="12" r="2"/><line x1="7" y1="12" x2="10" y2="12"/><line x1="14" y1="12" x2="17.2" y2="6.8"/><line x1="14.2" y1="12.8" x2="17.2" y2="17.5"/></svg>
+          Graph
+        </button>
+        <button class="tab-btn" data-panel="files">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+          Files
+        </button>
+      </div>
+      <div class="topbar-spacer"></div>
+      <div class="topbar-actions">
+        <button class="topbar-btn" id="btn-new-page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Page
+        </button>
+        <button class="topbar-btn" id="btn-upload">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+          Upload
+        </button>
+        <div class="dot-online" id="ws-dot" title="Gemini CLI status"></div>
+      </div>
+    </header>
+
+    <!-- Search results overlay -->
+    <div id="search-results"></div>
+
+    <!-- Content area -->
+    <div id="content">
+
+      <!-- Wiki panel -->
+      <div class="panel active" id="panel-wiki">
+        <div class="wiki-breadcrumb" id="wiki-breadcrumb">
+          <a onclick="app.showPanel('wiki')">Wiki</a>
+        </div>
+        <div id="wiki-body">
+          <div class="wiki-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            <h3>Select a page from the sidebar</h3>
+            <p style="font-size:13px;color:var(--text-3)">Or use the search bar to find content</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat panel -->
+      <div class="panel" id="panel-chat">
+        <div id="chat-messages">
+          <div class="chat-msg ai">
+            <div class="chat-avatar">G</div>
+            <div class="chat-bubble">
+              <strong>Gemini CLI connected.</strong><br>
+              Ask me anything about pulsars — I have full context of this wiki. Type your question below and I'll respond using the PulsarWiki knowledge base.
+            </div>
+          </div>
+        </div>
+        <div id="chat-bar">
+          <div class="chat-bar-inner">
+            <textarea id="chat-input" rows="1" placeholder="Ask about pulsars, timing, MeerKAT…"></textarea>
+            <button id="chat-abort" title="Stop">
+              <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+            </button>
+            <button id="chat-send" title="Send (Enter)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+          <div class="chat-status" id="chat-status">Press Enter to send · Shift+Enter for new line</div>
+        </div>
+      </div>
+
+      <!-- Graph panel -->
+      <div class="panel" id="panel-graph">
+        <svg id="graph-canvas"></svg>
+        <div class="graph-legend" id="graph-legend"></div>
+        <div class="graph-tooltip" id="graph-tooltip"></div>
+        <div class="graph-controls">
+          <button class="graph-btn" id="graph-zoom-in" title="Zoom in">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button class="graph-btn" id="graph-zoom-out" title="Zoom out">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button class="graph-btn" id="graph-reset" title="Reset">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Files panel -->
+      <div class="panel" id="panel-files">
+        <div class="files-header">
+          <h2>Source Files</h2>
+          <span class="badge" id="files-count">0</span>
+          <div class="files-header-spacer"></div>
+          <button class="upload-btn" id="files-upload-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+            Add File
+          </button>
+        </div>
+        <div class="files-grid" id="files-grid"><!-- populated by JS --></div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- Upload modal (hidden) -->
+<div class="modal-overlay" id="upload-modal" style="display:none">
+  <div class="modal">
+    <h3>Add Source File</h3>
+    <div class="dropzone" id="dropzone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+      <p>Drop files here or click to browse</p>
+      <small>PDF, TXT, MD supported</small>
+    </div>
+    <input type="file" id="file-input" style="display:none" multiple accept=".pdf,.txt,.md"/>
+    <div id="upload-progress" style="margin-top:12px;font-size:12px;color:var(--text-2)"></div>
+    <div class="modal-actions">
+      <button class="btn" id="modal-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- New page modal (hidden) -->
+<div class="modal-overlay" id="new-page-modal" style="display:none">
+  <div class="modal">
+    <h3>New Wiki Page</h3>
+    <div style="margin-bottom:16px">
+      <label style="display:block;font-size:12px;color:var(--text-2);margin-bottom:6px">Page name (lowercase, hyphens)</label>
+      <input type="text" id="new-page-name" placeholder="e.g. timing-noise"
+        style="width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;color:var(--text-1);font-family:var(--font);font-size:14px;outline:none"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="new-page-cancel">Cancel</button>
+      <button class="btn btn-primary" id="new-page-create">Create Page</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

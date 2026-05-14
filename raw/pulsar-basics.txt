@@ -1,0 +1,132 @@
+Welcome to the Swinburne Encyclopedia of Pulsar Astronomy
+Want to Learn About Pulsars? Start Here
+On the left-hand side, you will find information about pulsars that will allow you to be able to understand the data and plots analysed in the professional Swinburne Pulsar Data Portal
+
+What are
+Pulsars?
+In the standard model pulsars are rapidly rotating neutron stars that generate electromagnetic beams at their magnetic poles.
+
+As these beams sweep the cosmos, they can sometimes point towards the Earth, which astronomers detect as a pulse.
+
+A common analogy is to think of pulsars as cosmic lighthouses, and we can "see" a pulsar every time their beams are pointed in the direction of Earth.
+
+Video Credit to ARC Centre of Excellence for All-Sky Astrophysics (CAASTRO)
+
+History of
+Pulsars
+Pulsars were originally discovered in 1967 by Jocelyn Bell, a radio astronomer who became fascinated by a repeating signal that originated from a particular point in space.
+
+Initially, Bell thought she may have even discovered an alien beacon, and thus the name LGM-1 (Little Green Men 1) was given to this source. Soon after, multiple pulsating sources were found across the sky and the alien hypothesis was discounted.
+
+Astronomers realised that these sources could be better explained through a much more natural source, neutron stars.
+
+Since 1967, radio astronomers have discovered more than 3000 pulsars, with most of them recorded in the ATNF pulsar catalogue. Thousands of them are being observed by radio telescopes around the world, many on a daily basis.
+
+Properties of
+Pulsars
+Period - The time it takes for the pulsar to complete one revolution.
+
+Period Derivative (Pdot) - The rate of change (the time derivative) of the period with time.
+
+Signal-to-Noise Ratio (S/N) - The ratio between the integrated flux of the pulsar to the noise in an observation.
+
+Flux Density - how much radio energy is passing through a given area per second per unit bandwidth (Hertz).
+
+Orbital eccentricity (e) - A mathematical measure of how closely an orbit resembles a circle (e=0 is circular).
+
+Dispersion Measure (DM) - A quantity that is proportional to the column density of free electrons along the line of sight between the source and Earth.
+
+Time of Arrival (TOA) - the time at which a pulse arrives at the telescope.
+
+Pulse Profile - A graph that represents the average pulse profile as a function of pulsar phase (rotation). These can vary between a simple single-component profile and ones with complex structures. The average profile is usually remarkably constant, and thus enables precision (sub-microsecond!) pulsar timing, with its myriad of applications.
+
+Dedispersion - the process of correcting pulsar arrival times for the dispersion delay they experience due to the finite speed of radio waves in the interstellar medium.
+
+Types of
+Pulsars
+There are a variety of different types of pulsars that depend on the different properties described above.
+
+Some pulsars orbit another object, called a companion, and these pulsars are called binary pulsars
+
+When a histogram of pulsar periods is plotted two obvious groups of pulsars emerge. Those with periods less than about 30 milliseconds are often called “millisecond pulsars”, and those with periods greater than 100 milliseconds are often called “normal pulsars”. Depending upon their implied magnetic field strength, some of the pulsars in between are sometimes called “recycled pulsars”, because we believe that mass transfer has both reduced their fields and spun them up.
+
+Some pulsars have extremely strong magnetic fields (greater than 1014 gauss), which we call magnetars (magnetic stars).
+
+Pulsars can also be further classified based upon say the eccentricity of their orbits, or whether they are associated a globular cluster, supernova remnant, another galaxy or not, etc. There are a variety of different plots that can be used to visually separate the different types of pulsars. An example is the period vs. pdot (dP/dt) diagram below.
+
+
+A similar structure in the plot can be seen with the period vs. the inferred magnetic field strength diagram below.
+
+
+Different Plots of
+Pulsar Observations
+For each pulsar timing observation, we want to get as accurate arrival time as possible to enable precision pulsar timing.
+
+Several plots can be seen below. By hovering over each of the plots, you can understand what each plot represents.
+
+Pulse Profile
+A pulse profile shows the shape of a series of pulses all stacked one on top of another (ie average). Each pulsar has its own unique pulse profile that you can think of as a fingerprint.
+
+
+A time of arrival plot shows the time of arrivals of the pulses from a pulsar with time (in Modified Julian Date or MJD) on the x-axis and the TOAs on the y-axis after accounting for every rotation and subtracting off a mathematical model that describes the time delays associated with the pulsar's spin, position, motion and orbit.
+
+
+This greyscale plot shows the completely time-scrunched (integrated) data as a function of radio frequency after “dedispersion” and pulsar rotation phase (0-1) after subtracting a model of its rotation.
+
+
+This greyscale plot shows the completely frequency-scrunched (integrated) data after “dedipersion” as a function of time and pulsar rotation phase (0-1) after subtracting a model of its rotation and pulse dispersion.
+
+Equatorial Coordinate
+System
+The Equatorial Coordinate System is a system used by astronomers to map the unique location of objects in the night sky. In this coordinate system, the celestial sphere (a hypothetical sphere on which all the night sky objects reside) is broken up into Right Ascension (RA) and Declination (DEC), similar to how latitude and longitude break up the surface of the Earth to make it easier to locate places on Earth.
+
+The units for RA and Dec usually are in hours, minutes and seconds HH:MM:SS (e.g. 04:37:15) and degrees north or south of the equator respectively (often in degrees, arcminutes and arcseconds). In the case of using hours, the celestial sphere is broken up into vertical slices, with 24 slices across the entire celestial sphere. The width of one of these slices represents 1 hour (15 degrees across). Therefore, 24 hours gives you 360 degrees, or a full revolution of the Earth with respect to the stars.
+
+The names of each pulsar actually describe the approximate location of the pulsar, with the RA first (in hours) and the DEC second (in degrees). For example, the pulsar J0437-4715 describes a millisecond pulsar located at RA 04 hours 37 minutes and has a declination of -47:15 which is -47 degrees and 15 arc minutes (ie about -47.25 degrees).
+
+It's interesting to see the distribution of pulsars in RA and Dec, which is what the graph shows below. The curved line traced out by the dots shows that most (but not all) pulsars are associated with the Milky Way galaxy. We think that they are born in the disk of the galaxy and migrate from the disk before eventually dying.
+
+
+What is
+Flux Density and Signal to Noise Ratio?
+Flux often refers to the amount of power passing through a specific area but in radio astronomy we often refer to flux density, which is the amount of power per unit area per unit bandwidth (or Hertz). The radio spectrum can be described in terms of the cycles per second of the incident radio waves. For convenience we often talk about kilohertz (kHz), megahertz (MHz) or even gigahertz (GHz).
+
+In astronomy, the flux density (F) of a source is determined by the distance of the object from Earth (r), as well as the radio luminosity of the object (how luminous it is as a function of frequency) (L). Flux density is inversely proportional to the distance to the source r squared, because of the inverse square law. This can be seen in the formula below.
+
+where -
+
+F(f): Flux density as a function of frequency (watts per m2 per Hertz)
+L(f): Radio Luminosity of source (as a function of frequency)
+r: distance to object (often in metres)
+In pulsar astronomy the Signal to Noise Ratio (S/N or sometimes SNR) is a statistical estimate of the ratio of the integrated energy of the signal compared to the strength of the background noise in an observation. It is dependent on a variety of factors. In pulsar astronomy, the following formula is used to determine the ideal S/N in a particular observation in the approximation that the pulse profile is a rectangular pulse of width W.
+
+where -
+
+S/N: Signal to Noise (no units)
+G: Gain of Telescope (Kelvin per Jansky)
+S: Flux Density of Source (Jansky)
+Tsys: System Temperature (Kelvin)
+BW: Bandwidth of Telescope (Hertz)
+t: Length of Observation (seconds)
+Np: number of polarisations (usually 1 or 2)
+P: Period of Pulsar (seconds)
+W50: Width of pulse at half the peak (seconds)
+What is
+Pulsar Timing?
+The idea behind pulsar timing is to observe hundreds, or even thousands of pulsars on a regular basis (sometimes every single day). From this data and pulse arrival times, the motion, rotation and orbits of pulsars can be determined. By using the times of arrival at the observatory of the average pulse profile over a variety of epochs, astronomers can determine exactly how many rotations of the pulsar have occurred, the shapes of their orbits, motion across the sky, age and inferred magnetic field strength.
+
+The TOAs of pulses from pulsars can be used to understand with high precision the past and future rotational history of the pulsar and even monitor for “starquakes” or pulsar glitches. Pulsar glitches are events where the rotation rate of the pulsar rapidly increases due to some unknown mechanism. Some suspect this to be because of the changing superfluid interior inside the pulsar and how the magnetic field is attached to it. Pulsar timing allows astronomers to understand more about the interiors of pulsars, but also neutron stars in general.
+
+Some pulsars orbit other extreme objects, such as other neutron stars, (sometimes other pulsars) white dwarfs, high-mass stars and even planets. Such binary systems can allow astronomers to understand more about the companion object orbiting with the pulsar, and even test theories of gravity, like Einstein's Theory of General Relativity.
+
+Why Study
+Pulsars?
+There are a variety of reasons to study pulsars. Let's explore some of them.
+
+The first detection of exoplanets (planets outside the Solar System) were deduced because of the slight change in the TOAs of pulses from pulsars as the planets gently tugged on the pulsar. Nowadays the majority of planets have been discovered using the transit method, where planets block the light of their parent star during transits.
+
+Binary pulsar systems, especially double pulsar systems, are super useful in performing multiple tests of The General Theory of Relativity, the most successful theory of gravity.
+
+Since pulsar TOAs are super precise (pulses arrive at an extremely regular rate), pulsars can be thought of as the universe's natural clocks. In fact, on long timescales, some millisecond pulsars are comparable in accuracy of time compared to atomic clocks on Earth and require no maintenance! With such precision, it's possible to detect gravitational waves (ripples in space and time due to the orbit of super dense massive objects, such as supermassive black holes) and more specifically, a gravitational wave noise induced by many objects, which astronomers call the gravitational wave background.
+
+Pulsars are the most extreme objects in the universe (besides black holes). They're super dense, have extremely strong magnetic fields, and using them, astronomers can better understand extreme states of matter - like how squishy the neutrons are.
