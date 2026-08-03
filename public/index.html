@@ -80,7 +80,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
           Upload
         </button>
-        <div class="dot-online" id="ws-dot" title="Gemini CLI status"></div>
+        <button class="cli-status-btn" id="cli-status-button" type="button" title="Change CLI tool">
+          <span class="dot-online" id="ws-dot"></span>
+          <span id="cli-status-label">Choose CLI</span>
+        </button>
       </div>
     </header>
 
@@ -108,9 +111,9 @@
       <div class="panel" id="panel-chat">
         <div id="chat-messages">
           <div class="chat-msg ai">
-            <div class="chat-avatar">G</div>
+            <div class="chat-avatar" id="chat-welcome-avatar">AI</div>
             <div class="chat-bubble">
-              <strong>Gemini CLI connected.</strong><br>
+              <strong id="chat-welcome-title">Choose your CLI to get started.</strong><br>
               Ask me anything about pulsars — I have full context of this wiki. Type your question below and I'll respond using the PulsarWiki knowledge base.
             </div>
           </div>
@@ -217,6 +220,22 @@
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /app -->
+
+<!-- First-run CLI setup (also used to change the selection later) -->
+<div class="setup-overlay" id="setup-modal" style="display:none">
+  <section class="setup-dialog" role="dialog" aria-modal="true" aria-labelledby="setup-title" aria-describedby="setup-description">
+    <div class="setup-kicker">PulsarWiki setup</div>
+    <h2 id="setup-title">Choose your CLI</h2>
+    <p id="setup-description">PulsarWiki uses your preferred local coding agent to power chat. Choose one to continue.</p>
+    <div class="cli-options" id="cli-options" role="radiogroup" aria-label="CLI tool"></div>
+    <p class="setup-note">You can choose any tool now, even if PulsarWiki cannot detect it. Installation and PATH only matter when you start a chat.</p>
+    <div class="setup-error" id="setup-error" role="alert"></div>
+    <div class="setup-actions">
+      <button class="btn" id="setup-cancel" type="button">Cancel</button>
+      <button class="btn btn-primary" id="setup-save" type="button" disabled>Continue</button>
+    </div>
+  </section>
+</div>
 
 <!-- Upload modal (hidden) -->
 <div class="modal-overlay" id="upload-modal" style="display:none">

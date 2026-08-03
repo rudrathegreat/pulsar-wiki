@@ -46,6 +46,23 @@ npm.cmd start
 
 Then open <http://localhost:3000>.
 
+## First-run CLI setup
+
+On first launch, PulsarWiki asks which local coding-agent CLI should power chat:
+
+- Claude Code (`claude`)
+- Antigravity CLI (`agy`)
+- Codex CLI (`codex`)
+- OpenCode (`opencode`)
+
+You can select any tool during setup even if PulsarWiki cannot detect it. The
+selected command only needs to be installed, authenticated, and available on the
+server's `PATH` when you use chat. PulsarWiki stores the choice locally in
+`.pulsarwiki.json`; this file is ignored by Git. To change the selection later,
+click the CLI name in the top-right status control. The browser also keeps its
+own preference and sends it with chat requests, so setup still works when a host
+does not expose the configuration API correctly.
+
 ## Document viewing
 
 Open **Files** to preview source material without leaving PulsarWiki. PDF files use

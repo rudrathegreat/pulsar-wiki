@@ -357,7 +357,31 @@ body {
 
 .topbar-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
+}
+
+.cli-status-btn {
+  min-width: 112px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font: 500 11px var(--font);
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition), background var(--transition);
+}
+
+.cli-status-btn:hover {
+  color: var(--text-1);
+  border-color: var(--text-2);
+  background: var(--surface-3);
 }
 
 .topbar-btn {
@@ -1120,6 +1144,224 @@ body {
   text-align: center;
   color: var(--text-3);
   font-size: 13px;
+}
+
+/* ── CLI setup ───────────────────────────────────────────────────── */
+.setup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  padding: 28px;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.18s ease;
+}
+
+.setup-dialog {
+  width: min(720px, 100%);
+  max-height: calc(100dvh - 56px);
+  padding: 32px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  animation: slideUp 0.22s ease;
+}
+
+.setup-kicker {
+  margin-bottom: 8px;
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.setup-dialog h2 {
+  margin-bottom: 6px;
+  font-size: 22px;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+
+.setup-dialog > p {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.cli-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 24px 0 16px;
+}
+
+.cli-option {
+  min-width: 0;
+  min-height: 112px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 18px;
+  align-items: start;
+  gap: 12px;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition), transform var(--transition);
+}
+
+.cli-option:hover {
+  border-color: var(--text-3);
+  background: var(--surface-3);
+  transform: translateY(-1px);
+}
+
+.cli-option.selected {
+  border-color: var(--text-1);
+  background: var(--surface-3);
+}
+
+.cli-option:focus-within {
+  outline: 2px solid var(--text-2);
+  outline-offset: 2px;
+}
+
+.cli-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cli-option-mark {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 10px var(--mono);
+  letter-spacing: -0.03em;
+}
+
+.cli-option-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cli-option-copy strong {
+  margin-bottom: 2px;
+  color: var(--text-1);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.cli-option-copy small {
+  min-height: 34px;
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.cli-option-copy code {
+  width: max-content;
+  max-width: 100%;
+  margin-top: 8px;
+  padding: 2px 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-2);
+  font: 10px var(--mono);
+  text-overflow: ellipsis;
+}
+
+.cli-option-check {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cli-option.selected .cli-option-check {
+  border-color: var(--text-1);
+  background: var(--text-1);
+  color: var(--bg);
+}
+
+.cli-option-check svg {
+  width: 11px;
+  height: 11px;
+}
+
+.setup-note {
+  padding-left: 18px;
+  position: relative;
+  font-size: 11px !important;
+}
+
+.setup-note::before {
+  content: 'i';
+  position: absolute;
+  top: 1px;
+  left: 0;
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--text-3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 8px var(--mono);
+}
+
+.setup-error {
+  min-height: 18px;
+  margin-top: 10px;
+  color: #d97777;
+  font-size: 11px;
+}
+
+.setup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.setup-actions .btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+@media (max-width: 620px) {
+  .setup-overlay {
+    padding: 14px;
+  }
+
+  .setup-dialog {
+    max-height: calc(100dvh - 28px);
+    padding: 24px 18px;
+  }
+
+  .cli-options {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── Upload Modal ─────────────────────────────────────────────────── */

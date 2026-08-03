@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const chokidar = require('chokidar');
+const { buildCliInvocation, getCliTool, listCliTools } = require('./cli-tools');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,6 +15,24 @@ const ROOT_DIR = __dirname;
 const WIKI_DIR = path.join(ROOT_DIR, 'wiki');
 const RAW_DIR  = path.join(ROOT_DIR, 'raw');
 const PUB_DIR  = path.join(ROOT_DIR, 'public');
+const CONFIG_PATH = path.join(ROOT_DIR, '.pulsarwiki.json');
+const CHAT_PROTOCOL_VERSION = 2;
+
+function loadConfig() {
+  try {
+    const saved = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+    return getCliTool(saved.cli) ? { cli: saved.cli } : { cli: null };
+  } catch (error) {
+    if (error.code !== 'ENOENT') console.warn(`Unable to read ${path.basename(CONFIG_PATH)}: ${error.message}`);
+    return { cli: null };
+  }
+}
+
+function saveConfig(config) {
+  fs.writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`, 'utf-8');
+}
+
+let appConfig = loadConfig();
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(PUB_DIR));
@@ -39,6 +58,30 @@ function parseWikiLinks(content) {
 function safeBase(name) {
   return path.basename(name).replace(/\.\./g, '');
 }
+
+// --- App setup/config API ---
+app.get('/api/config', (_req, res) => {
+  const selectedTool = getCliTool(appConfig.cli);
+  res.json({
+    configured: Boolean(selectedTool),
+    cli: selectedTool?.id || null,
+    tool: selectedTool ? { id: selectedTool.id, name: selectedTool.name } : null,
+    tools: listCliTools(),
+  });
+});
+
+app.put('/api/config', (req, res) => {
+  const tool = getCliTool(req.body?.cli);
+  if (!tool) return res.status(400).json({ error: 'Choose a supported CLI tool.' });
+
+  try {
+    appConfig = { cli: tool.id };
+    saveConfig(appConfig);
+    res.json({ ok: true, cli: tool.id, tool: { id: tool.id, name: tool.name } });
+  } catch (error) {
+    res.status(500).json({ error: `Unable to save setup: ${error.message}` });
+  }
+});
 
 // --- Wiki API ---
 app.get('/api/wiki', (_req, res) => {
@@ -163,61 +206,112 @@ app.get('/api/search', (req, res) => {
   res.json(results);
 });
 
-// --- WebSocket: Gemini CLI ---
+// --- WebSocket: selected agent CLI ---
 wss.on('connection', ws => {
   let proc = null;
+  let requestId = 0;
 
   const send = obj => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj)); };
+  send({ type: 'server-hello', protocol: CHAT_PROTOCOL_VERSION });
 
   ws.on('message', raw => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
 
-    if (msg.type === 'chat') {
-      // Fire a one-shot gemini process per message
-      if (proc) { proc.kill(); proc = null; }
+    if (msg.type === 'client-hello') {
+      send({ type: 'server-hello', protocol: CHAT_PROTOCOL_VERSION });
+      return;
+    }
 
-      const escapedText = msg.text.replace(/"/g, '""');
-      const cmdLine = `npx -y gemini --prompt "${escapedText}"`;
-      proc = spawn(cmdLine, [], {
+    if (msg.type === 'chat') {
+      // A valid browser-level preference can override the project default. This
+      // keeps chat usable when a deployment rewrites or blocks /api/config.
+      const tool = getCliTool(msg.cli) || getCliTool(appConfig.cli);
+      if (!tool) {
+        send({ type: 'error', text: 'Setup is incomplete. Choose a CLI tool before starting a chat.' });
+        send({ type: 'done', code: 1 });
+        return;
+      }
+
+      let invocation;
+      try {
+        invocation = buildCliInvocation(tool.id, msg.text);
+      } catch (error) {
+        send({ type: 'error', text: error.message });
+        send({ type: 'done', code: 1 });
+        return;
+      }
+
+      // Fire a one-shot process per message. Arguments are passed without a shell.
+      requestId += 1;
+      const activeRequest = requestId;
+      if (proc) proc.kill();
+
+      const child = spawn(invocation.command, invocation.args, {
         cwd: ROOT_DIR,
-        shell: true,
+        shell: false,
         env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0', TERM: 'dumb' }
       });
+      proc = child;
 
       let buffer = '';
+      let stderr = '';
+      let hasOutput = false;
+      let failedToStart = false;
       const flush = () => {
-        if (buffer) { send({ type: 'chunk', text: buffer }); buffer = ''; }
+        if (activeRequest !== requestId) return;
+        if (buffer) {
+          hasOutput = true;
+          send({ type: 'chunk', text: buffer });
+          buffer = '';
+        }
       };
 
-      proc.stdout.on('data', chunk => {
+      child.stdout.on('data', chunk => {
         buffer += stripAnsi(chunk.toString());
         flush();
       });
-      proc.stderr.on('data', chunk => {
-        const t = stripAnsi(chunk.toString());
-        // Filter out noisy warnings
-        if (t.includes('256-color support not detected')) return;
-        if (t.includes('Attempt') && t.includes('failed')) return;
-        if (t.includes('Need to install')) return;
-        if (t.includes('npx: installed')) return;
-        if (t.trim()) send({ type: 'error', text: t });
+      child.stderr.on('data', chunk => {
+        // Agent CLIs commonly write progress diagnostics to stderr, so buffer
+        // it and surface useful details only if the command fails.
+        stderr = (stderr + stripAnsi(chunk.toString())).slice(-20000);
       });
-      proc.on('close', code => {
+      child.on('close', code => {
+        if (activeRequest !== requestId || failedToStart) return;
         flush();
+        if (code !== 0) {
+          const detail = hasOutput
+            ? `${tool.name} stopped before completing (exit code ${code}).`
+            : (stderr.trim() || `${tool.name} exited with code ${code}.`);
+          send({ type: 'error', text: detail });
+        }
         send({ type: 'done', code });
-        proc = null;
+        if (proc === child) proc = null;
       });
-      proc.on('error', err => {
-        send({ type: 'error', text: `Failed to start gemini: ${err.message}` });
-        proc = null;
+      child.on('error', err => {
+        if (activeRequest !== requestId) return;
+        failedToStart = true;
+        const hint = err.code === 'ENOENT'
+          ? ` Your ${tool.name} choice is saved, but the server could not start \`${tool.command}\`. Install it or add it to PATH before using chat.`
+          : '';
+        send({ type: 'error', text: `Failed to start ${tool.name}: ${err.message}.${hint}` });
+        send({ type: 'done', code: 1 });
+        if (proc === child) proc = null;
       });
     }
 
-    if (msg.type === 'abort' && proc) { proc.kill(); proc = null; send({ type: 'done', code: -1 }); }
+    if (msg.type === 'abort' && proc) {
+      requestId += 1;
+      proc.kill();
+      proc = null;
+      send({ type: 'done', code: -1 });
+    }
   });
 
-  ws.on('close', () => { if (proc) proc.kill(); });
+  ws.on('close', () => {
+    requestId += 1;
+    if (proc) proc.kill();
+  });
 });
 
 // --- File watcher for live reload ---

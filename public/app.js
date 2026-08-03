@@ -25,6 +25,54 @@ function renderMd(content) {
 
 // ── API helpers ────────────────────────────────────────────────────
 const api = {
+  async getConfig() {
+    const storedCli = getStoredCli();
+
+    try {
+      const response = await fetch('/api/config');
+      const data = await readJsonResponse(response, 'Setup');
+      const cli = storedCli || data.cli;
+      const tools = data.tools?.length ? data.tools : CLI_CHOICES;
+      return {
+        ...data,
+        configured: Boolean(cli),
+        cli: cli || null,
+        tool: tools.find(tool => tool.id === cli) || null,
+        tools,
+      };
+    } catch (error) {
+      const tool = CLI_CHOICES.find(choice => choice.id === storedCli) || null;
+      return {
+        configured: Boolean(tool),
+        cli: tool?.id || null,
+        tool,
+        tools: CLI_CHOICES,
+        localOnly: true,
+        warning: 'Server setup API unavailable; CLI choices will be stored in this browser.',
+      };
+    }
+  },
+  async saveConfig(cli) {
+    const tool = CLI_CHOICES.find(choice => choice.id === cli);
+    if (!tool) throw new Error('Choose a supported CLI tool.');
+    storeCli(cli);
+
+    try {
+      const response = await fetch('/api/config', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cli })
+      });
+      return await readJsonResponse(response, 'Setup');
+    } catch (error) {
+      return {
+        ok: true,
+        cli,
+        tool,
+        localOnly: true,
+        warning: 'Choice saved in this browser. Restart the PulsarWiki server if chat cannot connect to it.',
+      };
+    }
+  },
   async getWikiList()        { return fetch('/api/wiki').then(r => r.json()); },
   async getWikiPage(name)    { return fetch(`/api/wiki/${encodeURIComponent(name)}`).then(r => r.json()); },
   async saveWikiPage(name, content) {
@@ -55,6 +103,58 @@ const api = {
   }
 };
 
+// Setup choices are intentionally defined in the client so availability
+// detection can never hide or disable a supported CLI.
+const CLI_CHOICES = [
+  { id: 'claude', name: 'Claude Code', command: 'claude', description: 'Anthropic\'s agentic coding CLI.' },
+  { id: 'antigravity', name: 'Antigravity CLI', command: 'agy', description: 'Google Antigravity\'s terminal agent.' },
+  { id: 'codex', name: 'Codex CLI', command: 'codex', description: 'OpenAI\'s coding agent for the terminal.' },
+  { id: 'opencode', name: 'OpenCode', command: 'opencode', description: 'The open-source AI coding agent.' },
+];
+
+const CLI_INITIALS = {
+  claude: 'CC',
+  antigravity: 'AG',
+  codex: 'CX',
+  opencode: 'OC',
+};
+
+const CLI_STORAGE_KEY = 'pw-cli';
+
+async function readJsonResponse(response, apiName) {
+  const body = await response.text();
+  let data;
+
+  try {
+    data = body ? JSON.parse(body) : {};
+  } catch {
+    const returnedHtml = /^\s*</.test(body);
+    throw new Error(returnedHtml
+      ? `${apiName} API returned the app page instead of JSON. Restart the PulsarWiki server.`
+      : `${apiName} API returned an invalid response.`);
+  }
+
+  if (!response.ok) throw new Error(data.error || `${apiName} request failed.`);
+  return data;
+}
+
+function getStoredCli() {
+  try {
+    const cli = localStorage.getItem(CLI_STORAGE_KEY);
+    return CLI_CHOICES.some(choice => choice.id === cli) ? cli : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeCli(cli) {
+  try {
+    localStorage.setItem(CLI_STORAGE_KEY, cli);
+  } catch {
+    // The in-memory selection still works for this page session.
+  }
+}
+
 // ── State ──────────────────────────────────────────────────────────
 const state = {
   panel:      'wiki',
@@ -73,7 +173,14 @@ const state = {
   },
   ws:         null,
   wsReady:    false,
+  backendReady: false,
+  backendOutdated: false,
+  backendHandshakeTimer: null,
   aiRunning:  false,
+  config:     null,
+  cliTools:   CLI_CHOICES,
+  selectedCli: null,
+  setupRequired: false,
   chatHistory: [],     // { role, text }
   searchTimer: null,
   documentSession: 0,
@@ -104,6 +211,14 @@ const dom = {
   get chatAbort()      { return $('chat-abort'); },
   get chatStatus()     { return $('chat-status'); },
   get wsDot()          { return $('ws-dot'); },
+  get cliStatusButton(){ return $('cli-status-button'); },
+  get cliStatusLabel() { return $('cli-status-label'); },
+  get setupModal()     { return $('setup-modal'); },
+  get setupTitle()     { return $('setup-title'); },
+  get cliOptions()     { return $('cli-options'); },
+  get setupError()     { return $('setup-error'); },
+  get setupCancel()    { return $('setup-cancel'); },
+  get setupSave()      { return $('setup-save'); },
   get filesGrid()      { return $('files-grid'); },
   get filesCount()     { return $('files-count'); },
   get uploadModal()    { return $('upload-modal'); },
@@ -283,6 +398,133 @@ function hideSearch() {
   dom.searchResults.classList.remove('visible');
 }
 
+// ── CLI setup ─────────────────────────────────────────────────────
+function currentCliTool() {
+  return state.cliTools.find(tool => tool.id === state.config?.cli) || state.config?.tool || null;
+}
+
+function renderCliOptions() {
+  dom.cliOptions.innerHTML = state.cliTools.map(tool => {
+    const selected = tool.id === state.selectedCli;
+    return `
+      <label class="cli-option${selected ? ' selected' : ''}" data-cli="${escHtml(tool.id)}">
+        <input type="radio" name="cli-tool" value="${escHtml(tool.id)}" ${selected ? 'checked' : ''}>
+        <span class="cli-option-mark" aria-hidden="true">${CLI_INITIALS[tool.id] || 'AI'}</span>
+        <span class="cli-option-copy">
+          <strong>${escHtml(tool.name)}</strong>
+          <small>${escHtml(tool.description)}</small>
+          <code>${escHtml(tool.command)}</code>
+        </span>
+        <span class="cli-option-check" aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 8 3 3 7-7"/></svg>
+        </span>
+      </label>`;
+  }).join('');
+
+  dom.cliOptions.querySelectorAll('input[name="cli-tool"]').forEach(input => {
+    input.addEventListener('change', () => selectCli(input.value));
+  });
+}
+
+function selectCli(id) {
+  state.selectedCli = id;
+  dom.setupSave.disabled = false;
+  dom.setupError.textContent = '';
+  dom.cliOptions.querySelectorAll('.cli-option').forEach(option => {
+    option.classList.toggle('selected', option.dataset.cli === id);
+  });
+}
+
+function applyCliConfig(config) {
+  state.config = { ...state.config, ...config, configured: Boolean(config.cli) };
+  if (config.tools) {
+    const serverTools = new Map(config.tools.map(tool => [tool.id, tool]));
+    state.cliTools = CLI_CHOICES.map(choice => ({ ...choice, ...serverTools.get(choice.id) }));
+  }
+
+  const tool = currentCliTool();
+  const configured = Boolean(tool);
+  const canChat = configured && state.wsReady && state.backendReady;
+  const name = tool?.name || 'Choose CLI';
+  const initials = tool ? (CLI_INITIALS[tool.id] || 'AI') : 'AI';
+
+  dom.cliStatusLabel.textContent = name;
+  dom.cliStatusButton.title = configured ? `Change CLI tool (currently ${name})` : 'Choose CLI tool';
+  dom.wsDot.title = state.backendReady
+    ? `${configured ? `${name} selected · ` : ''}backend ready`
+    : (state.backendOutdated
+      ? 'Outdated PulsarWiki backend'
+      : (state.wsReady ? 'Checking backend version' : 'Server disconnected'));
+
+  const welcomeAvatar = $('chat-welcome-avatar');
+  const welcomeTitle = $('chat-welcome-title');
+  if (welcomeAvatar) welcomeAvatar.textContent = initials;
+  if (welcomeTitle) welcomeTitle.textContent = configured ? `${name} selected.` : 'Choose your CLI to get started.';
+
+  dom.chatInput.disabled = !canChat;
+  dom.chatSend.disabled = !canChat || state.aiRunning;
+  if (!state.aiRunning) {
+    dom.chatStatus.textContent = !configured
+      ? 'Complete setup to enable chat'
+      : (state.backendReady
+        ? 'Press Enter to send · Shift+Enter for new line'
+        : (state.backendOutdated
+          ? 'The server is outdated. Restart npm start, then refresh this page.'
+          : 'Connecting to the chat backend…'));
+  }
+}
+
+function openCliSetup(required = false) {
+  state.setupRequired = required || !state.config?.configured;
+  state.selectedCli = state.config?.cli || null;
+  dom.setupTitle.textContent = state.setupRequired ? 'Choose your CLI' : 'Change your CLI';
+  dom.setupCancel.style.display = state.setupRequired ? 'none' : 'inline-flex';
+  dom.setupSave.textContent = state.setupRequired ? 'Continue' : 'Save choice';
+  dom.setupSave.disabled = !state.selectedCli;
+  dom.setupError.textContent = '';
+  renderCliOptions();
+  dom.setupModal.style.display = 'flex';
+
+  requestAnimationFrame(() => {
+    const target = dom.cliOptions.querySelector('input:checked') || dom.cliOptions.querySelector('input');
+    target?.focus();
+  });
+}
+
+function closeCliSetup() {
+  if (state.setupRequired) return;
+  dom.setupModal.style.display = 'none';
+}
+
+async function saveCliSelection() {
+  if (!state.selectedCli) return;
+  dom.setupSave.disabled = true;
+  dom.setupSave.textContent = 'Saving…';
+  dom.setupError.textContent = '';
+
+  try {
+    const result = await api.saveConfig(state.selectedCli);
+    applyCliConfig({ ...result, configured: true });
+    state.setupRequired = false;
+    dom.setupModal.style.display = 'none';
+    if (result.warning) dom.chatStatus.textContent = result.warning;
+  } catch (error) {
+    dom.setupError.textContent = error.message;
+    dom.setupSave.disabled = false;
+    dom.setupSave.textContent = state.setupRequired ? 'Continue' : 'Save choice';
+  }
+}
+
+dom.cliStatusButton.addEventListener('click', () => openCliSetup(false));
+dom.setupCancel.addEventListener('click', closeCliSetup);
+dom.setupSave.addEventListener('click', saveCliSelection);
+dom.setupModal.addEventListener('click', event => {
+  if (event.target === dom.setupModal) closeCliSetup();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && dom.setupModal.style.display !== 'none') closeCliSetup();
+});
+
 // ── WebSocket / Chat ───────────────────────────────────────────────
 function connectWS() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -291,19 +533,43 @@ function connectWS() {
 
   ws.onopen = () => {
     state.wsReady = true;
-    dom.wsDot.classList.add('active');
-    dom.wsDot.title = 'Gemini CLI ready';
+    state.backendReady = false;
+    state.backendOutdated = false;
+    applyCliConfig(state.config || { cli: null });
+    ws.send(JSON.stringify({ type: 'client-hello', protocol: 2 }));
+    clearTimeout(state.backendHandshakeTimer);
+    state.backendHandshakeTimer = setTimeout(() => {
+      if (state.ws !== ws || state.backendReady) return;
+      state.backendOutdated = true;
+      dom.wsDot.classList.remove('active');
+      dom.wsDot.title = 'Outdated PulsarWiki backend';
+      dom.chatInput.disabled = true;
+      dom.chatSend.disabled = true;
+      dom.chatStatus.textContent = 'The server is outdated. Restart npm start, then refresh this page.';
+    }, 1500);
   };
 
   ws.onclose = () => {
+    clearTimeout(state.backendHandshakeTimer);
     state.wsReady = false;
+    state.backendReady = false;
+    state.backendOutdated = false;
     dom.wsDot.classList.remove('active');
+    dom.wsDot.title = 'Server disconnected';
     // Reconnect after 3s
     setTimeout(connectWS, 3000);
   };
 
   ws.onmessage = ({ data }) => {
     const msg = JSON.parse(data);
+    if (msg.type === 'server-hello') {
+      clearTimeout(state.backendHandshakeTimer);
+      state.backendReady = Number(msg.protocol) >= 2;
+      state.backendOutdated = !state.backendReady;
+      dom.wsDot.classList.toggle('active', state.backendReady);
+      applyCliConfig(state.config || { cli: null });
+      return;
+    }
     if (msg.type === 'filechange') { refreshWiki(); return; }
     if (msg.type === 'chunk')  handleAiChunk(msg.text);
     if (msg.type === 'error')  handleAiChunk(`\n⚠ ${msg.text}`);
@@ -316,7 +582,8 @@ let aiTarget = null;
 
 function sendChat() {
   const text = dom.chatInput.value.trim();
-  if (!text || state.aiRunning) return;
+  const tool = currentCliTool();
+  if (!text || state.aiRunning || !tool || !state.backendReady) return;
   dom.chatInput.value = '';
   resizeTextarea();
 
@@ -324,7 +591,7 @@ function sendChat() {
   state.aiRunning = true;
   dom.chatSend.disabled = true;
   dom.chatAbort.style.display = 'flex';
-  dom.chatStatus.textContent = 'Gemini is thinking…';
+  dom.chatStatus.textContent = `${tool.name} is thinking…`;
 
   // Create AI bubble
   const id = `ai-msg-${Date.now()}`;
@@ -332,7 +599,7 @@ function sendChat() {
   msgEl.className = 'chat-msg ai';
   msgEl.id = id;
   msgEl.innerHTML = `
-    <div class="chat-avatar">G</div>
+    <div class="chat-avatar">${CLI_INITIALS[tool.id] || 'AI'}</div>
     <div class="chat-bubble">
       <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
     </div>`;
@@ -341,7 +608,7 @@ function sendChat() {
   scrollChat();
 
   if (state.ws && state.wsReady) {
-    state.ws.send(JSON.stringify({ type: 'chat', text }));
+    state.ws.send(JSON.stringify({ type: 'chat', text, cli: tool.id }));
   } else {
     handleAiChunk('⚠ Not connected to server. Make sure the server is running.');
     handleAiDone();
@@ -358,9 +625,11 @@ function handleAiChunk(text) {
 
 function handleAiDone() {
   state.aiRunning = false;
-  dom.chatSend.disabled = false;
+  dom.chatSend.disabled = !currentCliTool() || !state.backendReady;
   dom.chatAbort.style.display = 'none';
-  dom.chatStatus.textContent = 'Press Enter to send · Shift+Enter for new line';
+  dom.chatStatus.textContent = currentCliTool()
+    ? 'Press Enter to send · Shift+Enter for new line'
+    : 'Complete setup to enable chat';
   aiTarget = null;
   scrollChat();
 }
@@ -368,7 +637,8 @@ function handleAiDone() {
 function appendChatMsg(role, text) {
   const el = document.createElement('div');
   el.className = `chat-msg ${role}`;
-  const initial = role === 'user' ? 'U' : 'G';
+  const tool = currentCliTool();
+  const initial = role === 'user' ? 'U' : (CLI_INITIALS[tool?.id] || 'AI');
   el.innerHTML = `
     <div class="chat-avatar">${initial}</div>
     <div class="chat-bubble">${role === 'user' ? escHtml(text) : renderMd(text)}</div>`;
@@ -923,6 +1193,18 @@ window.hideSearch = hideSearch;
 // ── Bootstrap ──────────────────────────────────────────────────────
 (async function init() {
   connectWS();
+
+  try {
+    const config = await api.getConfig();
+    applyCliConfig(config);
+    if (!config.configured) openCliSetup(true);
+    if (config.configured && config.warning) dom.chatStatus.textContent = config.warning;
+  } catch (error) {
+    applyCliConfig({ cli: null, configured: false });
+    openCliSetup(true);
+    dom.setupError.textContent = error.message;
+  }
+
   const pages = await api.getWikiList();
   buildSidebar(pages);
   // If hash present, open that page
