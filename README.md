@@ -46,6 +46,13 @@ npm.cmd start
 
 Then open <http://localhost:3000>.
 
+## Document viewing
+
+Open **Files** to preview source material without leaving PulsarWiki. PDF files use
+the built-in PDF.js viewer with page navigation, zoom, and fit-to-width controls.
+Markdown and text-based files render in the same themed reading surface as the
+rest of the wiki. Every document can still be downloaded from the viewer header.
+
 ## Troubleshooting
 
 ### `npm.ps1 cannot be loaded because running scripts is disabled`

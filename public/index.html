@@ -161,6 +161,58 @@
         <div class="files-grid" id="files-grid"><!-- populated by JS --></div>
       </div>
 
+      <!-- In-app document viewer -->
+      <div class="panel" id="panel-document">
+        <header class="document-header">
+          <button class="document-icon-btn document-back" id="document-back" type="button" title="Back to files" aria-label="Back to files">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          </button>
+          <div class="document-file-icon" id="document-file-icon"></div>
+          <div class="document-title-wrap">
+            <h2 id="document-title">Document</h2>
+            <div class="document-meta" id="document-meta"></div>
+          </div>
+          <div class="document-header-spacer"></div>
+          <a class="document-action" id="document-download" href="#" download>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download
+          </a>
+        </header>
+
+        <div class="document-toolbar" id="pdf-toolbar" hidden>
+          <div class="toolbar-group">
+            <button class="document-icon-btn" id="pdf-prev" type="button" title="Previous page" aria-label="Previous page">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <label class="page-control" aria-label="Current page">
+              <input id="pdf-page-input" type="number" min="1" value="1"/>
+              <span id="pdf-page-count">/ 1</span>
+            </label>
+            <button class="document-icon-btn" id="pdf-next" type="button" title="Next page" aria-label="Next page">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+          <div class="toolbar-divider"></div>
+          <div class="toolbar-group">
+            <button class="document-icon-btn" id="pdf-zoom-out" type="button" title="Zoom out" aria-label="Zoom out">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+            </button>
+            <span class="zoom-value" id="pdf-zoom-value">100%</span>
+            <button class="document-icon-btn" id="pdf-zoom-in" type="button" title="Zoom in" aria-label="Zoom in">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+            </button>
+            <button class="toolbar-text-btn" id="pdf-fit" type="button">Fit width</button>
+          </div>
+        </div>
+
+        <div class="document-stage" id="document-stage">
+          <div class="document-status" id="document-status">
+            <span class="document-spinner"></span>
+            <span>Preparing document…</span>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /app -->

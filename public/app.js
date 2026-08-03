@@ -68,6 +68,18 @@ const state = {
   aiRunning:  false,
   chatHistory: [],     // { role, text }
   searchTimer: null,
+  documentSession: 0,
+  currentDocument: null,
+  pdf: {
+    lib: null,
+    doc: null,
+    page: 1,
+    scale: 1,
+    fitWidth: true,
+    renderTask: null,
+    renderId: 0,
+    resizeTimer: null,
+  },
 };
 
 // ── DOM Refs ───────────────────────────────────────────────────────
@@ -95,22 +107,26 @@ const dom = {
   get graphCanvas()    { return $('graph-canvas'); },
   get graphLegend()    { return $('graph-legend'); },
   get graphTooltip()   { return $('graph-tooltip'); },
+  get documentStage()  { return $('document-stage'); },
+  get documentStatus() { return $('document-status'); },
+  get pdfToolbar()     { return $('pdf-toolbar'); },
 };
 
 // ── Panel switching ────────────────────────────────────────────────
 function showPanel(name) {
   console.log('Switching to panel:', name);
   state.panel = name;
+  const navigationPanel = name === 'document' ? 'files' : name;
   
   // Re-query panels to ensure we have the latest set
   const panels = document.querySelectorAll('.panel');
   panels.forEach(p => p.classList.toggle('active', p.id === `panel-${name}`));
   
   const tabBtns = document.querySelectorAll('.tab-btn');
-  tabBtns.forEach(b => b.classList.toggle('active', b.dataset.panel === name));
+  tabBtns.forEach(b => b.classList.toggle('active', b.dataset.panel === navigationPanel));
   
   const iconBtns = document.querySelectorAll('.icon-btn[data-panel]');
-  iconBtns.forEach(b => b.classList.toggle('active', b.dataset.panel === name));
+  iconBtns.forEach(b => b.classList.toggle('active', b.dataset.panel === navigationPanel));
 
   if (name === 'graph') {
     // Small timeout to ensure display:block has updated dimensions
@@ -500,43 +516,213 @@ function drawGraph(data) {
 }
 
 // ── Files panel ────────────────────────────────────────────────────
+function fileIcon(ext) {
+  if (ext === 'pdf') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`;
+  if (['txt', 'md', 'markdown', 'log'].includes(ext)) return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`;
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>`;
+}
+
+function fmtSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
+
 async function loadFiles() {
   const files = await api.getRawList();
   state.rawFiles = files;
   dom.filesCount.textContent = files.length;
 
-  const extIcon = ext => {
-    if (ext === 'pdf') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`;
-    if (ext === 'txt' || ext === 'md') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`;
-    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>`;
-  };
-
-  const fmtSize = bytes => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
-    return (bytes/1024/1024).toFixed(1) + ' MB';
-  };
-
-  dom.filesGrid.innerHTML = files.map(f => `
-    <div class="file-card" onclick="openRawFile('${escAttr(f.name)}', '${f.ext}')">
-      <div class="file-card-icon">${extIcon(f.ext)}</div>
-      <div>
+  dom.filesGrid.innerHTML = files.map((f, index) => `
+    <button class="file-card" type="button" data-file-index="${index}" aria-label="Open ${escHtml(f.name)}">
+      <div class="file-card-topline">
+        <div class="file-card-icon">${fileIcon(f.ext)}</div>
         <span class="file-card-ext">${f.ext || 'file'}</span>
       </div>
       <div class="file-card-name">${escHtml(f.name)}</div>
-      <div class="file-card-meta">${fmtSize(f.size)}</div>
-    </div>`).join('');
+      <div class="file-card-meta">${fmtSize(f.size)} · View document</div>
+    </button>`).join('');
+
+  dom.filesGrid.querySelectorAll('[data-file-index]').forEach(card => {
+    card.addEventListener('click', () => {
+      const file = state.rawFiles[Number(card.dataset.fileIndex)];
+      if (file) openRawFile(file.name, file.ext, file);
+    });
+  });
 }
 
-function openRawFile(name, ext) {
+function setDocumentStatus(message, detail = '', isError = false) {
+  dom.documentStage.innerHTML = `
+    <div class="document-status${isError ? ' error' : ''}">
+      ${isError ? fileIcon('file') : '<span class="document-spinner"></span>'}
+      <strong>${escHtml(message)}</strong>
+      ${detail ? `<span>${escHtml(detail)}</span>` : ''}
+    </div>`;
+}
+
+async function openRawFile(name, ext, file = {}, updateHash = true) {
+  const normalizedExt = String(ext || '').toLowerCase();
   const url = `/api/raw/${encodeURIComponent(name)}`;
-  if (ext === 'pdf') {
-    window.open(url, '_blank');
-  } else {
-    // Open text files in a new tab or preview
-    window.open(url, '_blank');
+  const session = ++state.documentSession;
+  state.currentDocument = { name, ext: normalizedExt, url };
+  state.pdf.doc = null;
+  state.pdf.page = 1;
+  state.pdf.scale = 1;
+  state.pdf.fitWidth = true;
+  if (state.pdf.renderTask) state.pdf.renderTask.cancel();
+
+  showPanel('document');
+  if (updateHash) history.replaceState(null, '', `#file/${encodeURIComponent(name)}`);
+  $('document-title').textContent = name;
+  $('document-file-icon').innerHTML = fileIcon(normalizedExt);
+  $('document-meta').innerHTML = `<span>${normalizedExt || 'FILE'}</span>${file.size != null ? `<span>${fmtSize(file.size)}</span>` : ''}`;
+  $('document-download').href = url;
+  $('document-download').setAttribute('download', name);
+  dom.pdfToolbar.hidden = normalizedExt !== 'pdf';
+  setDocumentStatus(`Opening ${normalizedExt ? normalizedExt.toUpperCase() : 'document'}…`);
+
+  try {
+    if (normalizedExt === 'pdf') {
+      await openPdf(url, session);
+      return;
+    }
+
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`The server returned ${response.status}.`);
+    const content = await response.text();
+    if (session !== state.documentSession) return;
+
+    if (['md', 'markdown'].includes(normalizedExt)) {
+      dom.documentStage.innerHTML = `<article class="document-reading-surface md-body">${renderMd(content)}</article>`;
+      dom.documentStage.querySelectorAll('a.wiki-link').forEach(a => {
+        a.addEventListener('click', () => openPage(a.dataset.page));
+      });
+      return;
+    }
+
+    if (['txt', 'log', 'csv', 'json', 'xml', 'yaml', 'yml'].includes(normalizedExt)) {
+      dom.documentStage.innerHTML = `<div class="document-reading-surface document-plain-text"><pre></pre></div>`;
+      dom.documentStage.querySelector('pre').textContent = content;
+      return;
+    }
+
+    setDocumentStatus('Preview not available', `Download ${name} to open it in another application.`, true);
+  } catch (error) {
+    if (session !== state.documentSession) return;
+    setDocumentStatus('Could not open this document', error.message, true);
   }
 }
+
+async function getPdfLibrary() {
+  if (!state.pdf.lib) {
+    state.pdf.lib = await import('/vendor/pdfjs/build/pdf.min.mjs');
+    state.pdf.lib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/build/pdf.worker.min.mjs';
+  }
+  return state.pdf.lib;
+}
+
+async function openPdf(url, session) {
+  const pdfjsLib = await getPdfLibrary();
+  const loadingTask = pdfjsLib.getDocument({
+    url,
+    cMapUrl: '/vendor/pdfjs/cmaps/',
+    cMapPacked: true,
+    standardFontDataUrl: '/vendor/pdfjs/standard_fonts/',
+    wasmUrl: '/vendor/pdfjs/wasm/',
+  });
+  const pdf = await loadingTask.promise;
+  if (session !== state.documentSession) {
+    pdf.destroy();
+    return;
+  }
+  state.pdf.doc = pdf;
+  $('pdf-page-input').max = pdf.numPages;
+  $('pdf-page-count').textContent = `/ ${pdf.numPages}`;
+  await renderPdfPage(1, true);
+}
+
+function clampPdfScale(value) {
+  return Math.min(3, Math.max(0.5, value));
+}
+
+async function renderPdfPage(pageNumber, fitWidth = state.pdf.fitWidth) {
+  const pdf = state.pdf.doc;
+  if (!pdf) return;
+  const renderId = ++state.pdf.renderId;
+  const session = state.documentSession;
+  const page = await pdf.getPage(Math.min(pdf.numPages, Math.max(1, pageNumber)));
+  if (session !== state.documentSession || renderId !== state.pdf.renderId) return;
+
+  state.pdf.page = page.pageNumber;
+  state.pdf.fitWidth = fitWidth;
+  const baseViewport = page.getViewport({ scale: 1 });
+  if (fitWidth) {
+    const availableWidth = Math.max(320, dom.documentStage.clientWidth - 96);
+    state.pdf.scale = clampPdfScale(availableWidth / baseViewport.width);
+  }
+
+  const viewport = page.getViewport({ scale: state.pdf.scale });
+  const outputScale = Math.min(window.devicePixelRatio || 1, 2);
+  if (state.pdf.renderTask) state.pdf.renderTask.cancel();
+
+  dom.documentStage.innerHTML = `
+    <div class="pdf-page-wrap" aria-label="Page ${page.pageNumber} of ${pdf.numPages}">
+      <canvas id="pdf-canvas"></canvas>
+    </div>`;
+  const canvas = $('pdf-canvas');
+  const context = canvas.getContext('2d');
+  canvas.width = Math.floor(viewport.width * outputScale);
+  canvas.height = Math.floor(viewport.height * outputScale);
+  canvas.style.width = `${Math.floor(viewport.width)}px`;
+  canvas.style.height = `${Math.floor(viewport.height)}px`;
+
+  $('pdf-page-input').value = page.pageNumber;
+  $('pdf-zoom-value').textContent = `${Math.round(state.pdf.scale * 100)}%`;
+  $('pdf-prev').disabled = page.pageNumber <= 1;
+  $('pdf-next').disabled = page.pageNumber >= pdf.numPages;
+  $('pdf-fit').classList.toggle('active', fitWidth);
+
+  const renderTask = page.render({
+    canvasContext: context,
+    viewport,
+    transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0],
+  });
+  state.pdf.renderTask = renderTask;
+
+  try {
+    await renderTask.promise;
+  } catch (error) {
+    if (error?.name !== 'RenderingCancelledException') throw error;
+  } finally {
+    if (state.pdf.renderTask === renderTask) state.pdf.renderTask = null;
+  }
+}
+
+$('document-back').addEventListener('click', () => {
+  history.replaceState(null, '', location.pathname);
+  showPanel('files');
+});
+$('pdf-prev').addEventListener('click', () => renderPdfPage(state.pdf.page - 1, state.pdf.fitWidth));
+$('pdf-next').addEventListener('click', () => renderPdfPage(state.pdf.page + 1, state.pdf.fitWidth));
+$('pdf-zoom-out').addEventListener('click', () => {
+  state.pdf.scale = clampPdfScale(state.pdf.scale - 0.15);
+  renderPdfPage(state.pdf.page, false);
+});
+$('pdf-zoom-in').addEventListener('click', () => {
+  state.pdf.scale = clampPdfScale(state.pdf.scale + 0.15);
+  renderPdfPage(state.pdf.page, false);
+});
+$('pdf-fit').addEventListener('click', () => renderPdfPage(state.pdf.page, true));
+$('pdf-page-input').addEventListener('change', event => {
+  const page = Math.min(state.pdf.doc?.numPages || 1, Math.max(1, Number(event.target.value) || 1));
+  renderPdfPage(page, state.pdf.fitWidth);
+});
+
+window.addEventListener('resize', () => {
+  clearTimeout(state.pdf.resizeTimer);
+  if (state.panel !== 'document' || !state.pdf.doc || !state.pdf.fitWidth) return;
+  state.pdf.resizeTimer = setTimeout(() => renderPdfPage(state.pdf.page, true), 120);
+});
 
 // ── Upload modal ───────────────────────────────────────────────────
 function openUploadModal() {
@@ -647,4 +833,10 @@ window.hideSearch = hideSearch;
   // If hash present, open that page
   const hash = location.hash;
   if (hash.startsWith('#wiki/')) openPage(decodeURIComponent(hash.slice(6)));
+  if (hash.startsWith('#file/')) {
+    const name = decodeURIComponent(hash.slice(6));
+    const files = await api.getRawList();
+    const file = files.find(item => item.name === name);
+    if (file) openRawFile(file.name, file.ext, file, false);
+  }
 })();
