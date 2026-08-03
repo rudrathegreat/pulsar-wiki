@@ -63,6 +63,14 @@ const state = {
   rawFiles:   [],
   graphData:  null,
   graphInit:  false,
+  graph: {
+    simulation: null,
+    resizeObserver: null,
+    svg: null,
+    zoom: null,
+    width: 0,
+    height: 0,
+  },
   ws:         null,
   wsReady:    false,
   aiRunning:  false,
@@ -107,6 +115,7 @@ const dom = {
   get graphCanvas()    { return $('graph-canvas'); },
   get graphLegend()    { return $('graph-legend'); },
   get graphTooltip()   { return $('graph-tooltip'); },
+  get graphStatus()    { return $('graph-status'); },
   get documentStage()  { return $('document-stage'); },
   get documentStatus() { return $('document-status'); },
   get pdfToolbar()     { return $('pdf-toolbar'); },
@@ -117,6 +126,7 @@ function showPanel(name) {
   console.log('Switching to panel:', name);
   state.panel = name;
   const navigationPanel = name === 'document' ? 'files' : name;
+  $('app').classList.toggle('graph-mode', name === 'graph');
   
   // Re-query panels to ensure we have the latest set
   const panels = document.querySelectorAll('.panel');
@@ -129,19 +139,7 @@ function showPanel(name) {
   iconBtns.forEach(b => b.classList.toggle('active', b.dataset.panel === navigationPanel));
 
   if (name === 'graph') {
-    // Small timeout to ensure display:block has updated dimensions
-    setTimeout(() => {
-      if (!state.graphData) {
-        api.getGraph().then(data => { 
-          state.graphData = data; 
-          state.graphInit = true;
-          drawGraph(data); 
-        });
-      } else {
-        state.graphInit = true;
-        drawGraph(state.graphData);
-      }
-    }, 50);
+    showGraph();
   }
   if (name === 'files') loadFiles();
 }
@@ -403,21 +401,61 @@ dom.chatAbort.addEventListener('click', () => {
 const GROUP_COLORS = ['#888','#f0f0f0','#c0c0c0','#909090','#606060','#404040'];
 const GROUP_COLORS_LIGHT = ['#888','#111','#333','#555','#777','#999'];
 
+function setGraphStatus(message = '') {
+  dom.graphStatus.textContent = message;
+  dom.graphStatus.classList.toggle('visible', Boolean(message));
+}
+
+async function showGraph() {
+  setGraphStatus('Loading graph\u2026');
+
+  try {
+    const data = state.graphData || await api.getGraph();
+    if (state.panel !== 'graph') return;
+    state.graphData = data;
+    state.graphInit = true;
+
+    // Wait for graph-mode layout styles to be painted before measuring.
+    requestAnimationFrame(() => requestAnimationFrame(() => drawGraph(data)));
+  } catch (error) {
+    console.error('Unable to load graph:', error);
+    setGraphStatus('The graph could not be loaded. Please try again.');
+  }
+}
+
 function drawGraph(data) {
-  if (!data || !data.nodes) return;
+  if (!window.d3) {
+    setGraphStatus('The graph renderer could not be loaded.');
+    return;
+  }
+  if (!data || !Array.isArray(data.nodes)) {
+    setGraphStatus('No graph data is available.');
+    return;
+  }
   const nodes = data.nodes.map(d => ({...d}));
-  const links = data.edges.map(d => ({...d}));
+  const links = (data.edges || []).map(d => ({...d}));
   
   const svg = d3.select('#graph-canvas');
   const panel = document.getElementById('panel-graph');
   const rect = panel.getBoundingClientRect();
-  const W = rect.width || 800;
-  const H = rect.height || 600;
+  const W = Math.round(rect.width);
+  const H = Math.round(rect.height);
+
+  if (!W || !H) {
+    requestAnimationFrame(() => {
+      if (state.panel === 'graph') drawGraph(data);
+    });
+    return;
+  }
 
   console.log(`Drawing graph: ${nodes.length} nodes, ${links.length} links, dim: ${W}x${H}`);
 
+  state.graph.simulation?.stop();
+  state.graph.resizeObserver?.disconnect();
   svg.selectAll('*').remove();
-  svg.attr('width', W).attr('height', H);
+  svg.attr('width', '100%').attr('height', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+  setGraphStatus(nodes.length ? '' : 'There are no pages to display yet.');
+  if (!nodes.length) return;
 
   const isLight = document.documentElement.dataset.theme === 'light';
   const colors = isLight ? GROUP_COLORS_LIGHT : GROUP_COLORS;
@@ -445,6 +483,8 @@ function drawGraph(data) {
     .force('link', d3.forceLink(links).id(d => d.id).distance(100).strength(0.5))
     .force('charge', d3.forceManyBody().strength(-400))
     .force('center', d3.forceCenter(W / 2, H / 2))
+    .force('x', d3.forceX(W / 2).strength(0.05))
+    .force('y', d3.forceY(H / 2).strength(0.05))
     .force('collision', d3.forceCollide(d => rScale(linkCount[d.id] || 0) + 15));
 
   const zoom = d3.zoom().scaleExtent([0.1, 5]).on('zoom', e => g.attr('transform', e.transform));
@@ -509,10 +549,56 @@ function drawGraph(data) {
     node.attr('transform', d => `translate(${d.x},${d.y})`);
   });
 
+  function fitGraph(animate = true) {
+    const width = state.graph.width;
+    const height = state.graph.height;
+    const xs = nodes.map(d => d.x).filter(Number.isFinite);
+    const ys = nodes.map(d => d.y).filter(Number.isFinite);
+    if (!xs.length || !ys.length || !width || !height) return;
+
+    const minX = d3.min(xs);
+    const maxX = d3.max(xs);
+    const minY = d3.min(ys);
+    const maxY = d3.max(ys);
+    const graphWidth = Math.max(1, maxX - minX);
+    const graphHeight = Math.max(1, maxY - minY);
+    const scale = Math.min(1.25, 0.86 / Math.max(graphWidth / width, graphHeight / height));
+    const transform = d3.zoomIdentity
+      .translate(width / 2, height / 2)
+      .scale(scale)
+      .translate(-(minX + maxX) / 2, -(minY + maxY) / 2);
+    const target = animate ? svg.transition().duration(350) : svg;
+    target.call(zoom.transform, transform);
+  }
+
+  let initialFitPending = true;
+  simulation.on('end', () => {
+    if (!initialFitPending) return;
+    initialFitPending = false;
+    fitGraph(false);
+  });
+
+  const resizeObserver = new ResizeObserver(entries => {
+    const size = entries[0]?.contentRect;
+    const nextWidth = Math.round(size?.width || 0);
+    const nextHeight = Math.round(size?.height || 0);
+    if (!nextWidth || !nextHeight || (nextWidth === state.graph.width && nextHeight === state.graph.height)) return;
+
+    state.graph.width = nextWidth;
+    state.graph.height = nextHeight;
+    svg.attr('viewBox', `0 0 ${nextWidth} ${nextHeight}`);
+    // Keep the settled force layout stable and fit it into the new viewport.
+    // Restarting the simulation here makes the graph drift after every resize.
+    fitGraph(false);
+  });
+
+  state.graph = { simulation, resizeObserver, svg, zoom, width: W, height: H };
+  resizeObserver.observe(panel);
+
   // Graph control buttons
   $('graph-zoom-in').onclick  = () => svg.transition().call(zoom.scaleBy, 1.4);
   $('graph-zoom-out').onclick = () => svg.transition().call(zoom.scaleBy, 0.7);
-  $('graph-reset').onclick    = () => svg.transition().call(zoom.transform, d3.zoomIdentity.translate(W/2, H/2).scale(1).translate(-W/2,-H/2));
+  $('graph-reset').onclick    = () => fitGraph();
 }
 
 // ── Files panel ────────────────────────────────────────────────────

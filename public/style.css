@@ -89,6 +89,7 @@ body {
 #app {
   display: flex;
   height: 100vh;
+  height: 100dvh;
 }
 
 /* Icon bar */
@@ -160,6 +161,20 @@ body {
 
 #sidebar.collapsed {
   width: 0;
+}
+
+/* Graph mode uses the whole application viewport while retaining the icon rail
+   as an always-visible way to leave the graph. */
+#app.graph-mode #sidebar {
+  width: 0;
+  border-right-width: 0;
+}
+
+#app.graph-mode #topbar {
+  height: 0;
+  padding-block: 0;
+  border-bottom-width: 0;
+  overflow: hidden;
 }
 
 .sidebar-header {
@@ -278,6 +293,8 @@ body {
 /* Main */
 #main {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -385,6 +402,8 @@ body {
 /* Content panels */
 #content {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
   position: relative;
 }
@@ -409,6 +428,7 @@ body {
 }
 
 #panel-graph.active {
+  display: block !important;
   overflow: hidden;
 }
 
@@ -833,17 +853,34 @@ body {
 /* ── Graph Panel ─────────────────────────────────────────────────── */
 #panel-graph {
   background: var(--bg);
-  display: flex;
-  flex-direction: column;
   overflow: hidden;
-  position: relative;
+  position: absolute;
 }
 
 #graph-canvas {
-  flex: 1;
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
+  touch-action: none;
+}
+
+.graph-status {
+  position: absolute;
+  inset: 0;
+  z-index: 120;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: var(--text-2);
+  background: var(--bg);
+  text-align: center;
+}
+
+.graph-status.visible {
+  display: flex;
 }
 
 .graph-controls {

@@ -17,6 +17,9 @@ const PUB_DIR  = path.join(ROOT_DIR, 'public');
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(PUB_DIR));
+// Keep browser libraries local so the UI does not depend on public CDNs.
+app.use('/vendor/d3', express.static(path.join(ROOT_DIR, 'node_modules', 'd3', 'dist')));
+app.use('/vendor/marked', express.static(path.join(ROOT_DIR, 'node_modules', 'marked', 'lib')));
 // Keep the PDF renderer local so documents still work without a CDN connection.
 app.use('/vendor/pdfjs', express.static(path.join(ROOT_DIR, 'node_modules', 'pdfjs-dist')));
 

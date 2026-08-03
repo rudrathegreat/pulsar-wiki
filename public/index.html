@@ -131,7 +131,8 @@
 
       <!-- Graph panel -->
       <div class="panel" id="panel-graph">
-        <svg id="graph-canvas"></svg>
+        <svg id="graph-canvas" role="img" aria-label="Interactive PulsarWiki relationship graph"></svg>
+        <div class="graph-status" id="graph-status" role="status" aria-live="polite"></div>
         <div class="graph-legend" id="graph-legend"></div>
         <div class="graph-tooltip" id="graph-tooltip"></div>
         <div class="graph-controls">
@@ -250,8 +251,8 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="/vendor/marked/marked.umd.js"></script>
+<script src="/vendor/d3/d3.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

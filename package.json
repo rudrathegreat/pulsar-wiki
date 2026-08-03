@@ -13,6 +13,7 @@
   "type": "commonjs",
   "dependencies": {
     "chokidar": "^5.0.0",
+    "d3": "^7.9.0",
     "express": "^5.2.1",
     "marked": "^18.0.2",
     "pdfjs-dist": "^5.4.624",
