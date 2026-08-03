@@ -126,7 +126,6 @@ function showPanel(name) {
   console.log('Switching to panel:', name);
   state.panel = name;
   const navigationPanel = name === 'document' ? 'files' : name;
-  $('app').classList.toggle('graph-mode', name === 'graph');
   
   // Re-query panels to ensure we have the latest set
   const panels = document.querySelectorAll('.panel');
@@ -415,7 +414,7 @@ async function showGraph() {
     state.graphData = data;
     state.graphInit = true;
 
-    // Wait for graph-mode layout styles to be painted before measuring.
+    // Wait for the active panel layout to be painted before measuring.
     requestAnimationFrame(() => requestAnimationFrame(() => drawGraph(data)));
   } catch (error) {
     console.error('Unable to load graph:', error);
@@ -478,24 +477,28 @@ function drawGraph(data) {
   });
 
   const rScale = d3.scaleSqrt().domain([0, d3.max(Object.values(linkCount)) || 1]).range([6, 18]);
+  const labelWidth = d => Math.min(160, Math.max(26, d.id.length * 6.8));
+  const nodeRadius = d => rScale(linkCount[d.id] || 0);
+  const collisionRadius = d => nodeRadius(d) + 14 + labelWidth(d) / 2;
+  const isConnected = d => (linkCount[d.id] || 0) > 0;
 
   const simulation = d3.forceSimulation(nodes)
-    .force('link', d3.forceLink(links).id(d => d.id).distance(100).strength(0.5))
-    .force('charge', d3.forceManyBody().strength(-400))
+    .force('link', d3.forceLink(links).id(d => d.id).distance(145).strength(0.42))
+    .force('charge', d3.forceManyBody().strength(d => isConnected(d) ? -750 : -120))
     .force('center', d3.forceCenter(W / 2, H / 2))
-    .force('x', d3.forceX(W / 2).strength(0.05))
-    .force('y', d3.forceY(H / 2).strength(0.05))
-    .force('collision', d3.forceCollide(d => rScale(linkCount[d.id] || 0) + 15));
+    .force('x', d3.forceX(W / 2).strength(d => isConnected(d) ? 0.014 : 0.3))
+    .force('y', d3.forceY(H / 2).strength(d => isConnected(d) ? 0.014 : 0.3))
+    .force('collision', d3.forceCollide(collisionRadius).strength(1).iterations(2));
 
-  const zoom = d3.zoom().scaleExtent([0.1, 5]).on('zoom', e => g.attr('transform', e.transform));
+  const zoom = d3.zoom().scaleExtent([0.2, 6]).on('zoom', e => g.attr('transform', e.transform));
   svg.call(zoom);
 
   const g = svg.append('g');
 
   const link = g.append('g').selectAll('line').data(links).join('line')
     .attr('stroke', isLight ? '#ccc' : '#333')
-    .attr('stroke-width', 1.5)
-    .attr('stroke-opacity', 0.6);
+    .attr('stroke-width', 1.25)
+    .attr('stroke-opacity', 0.48);
 
   const node = g.append('g').selectAll('g').data(nodes).join('g')
     .style('cursor', 'pointer')
@@ -527,19 +530,23 @@ function drawGraph(data) {
     });
 
   node.append('circle')
-    .attr('r', d => rScale(linkCount[d.id] || 0))
+    .attr('r', nodeRadius)
     .attr('fill', d => colors[d.group] || colors[0])
     .attr('fill-opacity', 0.9)
     .attr('stroke', isLight ? '#fff' : '#0c0c0c')
     .attr('stroke-width', 2);
 
-  node.append('text')
+  const label = node.append('text')
     .text(d => d.id)
-    .attr('x', d => rScale(linkCount[d.id] || 0) + 5)
     .attr('y', '0.35em')
-    .attr('font-size', '10px')
+    .attr('font-size', '12px')
     .attr('font-family', 'Inter, system-ui, sans-serif')
+    .attr('font-weight', '500')
     .attr('fill', isLight ? '#333' : '#bbb')
+    .attr('stroke', isLight ? '#f5f5f5' : '#0c0c0c')
+    .attr('stroke-width', 3)
+    .attr('stroke-linejoin', 'round')
+    .attr('paint-order', 'stroke')
     .attr('pointer-events', 'none');
 
   simulation.on('tick', () => {
@@ -547,22 +554,24 @@ function drawGraph(data) {
       .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
       .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
     node.attr('transform', d => `translate(${d.x},${d.y})`);
+    label
+      .attr('x', d => (d.x < W / 2 ? -1 : 1) * (nodeRadius(d) + 7))
+      .attr('text-anchor', d => d.x < W / 2 ? 'end' : 'start');
   });
 
   function fitGraph(animate = true) {
     const width = state.graph.width;
     const height = state.graph.height;
-    const xs = nodes.map(d => d.x).filter(Number.isFinite);
-    const ys = nodes.map(d => d.y).filter(Number.isFinite);
-    if (!xs.length || !ys.length || !width || !height) return;
+    const positionedNodes = nodes.filter(d => Number.isFinite(d.x) && Number.isFinite(d.y));
+    if (!positionedNodes.length || !width || !height) return;
 
-    const minX = d3.min(xs);
-    const maxX = d3.max(xs);
-    const minY = d3.min(ys);
-    const maxY = d3.max(ys);
+    const minX = d3.min(positionedNodes, d => d.x - (d.x < W / 2 ? labelWidth(d) + nodeRadius(d) + 7 : nodeRadius(d)));
+    const maxX = d3.max(positionedNodes, d => d.x + (d.x < W / 2 ? nodeRadius(d) : labelWidth(d) + nodeRadius(d) + 7));
+    const minY = d3.min(positionedNodes, d => d.y - Math.max(nodeRadius(d), 8));
+    const maxY = d3.max(positionedNodes, d => d.y + Math.max(nodeRadius(d), 8));
     const graphWidth = Math.max(1, maxX - minX);
     const graphHeight = Math.max(1, maxY - minY);
-    const scale = Math.min(1.25, 0.86 / Math.max(graphWidth / width, graphHeight / height));
+    const scale = Math.min(1.8, 0.9 / Math.max(graphWidth / width, graphHeight / height));
     const transform = d3.zoomIdentity
       .translate(width / 2, height / 2)
       .scale(scale)

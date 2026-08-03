@@ -163,20 +163,6 @@ body {
   width: 0;
 }
 
-/* Graph mode uses the whole application viewport while retaining the icon rail
-   as an always-visible way to leave the graph. */
-#app.graph-mode #sidebar {
-  width: 0;
-  border-right-width: 0;
-}
-
-#app.graph-mode #topbar {
-  height: 0;
-  padding-block: 0;
-  border-bottom-width: 0;
-  overflow: hidden;
-}
-
 .sidebar-header {
   padding: 16px 16px 12px;
   border-bottom: 1px solid var(--border-sub);
@@ -864,6 +850,11 @@ body {
   height: 100%;
   display: block;
   touch-action: none;
+  cursor: grab;
+}
+
+#graph-canvas:active {
+  cursor: grabbing;
 }
 
 .graph-status {
