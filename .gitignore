@@ -1,7 +1,6 @@
 # Dependencies
 node_modules/
-.pulsarwiki.json
-pulsar-wiki-electrom/
+/.pulsarwiki/
 
 # Local environment files
 .env

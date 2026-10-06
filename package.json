@@ -1,7 +1,7 @@
 {
   "name": "llm-wiki-concept",
   "version": "1.0.0",
-  "description": "PulsarWiki — visual frontend for the pulsar astronomy knowledge base",
+  "description": "PulsarWiki — local browser interface for the pulsar astronomy knowledge base",
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
@@ -16,7 +16,9 @@
     "chokidar": "^5.0.0",
     "d3": "^7.9.0",
     "express": "^5.2.1",
+    "jose": "^6.1.0",
     "marked": "^18.0.2",
+    "openai": "^7.21.0",
     "pdfjs-dist": "^5.4.624",
     "ws": "^8.20.0"
   }

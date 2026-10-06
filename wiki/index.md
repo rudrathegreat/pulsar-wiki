@@ -18,6 +18,7 @@ Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pul
 
 ## Pillar 3: Observational Methodology
 - [[pulsar-timing]]: The core science of high-precision pulse measurement.
+- [[pulsar-glitches]]: Sudden increases in pulsar rotation rate and probes of neutron-star interiors.
 - [[astrometry]]: Precision measurements of position, motion, and parallax.
 - [[polarimetry]]: Studying the emission geometry via Stokes parameters.
 - [[shapiro-delay]]: Relativistic path delays used for mass determination.
@@ -33,7 +34,7 @@ Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pul
 - [[radio-frequency-interference]]: Managing contamination in radio data.
 
 ## Pillar 5: Notable Objects & Data
-- [[psr-j0740+6620]]: The record-breaking $2.14 M_{\odot}$ neutron star.
+- [[psr-j0740+6620]]: The record-breaking $2.14 M_{\\odot}$ neutron star.
 - [[psr-j0437-4715]]: The brightest MSP and primary timing laboratory.
 - [[vela-pulsar]]: A bright young pulsar and glitch laboratory.
 - [[crab-pulsar]]: The multi-wavelength remnant of SN 1054.

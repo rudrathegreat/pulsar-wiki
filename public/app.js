@@ -1,20 +1,17 @@
-// ── Markdown config ────────────────────────────────────────────────
+// Markdown rendering
 marked.setOptions({ breaks: true, gfm: true });
 
 function preprocessMd(text) {
-  // Convert [[wikilinks]] → markdown links with WIKILINK: prefix
-  return text.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, page, label) => {
+  return String(text || '').replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, page, label) => {
     const display = label || page;
-    const safePage = page.toLowerCase().trim();
-    return `[${display}](WIKILINK:${safePage})`;
+    return `[${display}](WIKILINK:${page.toLowerCase().trim()})`;
   });
 }
 
 function postProcessHtml(html) {
-  // Turn WIKILINK: hrefs into data-page wiki links
   return html.replace(
     /href="WIKILINK:([^"]+)"/g,
-    (_, page) => `href="javascript:void(0)" class="wiki-link" data-page="${page}"`
+    (_, page) => `href="#wiki/${encodeURIComponent(page)}" class="wiki-link" data-page="${escHtml(page)}"`
   );
 }
 
@@ -22,651 +19,271 @@ function renderMd(content) {
   return postProcessHtml(marked.parse(preprocessMd(content)));
 }
 
+async function readJsonResponse(response, apiName) {
+  const body = await response.text();
+  let data;
+  try {
+    data = body ? JSON.parse(body) : {};
+  } catch {
+    throw new Error(/^\s*</.test(body)
+      ? `${apiName} API returned the app page instead of JSON. Restart PulsarWiki.`
+      : `${apiName} API returned an invalid response.`);
+  }
+  if (!response.ok) throw new Error(data.error || `${apiName} request failed.`);
+  return data;
+}
 
-// ── API helpers ────────────────────────────────────────────────────
+// Local browser API. ChatGPT credentials never enter this client.
 const api = {
-  async getConfig() {
-    const storedCli = getStoredCli();
-
-    try {
-      const response = await fetch('/api/config');
-      const data = await readJsonResponse(response, 'Setup');
-      const cli = storedCli || data.cli;
-      const tools = data.tools?.length ? data.tools : CLI_CHOICES;
-      return {
-        ...data,
-        configured: Boolean(cli),
-        cli: cli || null,
-        tool: tools.find(tool => tool.id === cli) || null,
-        tools,
-      };
-    } catch (error) {
-      const tool = CLI_CHOICES.find(choice => choice.id === storedCli) || null;
-      return {
-        configured: Boolean(tool),
-        cli: tool?.id || null,
-        tool,
-        tools: CLI_CHOICES,
-        localOnly: true,
-        warning: 'Server setup API unavailable; CLI choices will be stored in this browser.',
-      };
-    }
+  async getChatGPTStatus() {
+    return readJsonResponse(await fetch('/api/chatgpt/status'), 'ChatGPT status');
   },
-  async saveConfig(cli) {
-    const tool = CLI_CHOICES.find(choice => choice.id === cli);
-    if (!tool) throw new Error('Choose a supported CLI tool.');
-    storeCli(cli);
-
-    try {
-      const response = await fetch('/api/config', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cli })
-      });
-      return await readJsonResponse(response, 'Setup');
-    } catch (error) {
-      return {
-        ok: true,
-        cli,
-        tool,
-        localOnly: true,
-        warning: 'Choice saved in this browser. Restart the PulsarWiki server if chat cannot connect to it.',
-      };
-    }
+  async saveChatGPTModel(model) {
+    return readJsonResponse(await fetch('/api/chatgpt/model', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model }),
+    }), 'ChatGPT model');
   },
-  async getWikiList()        { return fetch('/api/wiki').then(r => r.json()); },
-  async getWikiPage(name)    { return fetch(`/api/wiki/${encodeURIComponent(name)}`).then(r => r.json()); },
+  async disconnectChatGPT() {
+    return readJsonResponse(await fetch('/api/chatgpt/session', { method: 'DELETE' }), 'ChatGPT disconnect');
+  },
+  async forgetChatGPTAccount() {
+    return readJsonResponse(await fetch('/api/chatgpt/account', { method: 'DELETE' }), 'ChatGPT account');
+  },
+  async listThreads() {
+    return readJsonResponse(await fetch('/api/chat/threads'), 'Saved chats');
+  },
+  async createThread(title) {
+    return readJsonResponse(await fetch('/api/chat/threads', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }),
+    }), 'Saved chat');
+  },
+  async getThread(id) {
+    return readJsonResponse(await fetch(`/api/chat/threads/${encodeURIComponent(id)}`), 'Saved chat');
+  },
+  async renameThread(id, title) {
+    return readJsonResponse(await fetch(`/api/chat/threads/${encodeURIComponent(id)}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }),
+    }), 'Saved chat');
+  },
+  async deleteThread(id) {
+    const response = await fetch(`/api/chat/threads/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!response.ok) await readJsonResponse(response, 'Saved chat');
+  },
+  async getWikiList() { return readJsonResponse(await fetch('/api/wiki'), 'Wiki'); },
+  async getWikiPage(name) { return readJsonResponse(await fetch(`/api/wiki/${encodeURIComponent(name)}`), 'Wiki page'); },
   async saveWikiPage(name, content) {
-    return fetch(`/api/wiki/${encodeURIComponent(name)}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content })
-    }).then(r => r.json());
+    return readJsonResponse(await fetch(`/api/wiki/${encodeURIComponent(name)}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }),
+    }), 'Wiki page');
   },
   async createWikiPage(name, content) {
-    return fetch('/api/wiki', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, content })
-    }).then(r => r.json());
+    return readJsonResponse(await fetch('/api/wiki', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, content }),
+    }), 'Wiki page');
   },
-  async getRawList()         { return fetch('/api/raw').then(r => r.json()); },
-  async getGraph()           { return fetch('/api/graph').then(r => r.json()); },
-  async search(q)            { return fetch(`/api/search?q=${encodeURIComponent(q)}`).then(r => r.json()); },
+  async getRawList() { return readJsonResponse(await fetch('/api/raw'), 'Source files'); },
+  async getGraph() { return readJsonResponse(await fetch('/api/graph'), 'Wiki graph'); },
+  async search(query) { return readJsonResponse(await fetch(`/api/search?q=${encodeURIComponent(query)}`), 'Search'); },
   async uploadFile(file, onProgress) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/api/upload');
       xhr.setRequestHeader('X-Filename', encodeURIComponent(file.name));
-      xhr.upload.onprogress = e => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
-      xhr.onload  = () => resolve(JSON.parse(xhr.responseText));
-      xhr.onerror = () => reject(new Error('Upload failed'));
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      xhr.upload.onprogress = event => {
+        if (event.lengthComputable && onProgress) onProgress(event.loaded / event.total);
+      };
+      xhr.onload = () => {
+        let result;
+        try { result = xhr.responseText ? JSON.parse(xhr.responseText) : {}; }
+        catch { reject(new Error('Upload returned an invalid response.')); return; }
+        if (xhr.status >= 200 && xhr.status < 300) resolve(result);
+        else reject(new Error(result.error || `Upload failed with status ${xhr.status}.`));
+      };
+      xhr.onerror = () => reject(new Error('Upload failed because the local server could not be reached.'));
+      xhr.onabort = () => reject(new Error('Upload was canceled.'));
       xhr.send(file);
     });
-  }
-};
-
-// Setup choices are intentionally defined in the client so availability
-// detection can never hide or disable a supported CLI.
-const CLI_CHOICES = [
-  { id: 'claude', name: 'Claude Code', command: 'claude', description: 'Anthropic\'s agentic coding CLI.' },
-  { id: 'antigravity', name: 'Antigravity CLI', command: 'agy', description: 'Google Antigravity\'s terminal agent.' },
-  { id: 'codex', name: 'Codex CLI', command: 'codex', description: 'OpenAI\'s coding agent for the terminal.' },
-  { id: 'opencode', name: 'OpenCode', command: 'opencode', description: 'The open-source AI coding agent.' },
-];
-
-const CLI_INITIALS = {
-  claude: 'CC',
-  antigravity: 'AG',
-  codex: 'CX',
-  opencode: 'OC',
-};
-
-const CLI_STORAGE_KEY = 'pw-cli';
-
-async function readJsonResponse(response, apiName) {
-  const body = await response.text();
-  let data;
-
-  try {
-    data = body ? JSON.parse(body) : {};
-  } catch {
-    const returnedHtml = /^\s*</.test(body);
-    throw new Error(returnedHtml
-      ? `${apiName} API returned the app page instead of JSON. Restart the PulsarWiki server.`
-      : `${apiName} API returned an invalid response.`);
-  }
-
-  if (!response.ok) throw new Error(data.error || `${apiName} request failed.`);
-  return data;
-}
-
-function getStoredCli() {
-  try {
-    const cli = localStorage.getItem(CLI_STORAGE_KEY);
-    return CLI_CHOICES.some(choice => choice.id === cli) ? cli : null;
-  } catch {
-    return null;
-  }
-}
-
-function storeCli(cli) {
-  try {
-    localStorage.setItem(CLI_STORAGE_KEY, cli);
-  } catch {
-    // The in-memory selection still works for this page session.
-  }
-}
-
-// ── State ──────────────────────────────────────────────────────────
-const state = {
-  panel:      'wiki',
-  wikiPages:  [],
-  currentPage: null,
-  rawFiles:   [],
-  graphData:  null,
-  graphInit:  false,
-  graph: {
-    simulation: null,
-    resizeObserver: null,
-    svg: null,
-    zoom: null,
-    width: 0,
-    height: 0,
   },
-  ws:         null,
-  wsReady:    false,
+};
+
+const state = {
+  panel: 'wiki',
+  wikiPages: [],
+  currentPage: null,
+  rawFiles: [],
+  graphData: null,
+  graphInit: false,
+  graph: { simulation: null, resizeObserver: null, svg: null, zoom: null, width: 0, height: 0 },
+  ws: null,
+  wsReady: false,
   backendReady: false,
-  backendOutdated: false,
-  backendHandshakeTimer: null,
-  aiRunning:  false,
-  config:     null,
-  cliTools:   CLI_CHOICES,
-  selectedCli: null,
-  setupRequired: false,
-  chatHistory: [],     // { role, text }
+  aiRunning: false,
+  chatgpt: null,
+  threads: [],
+  activeThreadId: null,
   searchTimer: null,
   documentSession: 0,
   currentDocument: null,
-  pdf: {
-    lib: null,
-    doc: null,
-    page: 1,
-    scale: 1,
-    fitWidth: true,
-    renderTask: null,
-    renderId: 0,
-    resizeTimer: null,
-  },
+  pdf: { lib: null, doc: null, page: 1, scale: 1, fitWidth: true, renderTask: null, renderId: 0, resizeTimer: null },
 };
 
-// ── DOM Refs ───────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 const dom = {
-  get sidebarBody()    { return $('sidebar-body'); },
-  get wikiBody()       { return $('wiki-body'); },
-  get wikiBc()         { return $('wiki-breadcrumb'); },
-  get searchInput()    { return $('search-input'); },
-  get searchResults()  { return $('search-results'); },
-  get chatMessages()   { return $('chat-messages'); },
-  get chatInput()      { return $('chat-input'); },
-  get chatSend()       { return $('chat-send'); },
-  get chatAbort()      { return $('chat-abort'); },
-  get chatStatus()     { return $('chat-status'); },
-  get wsDot()          { return $('ws-dot'); },
-  get cliStatusButton(){ return $('cli-status-button'); },
-  get cliStatusLabel() { return $('cli-status-label'); },
-  get setupModal()     { return $('setup-modal'); },
-  get setupTitle()     { return $('setup-title'); },
-  get cliOptions()     { return $('cli-options'); },
-  get setupError()     { return $('setup-error'); },
-  get setupCancel()    { return $('setup-cancel'); },
-  get setupSave()      { return $('setup-save'); },
-  get filesGrid()      { return $('files-grid'); },
-  get filesCount()     { return $('files-count'); },
-  get uploadModal()    { return $('upload-modal'); },
-  get newPageModal()   { return $('new-page-modal'); },
-  get dropzone()       { return $('dropzone'); },
-  get fileInput()      { return $('file-input'); },
+  get sidebarBody() { return $('sidebar-body'); },
+  get wikiBody() { return $('wiki-body'); },
+  get wikiBc() { return $('wiki-breadcrumb'); },
+  get searchInput() { return $('search-input'); },
+  get searchResults() { return $('search-results'); },
+  get chatMessages() { return $('chat-messages'); },
+  get chatInput() { return $('chat-input'); },
+  get chatSend() { return $('chat-send'); },
+  get chatAbort() { return $('chat-abort'); },
+  get chatStatus() { return $('chat-status'); },
+  get chatNewThread() { return $('chat-new-thread'); },
+  get chatThreadList() { return $('chat-thread-list'); },
+  get wsDot() { return $('ws-dot'); },
+  get chatgptSettingsButton() { return $('chatgpt-settings-button'); },
+  get chatgptSettingsLabel() { return $('chatgpt-settings-label'); },
+  get chatgptSettingsModal() { return $('chatgpt-settings-modal'); },
+  get chatgptAccount() { return $('chatgpt-account'); },
+  get chatgptConnectionStatus() { return $('chatgpt-connection-status'); },
+  get chatgptConnect() { return $('chatgpt-connect'); },
+  get chatgptNewAccount() { return $('chatgpt-new-account'); },
+  get chatgptModelField() { return $('chatgpt-model-field'); },
+  get chatgptModel() { return $('chatgpt-model'); },
+  get chatgptModelSave() { return $('chatgpt-model-save'); },
+  get chatgptDisconnect() { return $('chatgpt-disconnect'); },
+  get chatgptForget() { return $('chatgpt-forget'); },
+  get chatgptClose() { return $('chatgpt-close'); },
+  get chatgptError() { return $('chatgpt-error'); },
+  get filesGrid() { return $('files-grid'); },
+  get filesCount() { return $('files-count'); },
+  get uploadModal() { return $('upload-modal'); },
+  get newPageModal() { return $('new-page-modal'); },
+  get dropzone() { return $('dropzone'); },
+  get fileInput() { return $('file-input'); },
   get uploadProgress() { return $('upload-progress'); },
-  get newPageName()    { return $('new-page-name'); },
-  get graphCanvas()    { return $('graph-canvas'); },
-  get graphLegend()    { return $('graph-legend'); },
-  get graphTooltip()   { return $('graph-tooltip'); },
-  get graphStatus()    { return $('graph-status'); },
-  get documentStage()  { return $('document-stage'); },
+  get newPageName() { return $('new-page-name'); },
+  get graphCanvas() { return $('graph-canvas'); },
+  get graphLegend() { return $('graph-legend'); },
+  get graphTooltip() { return $('graph-tooltip'); },
+  get graphStatus() { return $('graph-status'); },
+  get documentStage() { return $('document-stage'); },
   get documentStatus() { return $('document-status'); },
-  get pdfToolbar()     { return $('pdf-toolbar'); },
+  get pdfToolbar() { return $('pdf-toolbar'); },
 };
 
-// ── Panel switching ────────────────────────────────────────────────
 function showPanel(name) {
-  console.log('Switching to panel:', name);
   state.panel = name;
   const navigationPanel = name === 'document' ? 'files' : name;
-  
-  // Re-query panels to ensure we have the latest set
-  const panels = document.querySelectorAll('.panel');
-  panels.forEach(p => p.classList.toggle('active', p.id === `panel-${name}`));
-  
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  tabBtns.forEach(b => b.classList.toggle('active', b.dataset.panel === navigationPanel));
-  
-  const iconBtns = document.querySelectorAll('.icon-btn[data-panel]');
-  iconBtns.forEach(b => b.classList.toggle('active', b.dataset.panel === navigationPanel));
-
-  if (name === 'graph') {
-    showGraph();
-  }
+  document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === `panel-${name}`));
+  document.querySelectorAll('.tab-btn').forEach(button => button.classList.toggle('active', button.dataset.panel === navigationPanel));
+  document.querySelectorAll('.icon-btn[data-panel]').forEach(button => button.classList.toggle('active', button.dataset.panel === navigationPanel));
+  if (name === 'graph') showGraph();
   if (name === 'files') loadFiles();
 }
 
-// ── Sidebar ────────────────────────────────────────────────────────
 const PILLAR_LABELS = [
-  'Other',
-  'Foundational Physics',
-  'Taxonomy & Evolution',
-  'Observational Methods',
-  'Facilities & Tools',
-  'Notable Objects'
+  'Other', 'Foundational Physics', 'Taxonomy & Evolution', 'Observational Methods', 'Facilities & Tools', 'Notable Objects',
 ];
 
 function buildSidebar(pages) {
   state.wikiPages = pages;
-  const groups = {};
-  pages.forEach(p => {
-    // Try to assign group from index categories (we'll match later); default 0
-    const g = p.group || 0;
-    if (!groups[g]) groups[g] = [];
-    groups[g].push(p);
-  });
-
-  // Also load graph for group info
   api.getGraph().then(data => {
     state.graphData = data;
-    // Build a map of name→group
     const groupMap = {};
-    data.nodes.forEach(n => { groupMap[n.id] = n.group; });
-    // Re-render sidebar with groups
+    data.nodes.forEach(node => { groupMap[node.id] = node.group; });
     const grouped = {};
-    pages.forEach(p => {
-      const g = groupMap[p.name] || 0;
-      if (!grouped[g]) grouped[g] = [];
-      grouped[g].push(p);
+    pages.forEach(page => {
+      const group = groupMap[page.name] || 0;
+      if (!grouped[group]) grouped[group] = [];
+      grouped[group].push(page);
     });
     renderSidebarGroups(grouped);
-  }).catch(() => {
-    const grouped = { 0: pages };
-    renderSidebarGroups(grouped);
-  });
+  }).catch(() => renderSidebarGroups({ 0: pages }));
 }
 
 function renderSidebarGroups(grouped) {
-  const keys = Object.keys(grouped).sort((a, b) => +a - +b);
   let html = '';
-  keys.forEach(k => {
-    const label = PILLAR_LABELS[+k] || `Group ${k}`;
-    const items = grouped[k];
-    if (+k > 0) html += `<div class="nav-section-title">${label}</div>`;
-    items.sort((a, b) => a.name.localeCompare(b.name)).forEach(p => {
-      html += `<div class="nav-item" data-page="${p.name}" onclick="openPage('${p.name}')">
+  Object.keys(grouped).sort((left, right) => +left - +right).forEach(key => {
+    const label = PILLAR_LABELS[+key] || `Group ${key}`;
+    if (+key > 0) html += `<div class="nav-section-title">${escHtml(label)}</div>`;
+    grouped[key].sort((left, right) => left.name.localeCompare(right.name)).forEach(page => {
+      html += `<button class="nav-item" type="button" data-page="${escHtml(page.name)}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        ${p.name}
-      </div>`;
+        ${escHtml(page.name)}
+      </button>`;
     });
   });
   dom.sidebarBody.innerHTML = html;
-  // Mark active
   highlightSidebarItem(state.currentPage);
 }
 
 function highlightSidebarItem(name) {
-  document.querySelectorAll('.nav-item[data-page]').forEach(el => {
-    el.classList.toggle('active', el.dataset.page === name);
-  });
+  document.querySelectorAll('.nav-item[data-page]').forEach(item => item.classList.toggle('active', item.dataset.page === name));
 }
 
-// ── Wiki page view ─────────────────────────────────────────────────
+dom.sidebarBody.addEventListener('click', event => {
+  const item = event.target.closest('.nav-item[data-page]');
+  if (item && dom.sidebarBody.contains(item)) openPage(item.dataset.page);
+});
+
 async function openPage(name) {
   showPanel('wiki');
   highlightSidebarItem(name);
   state.currentPage = name;
-
-  const wikiPanel = $('panel-wiki');
-
-  // Breadcrumb
-  dom.wikiBc.innerHTML = `
-    <a onclick="app.showPanel('wiki')">Wiki</a>
-    <span>›</span>
-    <span>${name}</span>`;
-
-  dom.wikiBody.innerHTML = `<div style="color:var(--text-3);padding:40px 0;text-align:center;font-size:13px">Loading…</div>`;
-
-  let data;
+  dom.wikiBc.innerHTML = `<button class="breadcrumb-link" type="button" data-action="show-wiki">Wiki</button><span>›</span><span>${escHtml(name)}</span>`;
+  dom.wikiBody.innerHTML = '<div class="wiki-loading">Loading…</div>';
   try {
-    data = await api.getWikiPage(name);
-  } catch(e) {
-    dom.wikiBody.innerHTML = `<div class="wiki-empty"><p style="color:var(--text-3)">Failed to load page: ${e.message}</p></div>`;
-    return;
+    const data = await api.getWikiPage(name);
+    dom.wikiBody.innerHTML = `<div class="md-body">${renderMd(data.content)}</div>`;
+    dom.wikiBody.querySelectorAll('a.wiki-link').forEach(link => link.addEventListener('click', event => {
+      event.preventDefault();
+      openPage(link.dataset.page);
+    }));
+    $('panel-wiki').scrollTop = 0;
+  } catch (error) {
+    dom.wikiBody.innerHTML = `<div class="wiki-empty"><p class="wiki-empty-copy">${escHtml(error.message)}</p></div>`;
   }
-
-  if (data.error) {
-    dom.wikiBody.innerHTML = `<div class="wiki-empty"><p style="color:var(--text-3)">${data.error}</p></div>`;
-    return;
-  }
-
-  const html = renderMd(data.content);
-  dom.wikiBody.innerHTML = `<div class="md-body">${html}</div>`;
-
-  // Wire up wiki-link clicks
-  dom.wikiBody.querySelectorAll('a.wiki-link').forEach(a => {
-    a.addEventListener('click', () => openPage(a.dataset.page));
-  });
-
-  // Scroll to top
-  wikiPanel.scrollTop = 0;
 }
 
-// ── Search ─────────────────────────────────────────────────────────
+dom.wikiBc.addEventListener('click', event => {
+  if (event.target.closest('[data-action="show-wiki"]')) showPanel('wiki');
+});
+
 dom.searchInput.addEventListener('input', () => {
   clearTimeout(state.searchTimer);
-  const q = dom.searchInput.value.trim();
-  if (!q) { hideSearch(); return; }
-  state.searchTimer = setTimeout(() => doSearch(q), 250);
+  const query = dom.searchInput.value.trim();
+  if (!query) { hideSearch(); return; }
+  state.searchTimer = setTimeout(() => doSearch(query), 250);
+});
+dom.searchInput.addEventListener('keydown', event => { if (event.key === 'Escape') hideSearch(); });
+document.addEventListener('click', event => {
+  if (!dom.searchResults.contains(event.target) && event.target !== dom.searchInput) hideSearch();
 });
 
-dom.searchInput.addEventListener('keydown', e => {
-  if (e.key === 'Escape') hideSearch();
-});
-
-document.addEventListener('click', e => {
-  if (!dom.searchResults.contains(e.target) && e.target !== dom.searchInput) hideSearch();
-});
-
-async function doSearch(q) {
-  const results = await api.search(q);
-  if (!results.length) {
-    dom.searchResults.innerHTML = `<div class="search-no-results">No results for "<strong>${q}</strong>"</div>`;
-  } else {
-    dom.searchResults.innerHTML = results.map(r => `
-      <div class="search-result-item" onclick="openPage('${r.page}');hideSearch()">
-        <div class="search-result-page">${r.page}</div>
-        ${r.matches.slice(0,2).map(m => `<div class="search-result-match">${escHtml(m.text)}</div>`).join('')}
-      </div>`).join('');
-  }
+async function doSearch(query) {
+  const results = await api.search(query);
+  dom.searchResults.innerHTML = results.length ? results.map(result => `
+    <button class="search-result-item" type="button" data-page="${escHtml(result.page)}">
+      <div class="search-result-page">${escHtml(result.page)}</div>
+      ${result.matches.slice(0, 2).map(match => `<div class="search-result-match">${escHtml(match.text)}</div>`).join('')}
+    </button>`).join('') : `<div class="search-no-results">No results for “<strong>${escHtml(query)}</strong>”</div>`;
   dom.searchResults.classList.add('visible');
 }
 
-function hideSearch() {
-  dom.searchResults.classList.remove('visible');
-}
+function hideSearch() { dom.searchResults.classList.remove('visible'); }
 
-// ── CLI setup ─────────────────────────────────────────────────────
-function currentCliTool() {
-  return state.cliTools.find(tool => tool.id === state.config?.cli) || state.config?.tool || null;
-}
-
-function renderCliOptions() {
-  dom.cliOptions.innerHTML = state.cliTools.map(tool => {
-    const selected = tool.id === state.selectedCli;
-    return `
-      <label class="cli-option${selected ? ' selected' : ''}" data-cli="${escHtml(tool.id)}">
-        <input type="radio" name="cli-tool" value="${escHtml(tool.id)}" ${selected ? 'checked' : ''}>
-        <span class="cli-option-mark" aria-hidden="true">${CLI_INITIALS[tool.id] || 'AI'}</span>
-        <span class="cli-option-copy">
-          <strong>${escHtml(tool.name)}</strong>
-          <small>${escHtml(tool.description)}</small>
-          <code>${escHtml(tool.command)}</code>
-        </span>
-        <span class="cli-option-check" aria-hidden="true">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 8 3 3 7-7"/></svg>
-        </span>
-      </label>`;
-  }).join('');
-
-  dom.cliOptions.querySelectorAll('input[name="cli-tool"]').forEach(input => {
-    input.addEventListener('change', () => selectCli(input.value));
-  });
-}
-
-function selectCli(id) {
-  state.selectedCli = id;
-  dom.setupSave.disabled = false;
-  dom.setupError.textContent = '';
-  dom.cliOptions.querySelectorAll('.cli-option').forEach(option => {
-    option.classList.toggle('selected', option.dataset.cli === id);
-  });
-}
-
-function applyCliConfig(config) {
-  state.config = { ...state.config, ...config, configured: Boolean(config.cli) };
-  if (config.tools) {
-    const serverTools = new Map(config.tools.map(tool => [tool.id, tool]));
-    state.cliTools = CLI_CHOICES.map(choice => ({ ...choice, ...serverTools.get(choice.id) }));
-  }
-
-  const tool = currentCliTool();
-  const configured = Boolean(tool);
-  const canChat = configured && state.wsReady && state.backendReady;
-  const name = tool?.name || 'Choose CLI';
-  const initials = tool ? (CLI_INITIALS[tool.id] || 'AI') : 'AI';
-
-  dom.cliStatusLabel.textContent = name;
-  dom.cliStatusButton.title = configured ? `Change CLI tool (currently ${name})` : 'Choose CLI tool';
-  dom.wsDot.title = state.backendReady
-    ? `${configured ? `${name} selected · ` : ''}backend ready`
-    : (state.backendOutdated
-      ? 'Outdated PulsarWiki backend'
-      : (state.wsReady ? 'Checking backend version' : 'Server disconnected'));
-
-  const welcomeAvatar = $('chat-welcome-avatar');
-  const welcomeTitle = $('chat-welcome-title');
-  if (welcomeAvatar) welcomeAvatar.textContent = initials;
-  if (welcomeTitle) welcomeTitle.textContent = configured ? `${name} selected.` : 'Choose your CLI to get started.';
-
-  dom.chatInput.disabled = !canChat;
-  dom.chatSend.disabled = !canChat || state.aiRunning;
-  if (!state.aiRunning) {
-    dom.chatStatus.textContent = !configured
-      ? 'Complete setup to enable chat'
-      : (state.backendReady
-        ? 'Press Enter to send · Shift+Enter for new line'
-        : (state.backendOutdated
-          ? 'The server is outdated. Restart npm start, then refresh this page.'
-          : 'Connecting to the chat backend…'));
-  }
-}
-
-function openCliSetup(required = false) {
-  state.setupRequired = required || !state.config?.configured;
-  state.selectedCli = state.config?.cli || null;
-  dom.setupTitle.textContent = state.setupRequired ? 'Choose your CLI' : 'Change your CLI';
-  dom.setupCancel.style.display = state.setupRequired ? 'none' : 'inline-flex';
-  dom.setupSave.textContent = state.setupRequired ? 'Continue' : 'Save choice';
-  dom.setupSave.disabled = !state.selectedCli;
-  dom.setupError.textContent = '';
-  renderCliOptions();
-  dom.setupModal.style.display = 'flex';
-
-  requestAnimationFrame(() => {
-    const target = dom.cliOptions.querySelector('input:checked') || dom.cliOptions.querySelector('input');
-    target?.focus();
-  });
-}
-
-function closeCliSetup() {
-  if (state.setupRequired) return;
-  dom.setupModal.style.display = 'none';
-}
-
-async function saveCliSelection() {
-  if (!state.selectedCli) return;
-  dom.setupSave.disabled = true;
-  dom.setupSave.textContent = 'Saving…';
-  dom.setupError.textContent = '';
-
-  try {
-    const result = await api.saveConfig(state.selectedCli);
-    applyCliConfig({ ...result, configured: true });
-    state.setupRequired = false;
-    dom.setupModal.style.display = 'none';
-    if (result.warning) dom.chatStatus.textContent = result.warning;
-  } catch (error) {
-    dom.setupError.textContent = error.message;
-    dom.setupSave.disabled = false;
-    dom.setupSave.textContent = state.setupRequired ? 'Continue' : 'Save choice';
-  }
-}
-
-dom.cliStatusButton.addEventListener('click', () => openCliSetup(false));
-dom.setupCancel.addEventListener('click', closeCliSetup);
-dom.setupSave.addEventListener('click', saveCliSelection);
-dom.setupModal.addEventListener('click', event => {
-  if (event.target === dom.setupModal) closeCliSetup();
-});
-document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && dom.setupModal.style.display !== 'none') closeCliSetup();
+dom.searchResults.addEventListener('click', event => {
+  const result = event.target.closest('.search-result-item[data-page]');
+  if (!result) return;
+  openPage(result.dataset.page);
+  hideSearch();
 });
 
-// ── WebSocket / Chat ───────────────────────────────────────────────
-function connectWS() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(`${proto}://${location.host}`);
-  state.ws = ws;
-
-  ws.onopen = () => {
-    state.wsReady = true;
-    state.backendReady = false;
-    state.backendOutdated = false;
-    applyCliConfig(state.config || { cli: null });
-    ws.send(JSON.stringify({ type: 'client-hello', protocol: 2 }));
-    clearTimeout(state.backendHandshakeTimer);
-    state.backendHandshakeTimer = setTimeout(() => {
-      if (state.ws !== ws || state.backendReady) return;
-      state.backendOutdated = true;
-      dom.wsDot.classList.remove('active');
-      dom.wsDot.title = 'Outdated PulsarWiki backend';
-      dom.chatInput.disabled = true;
-      dom.chatSend.disabled = true;
-      dom.chatStatus.textContent = 'The server is outdated. Restart npm start, then refresh this page.';
-    }, 1500);
-  };
-
-  ws.onclose = () => {
-    clearTimeout(state.backendHandshakeTimer);
-    state.wsReady = false;
-    state.backendReady = false;
-    state.backendOutdated = false;
-    dom.wsDot.classList.remove('active');
-    dom.wsDot.title = 'Server disconnected';
-    // Reconnect after 3s
-    setTimeout(connectWS, 3000);
-  };
-
-  ws.onmessage = ({ data }) => {
-    const msg = JSON.parse(data);
-    if (msg.type === 'server-hello') {
-      clearTimeout(state.backendHandshakeTimer);
-      state.backendReady = Number(msg.protocol) >= 2;
-      state.backendOutdated = !state.backendReady;
-      dom.wsDot.classList.toggle('active', state.backendReady);
-      applyCliConfig(state.config || { cli: null });
-      return;
-    }
-    if (msg.type === 'filechange') { refreshWiki(); return; }
-    if (msg.type === 'chunk')  handleAiChunk(msg.text);
-    if (msg.type === 'error')  handleAiChunk(`\n⚠ ${msg.text}`);
-    if (msg.type === 'done')   handleAiDone();
-  };
-}
-
-// Current AI response buffer
-let aiTarget = null;
-
-function sendChat() {
-  const text = dom.chatInput.value.trim();
-  const tool = currentCliTool();
-  if (!text || state.aiRunning || !tool || !state.backendReady) return;
-  dom.chatInput.value = '';
-  resizeTextarea();
-
-  appendChatMsg('user', text);
-  state.aiRunning = true;
-  dom.chatSend.disabled = true;
-  dom.chatAbort.style.display = 'flex';
-  dom.chatStatus.textContent = `${tool.name} is thinking…`;
-
-  // Create AI bubble
-  const id = `ai-msg-${Date.now()}`;
-  const msgEl = document.createElement('div');
-  msgEl.className = 'chat-msg ai';
-  msgEl.id = id;
-  msgEl.innerHTML = `
-    <div class="chat-avatar">${CLI_INITIALS[tool.id] || 'AI'}</div>
-    <div class="chat-bubble">
-      <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
-    </div>`;
-  dom.chatMessages.appendChild(msgEl);
-  aiTarget = { el: msgEl.querySelector('.chat-bubble'), buffer: '' };
-  scrollChat();
-
-  if (state.ws && state.wsReady) {
-    state.ws.send(JSON.stringify({ type: 'chat', text, cli: tool.id }));
-  } else {
-    handleAiChunk('⚠ Not connected to server. Make sure the server is running.');
-    handleAiDone();
-  }
-}
-
-function handleAiChunk(text) {
-  if (!aiTarget) return;
-  aiTarget.buffer += text;
-  // Render as markdown
-  aiTarget.el.innerHTML = `<div class="md-body" style="padding:0">${renderMd(aiTarget.buffer)}</div>`;
-  scrollChat();
-}
-
-function handleAiDone() {
-  state.aiRunning = false;
-  dom.chatSend.disabled = !currentCliTool() || !state.backendReady;
-  dom.chatAbort.style.display = 'none';
-  dom.chatStatus.textContent = currentCliTool()
-    ? 'Press Enter to send · Shift+Enter for new line'
-    : 'Complete setup to enable chat';
-  aiTarget = null;
-  scrollChat();
-}
-
-function appendChatMsg(role, text) {
-  const el = document.createElement('div');
-  el.className = `chat-msg ${role}`;
-  const tool = currentCliTool();
-  const initial = role === 'user' ? 'U' : (CLI_INITIALS[tool?.id] || 'AI');
-  el.innerHTML = `
-    <div class="chat-avatar">${initial}</div>
-    <div class="chat-bubble">${role === 'user' ? escHtml(text) : renderMd(text)}</div>`;
-  dom.chatMessages.appendChild(el);
-  scrollChat();
-}
-
-function scrollChat() {
-  dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
-}
-
-// Auto-resize textarea
-function resizeTextarea() {
-  dom.chatInput.style.height = 'auto';
-  dom.chatInput.style.height = Math.min(dom.chatInput.scrollHeight, 180) + 'px';
-}
-
-dom.chatInput.addEventListener('input', resizeTextarea);
-dom.chatInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
-});
-dom.chatSend.addEventListener('click', sendChat);
-dom.chatAbort.addEventListener('click', () => {
-  if (state.ws && state.wsReady) state.ws.send(JSON.stringify({ type: 'abort' }));
-  handleAiDone();
-});
-
-// ── Graph view ─────────────────────────────────────────────────────
 const GROUP_COLORS = ['#888','#f0f0f0','#c0c0c0','#909090','#606060','#404040'];
 const GROUP_COLORS_LIGHT = ['#888','#111','#333','#555','#777','#999'];
 
@@ -1190,19 +807,419 @@ window.openPage = openPage;
 window.openRawFile = openRawFile;
 window.hideSearch = hideSearch;
 
+// ── ChatGPT subscription chat ─────────────────────────────────────
+// OAuth credentials stay on the server; this client receives sanitized state.
+let aiTarget = null;
+
+function scrollChat() {
+  dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
+}
+
+function resizeTextarea() {
+  dom.chatInput.style.height = 'auto';
+  dom.chatInput.style.height = Math.min(dom.chatInput.scrollHeight, 180) + 'px';
+}
+
+function agentReady() {
+  return Boolean(state.chatgpt?.ready && state.wsReady && state.backendReady && state.activeThreadId);
+}
+
+function updateAgentUi() {
+  const status = state.chatgpt || {};
+  const backendConnected = Boolean(state.wsReady && state.backendReady);
+  dom.chatgptSettingsLabel.textContent = status.ready
+    ? `ChatGPT · ${status.selectedModel}`
+    : (status.savedAccount ? 'Reconnect ChatGPT' : 'Connect ChatGPT');
+  dom.wsDot.classList.toggle('active', Boolean(status.ready && backendConnected));
+  dom.wsDot.title = status.ready
+    ? (backendConnected ? 'ChatGPT and agent service connected' : 'Agent service disconnected')
+    : 'ChatGPT subscription not connected';
+  dom.chatInput.disabled = !agentReady() || state.aiRunning;
+  dom.chatSend.disabled = !agentReady() || state.aiRunning;
+  if (!state.aiRunning) {
+    if (!status.ready) {
+      dom.chatStatus.textContent = status.planEnabled === false && status.connected
+        ? 'Reconnect ChatGPT and allow subscription use to chat.'
+        : (status.savedAccount ? 'Reconnect the saved ChatGPT account to chat.' : 'Connect an eligible ChatGPT subscription to chat.');
+    } else if (!state.activeThreadId) {
+      dom.chatStatus.textContent = 'Create or select a saved chat.';
+    } else if (!backendConnected) {
+      dom.chatStatus.textContent = 'Connecting to the agent service…';
+    } else {
+      dom.chatStatus.textContent = 'Press Enter to send · Shift+Enter for new line';
+    }
+  }
+}
+
+function renderThreads() {
+  dom.chatThreadList.replaceChildren();
+  if (!state.threads.length) {
+    const empty = document.createElement('p');
+    empty.className = 'chat-thread-empty';
+    empty.textContent = 'No saved chats yet.';
+    dom.chatThreadList.appendChild(empty);
+    return;
+  }
+  for (const thread of state.threads) {
+    const row = document.createElement('div');
+    row.className = 'chat-thread' + (thread.id === state.activeThreadId ? ' active' : '');
+    const select = document.createElement('button');
+    select.type = 'button';
+    select.className = 'chat-thread-select';
+    select.textContent = thread.title;
+    select.title = thread.title;
+    select.addEventListener('click', () => { void selectThread(thread.id); });
+    const menu = document.createElement('button');
+    menu.type = 'button';
+    menu.className = 'chat-thread-menu';
+    menu.textContent = '•••';
+    menu.title = 'Rename or delete this chat';
+    menu.addEventListener('click', event => {
+      event.stopPropagation();
+      const action = window.prompt('Type “rename” to rename this chat, or “delete” to remove it.');
+      if (action?.trim().toLowerCase() === 'rename') {
+        const title = window.prompt('New chat name:', thread.title);
+        if (title?.trim()) void renameThread(thread.id, title);
+      } else if (action?.trim().toLowerCase() === 'delete' && window.confirm('Delete this local saved chat?')) {
+        void deleteThread(thread.id);
+      }
+    });
+    row.append(select, menu);
+    dom.chatThreadList.appendChild(row);
+  }
+}
+
+function clearChatMessages() {
+  dom.chatMessages.replaceChildren();
+}
+
+function renderThread(thread) {
+  clearChatMessages();
+  if (!thread.messages?.length) {
+    appendChatMsg('ai', state.chatgpt?.ready
+      ? '**A new saved chat is ready.**\n\nAsk a question about the PulsarWiki, or tell the agent what to update.'
+      : '**Connect ChatGPT to get started.**\n\nYour conversations are saved locally.');
+  } else {
+    for (const message of thread.messages) appendChatMsg(message.role, message.text);
+  }
+  scrollChat();
+}
+
+async function refreshThreads({ createIfEmpty = false } = {}) {
+  state.threads = await api.listThreads();
+  if (createIfEmpty && !state.threads.length) {
+    state.threads = [await api.createThread('New chat')];
+  }
+  renderThreads();
+  if (!state.activeThreadId && state.threads[0]) await selectThread(state.threads[0].id, { refresh: false });
+  updateAgentUi();
+}
+
+async function selectThread(id, { refresh = true } = {}) {
+  if (state.aiRunning && id !== state.activeThreadId) return;
+  const thread = await api.getThread(id);
+  state.activeThreadId = id;
+  renderThreads();
+  renderThread(thread);
+  if (refresh) await refreshThreads();
+  updateAgentUi();
+}
+
+async function createThread() {
+  if (state.aiRunning) return;
+  const title = window.prompt('Name this chat (optional):') || 'New chat';
+  const thread = await api.createThread(title);
+  state.activeThreadId = thread.id;
+  await refreshThreads();
+  await selectThread(thread.id, { refresh: false });
+}
+
+async function renameThread(id, title) {
+  await api.renameThread(id, title);
+  await refreshThreads();
+}
+
+async function deleteThread(id) {
+  await api.deleteThread(id);
+  if (state.activeThreadId === id) state.activeThreadId = null;
+  await refreshThreads({ createIfEmpty: true });
+}
+
+const CHATGPT_CALLBACK_MESSAGES = {
+  connected: 'ChatGPT connected successfully.',
+  'plan-permission-required': 'Reconnect and allow ChatGPT plan usage for PulsarWiki.',
+  'access-denied': 'ChatGPT sign-in was declined. You can try again when ready.',
+  'authorization-expired': 'The sign-in request expired. Start a new connection.',
+  'invalid-state': 'That sign-in request was invalid or had already been used. Start again.',
+  'account-mismatch': 'That was not the saved ChatGPT account. Use “Use another account” to replace it.',
+  'connection-failed': 'ChatGPT sign-in could not be completed. Please try again.',
+};
+
+function accountLabel(account) {
+  if (!account) return 'No ChatGPT account saved.';
+  if (account.name && account.email) return `${account.name} (${account.email})`;
+  return account.name || account.email || 'Saved ChatGPT account';
+}
+
+function renderChatGPTSettings() {
+  const status = state.chatgpt || {};
+  dom.chatgptAccount.textContent = accountLabel(status.account);
+  dom.chatgptModel.replaceChildren();
+  for (const model of status.models || []) {
+    const option = document.createElement('option');
+    option.value = model.id;
+    option.textContent = model.name;
+    dom.chatgptModel.appendChild(option);
+  }
+  dom.chatgptModel.value = status.selectedModel || '';
+  dom.chatgptModelField.hidden = !status.ready;
+  dom.chatgptModelSave.hidden = !status.ready;
+  dom.chatgptConnect.hidden = Boolean(status.connected && status.planEnabled);
+  dom.chatgptConnect.textContent = status.savedAccount ? 'Reconnect ChatGPT' : 'Continue with ChatGPT';
+  dom.chatgptNewAccount.hidden = !status.savedAccount;
+  dom.chatgptDisconnect.hidden = !status.connected;
+  dom.chatgptForget.hidden = !status.savedAccount;
+
+  if (status.ready) {
+    dom.chatgptConnectionStatus.textContent = 'Connected. Choose any model available to this subscription.';
+  } else if (status.connected && !status.planEnabled) {
+    dom.chatgptConnectionStatus.textContent = 'Plan permission is missing. Reconnect and approve subscription use.';
+  } else if (status.reauthorizationRequired) {
+    dom.chatgptConnectionStatus.textContent = 'The saved account needs to sign in again.';
+  } else if (status.connected) {
+    dom.chatgptConnectionStatus.textContent = 'Connected, but ChatGPT plan use is not currently available.';
+  } else if (status.savedAccount) {
+    dom.chatgptConnectionStatus.textContent = 'The saved account is disconnected.';
+  } else {
+    dom.chatgptConnectionStatus.textContent = 'Connect an eligible ChatGPT subscription.';
+  }
+  if (status.error) dom.chatgptError.textContent = status.error.message || 'ChatGPT is temporarily unavailable.';
+}
+
+function openChatGPTSettings(message = '') {
+  renderChatGPTSettings();
+  dom.chatgptError.textContent = message || state.chatgpt?.error?.message || '';
+  dom.chatgptSettingsModal.style.display = 'flex';
+}
+
+function closeChatGPTSettings() {
+  dom.chatgptSettingsModal.style.display = 'none';
+}
+
+async function refreshChatGPTStatus({ open = false, message = '' } = {}) {
+  try {
+    state.chatgpt = await api.getChatGPTStatus();
+    updateAgentUi();
+    if (open) openChatGPTSettings(message);
+  } catch (error) {
+    state.chatgpt = state.chatgpt || { connected: false, savedAccount: false, ready: false, models: [] };
+    updateAgentUi();
+    if (open) openChatGPTSettings(error.message);
+  }
+}
+
+async function saveChatGPTModel() {
+  dom.chatgptModelSave.disabled = true;
+  dom.chatgptError.textContent = '';
+  try {
+    state.chatgpt = await api.saveChatGPTModel(dom.chatgptModel.value);
+    updateAgentUi();
+    renderChatGPTSettings();
+  } catch (error) {
+    dom.chatgptError.textContent = error.message;
+  } finally {
+    dom.chatgptModelSave.disabled = false;
+  }
+}
+
+async function disconnectChatGPT() {
+  dom.chatgptDisconnect.disabled = true;
+  dom.chatgptError.textContent = '';
+  try {
+    state.chatgpt = await api.disconnectChatGPT();
+    updateAgentUi();
+    renderChatGPTSettings();
+    if (state.chatgpt.revocationConfirmed === false) {
+      dom.chatgptError.textContent = 'The local session was cleared, but OpenAI could not confirm remote revocation.';
+    }
+  } catch (error) {
+    dom.chatgptError.textContent = error.message;
+  } finally {
+    dom.chatgptDisconnect.disabled = false;
+  }
+}
+
+async function forgetChatGPTAccount() {
+  if (!window.confirm('Disconnect and forget the saved ChatGPT account on this computer?')) return;
+  dom.chatgptForget.disabled = true;
+  dom.chatgptError.textContent = '';
+  try {
+    state.chatgpt = await api.forgetChatGPTAccount();
+    updateAgentUi();
+    renderChatGPTSettings();
+  } catch (error) {
+    dom.chatgptError.textContent = error.message;
+  } finally {
+    dom.chatgptForget.disabled = false;
+  }
+}
+
+async function useAnotherChatGPTAccount() {
+  dom.chatgptNewAccount.disabled = true;
+  dom.chatgptError.textContent = '';
+  try {
+    await api.forgetChatGPTAccount();
+    window.location.assign('/auth/chatgpt/start');
+  } catch (error) {
+    dom.chatgptError.textContent = error.message;
+    dom.chatgptNewAccount.disabled = false;
+  }
+}
+
+function connectDirectAgentWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(proto + '://' + location.host);
+  state.ws = ws;
+  ws.onopen = () => {
+    state.wsReady = true;
+    state.backendReady = false;
+    ws.send(JSON.stringify({ type: 'client-hello', protocol: 4 }));
+    updateAgentUi();
+  };
+  ws.onclose = () => {
+    if (state.ws !== ws) return;
+    state.wsReady = false;
+    state.backendReady = false;
+    updateAgentUi();
+    setTimeout(connectDirectAgentWS, 3000);
+  };
+  ws.onmessage = ({ data }) => {
+    let message;
+    try { message = JSON.parse(data); } catch { return; }
+    if (message.type === 'server-hello') {
+      state.backendReady = Number(message.protocol) === 4;
+      updateAgentUi();
+      return;
+    }
+    if (message.type === 'filechange') { void refreshWiki(); return; }
+    if (message.threadId && message.threadId !== state.activeThreadId) return;
+    if (message.type === 'chunk') handleAiChunk(message.text);
+    if (message.type === 'tool-status') handleToolStatus(message);
+    if (message.type === 'error') handleAiError(message);
+    if (message.type === 'thread-updated') void refreshThreads();
+    if (message.type === 'done') handleAiDone();
+  };
+}
+
+function sendChat() {
+  const text = dom.chatInput.value.trim();
+  if (!text || state.aiRunning || !agentReady()) return;
+  dom.chatInput.value = '';
+  resizeTextarea();
+  appendChatMsg('user', text);
+  state.aiRunning = true;
+  dom.chatInput.disabled = true;
+  dom.chatSend.disabled = true;
+  dom.chatAbort.style.display = 'flex';
+  dom.chatStatus.textContent = 'ChatGPT is thinking…';
+  const message = document.createElement('div');
+  message.className = 'chat-msg ai';
+  message.innerHTML = '<div class="chat-avatar">AI</div><div class="chat-bubble"><div class="chat-response"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div><div class="chat-activity" hidden><details open><summary>Wiki activity</summary><pre></pre></details></div></div>';
+  dom.chatMessages.appendChild(message);
+  const activity = message.querySelector('.chat-activity');
+  aiTarget = { el: message.querySelector('.chat-response'), buffer: '', activity, activityOutput: activity.querySelector('pre') };
+  scrollChat();
+  state.ws.send(JSON.stringify({ type: 'chat', threadId: state.activeThreadId, text }));
+}
+
+function handleAiChunk(text) {
+  if (!aiTarget || typeof text !== 'string') return;
+  aiTarget.buffer += text;
+  aiTarget.el.innerHTML = '<div class="md-body" style="padding:0">' + renderMd(aiTarget.buffer) + '</div>';
+  scrollChat();
+}
+
+function handleToolStatus(event) {
+  if (!aiTarget) return;
+  aiTarget.activity.hidden = false;
+  const label = event.status === 'completed' ? 'completed' : (event.status === 'failed' ? 'failed' : 'running');
+  const detail = event.status === 'failed' && event.detail ? ` (${event.detail})` : '';
+  aiTarget.activityOutput.textContent += (event.name || 'wiki tool') + ': ' + label + detail + '\n';
+  scrollChat();
+}
+
+function handleAiError(message) {
+  const text = '> ⚠ ' + (message.text || 'The agent request failed.');
+  if (aiTarget) handleAiChunk('\n\n' + text);
+  else appendChatMsg('ai', text);
+  if (['reauthorization-required', 'plan-permission-required'].includes(message.code)) {
+    void refreshChatGPTStatus();
+    if (aiTarget && !aiTarget.recoveryShown) {
+      aiTarget.recoveryShown = true;
+      const action = document.createElement('button');
+      action.type = 'button';
+      action.className = 'btn chat-recovery';
+      action.textContent = 'Reconnect ChatGPT';
+      action.addEventListener('click', () => openChatGPTSettings(message.text || 'Sign in again to continue.'));
+      aiTarget.el.appendChild(action);
+    }
+  }
+}
+
+function handleAiDone() {
+  state.aiRunning = false;
+  dom.chatAbort.style.display = 'none';
+  aiTarget = null;
+  updateAgentUi();
+  void refreshThreads();
+}
+
+function appendChatMsg(role, text) {
+  const el = document.createElement('div');
+  el.className = 'chat-msg ' + role;
+  el.innerHTML = '<div class="chat-avatar">' + (role === 'user' ? 'U' : 'AI') + '</div><div class="chat-bubble">' + (role === 'user' ? escHtml(text) : renderMd(text)) + '</div>';
+  dom.chatMessages.appendChild(el);
+  scrollChat();
+}
+
+dom.chatgptSettingsButton.addEventListener('click', () => { void refreshChatGPTStatus({ open: true }); });
+dom.chatgptClose.addEventListener('click', closeChatGPTSettings);
+dom.chatgptModelSave.addEventListener('click', () => { void saveChatGPTModel(); });
+dom.chatgptConnect.addEventListener('click', () => { window.location.assign('/auth/chatgpt/start'); });
+dom.chatgptNewAccount.addEventListener('click', () => { void useAnotherChatGPTAccount(); });
+dom.chatgptDisconnect.addEventListener('click', () => { void disconnectChatGPT(); });
+dom.chatgptForget.addEventListener('click', () => { void forgetChatGPTAccount(); });
+dom.chatgptSettingsModal.addEventListener('click', event => {
+  if (event.target === dom.chatgptSettingsModal) closeChatGPTSettings();
+});
+dom.chatNewThread.addEventListener('click', () => { void createThread(); });
+dom.chatInput.addEventListener('input', resizeTextarea);
+dom.chatInput.addEventListener('keydown', event => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    sendChat();
+  }
+});
+dom.chatSend.addEventListener('click', sendChat);
+dom.chatAbort.addEventListener('click', () => {
+  if (state.ws?.readyState === WebSocket.OPEN) {
+    state.ws.send(JSON.stringify({ type: 'abort', threadId: state.activeThreadId }));
+  }
+});
+
 // ── Bootstrap ──────────────────────────────────────────────────────
 (async function init() {
-  connectWS();
+  connectDirectAgentWS();
+
+  const callbackCode = new URLSearchParams(location.search).get('chatgpt');
+  const callbackMessage = callbackCode ? (CHATGPT_CALLBACK_MESSAGES[callbackCode] || 'ChatGPT connection status changed.') : '';
+  await refreshChatGPTStatus({ open: Boolean(callbackCode), message: callbackMessage });
+  if (callbackCode) history.replaceState(null, '', location.pathname + location.hash);
 
   try {
-    const config = await api.getConfig();
-    applyCliConfig(config);
-    if (!config.configured) openCliSetup(true);
-    if (config.configured && config.warning) dom.chatStatus.textContent = config.warning;
+    await refreshThreads({ createIfEmpty: true });
   } catch (error) {
-    applyCliConfig({ cli: null, configured: false });
-    openCliSetup(true);
-    dom.setupError.textContent = error.message;
+    dom.chatStatus.textContent = error.message;
   }
 
   const pages = await api.getWikiList();
