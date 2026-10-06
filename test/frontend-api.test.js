@@ -8,6 +8,8 @@ const vm = require('node:vm');
 
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
 const indexSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+const styleSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'style.css'), 'utf8');
+const serverSource = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
 
 function loadApi(fetch) {
   const apiSource = appSource.slice(0, appSource.indexOf('const state ='));
@@ -27,6 +29,18 @@ function response(status, payload = {}) {
     status,
     async text() { return status === 204 ? '' : JSON.stringify(payload); },
   };
+}
+
+function loadClientHelpers() {
+  const helperSource = appSource.slice(0, appSource.indexOf('const state ='));
+  const context = {
+    fetch: async () => response(200),
+    XMLHttpRequest: class {},
+    marked: { setOptions() {}, parse(value) { return value; } },
+  };
+  vm.createContext(context);
+  vm.runInContext(`${helperSource}\nglobalThis.__helpers = { stripEmoji, normalizeWikiPageName, wikiPath, wikiPageFromPath, preprocessMd };`, context);
+  return context.__helpers;
 }
 
 test('frontend reads sanitized ChatGPT status and persists a catalog model slug', async () => {
@@ -87,4 +101,51 @@ test('subscription UI covers connect, reconnect, selection, disconnect, and repl
   assert.match(appSource, /sign-in was declined/i);
   assert.doesNotMatch(indexSource, /API key|agent-provider|agent-model/);
   assert.doesNotMatch(appSource, /getAgentSettings|saveAgentSettings|FALLBACK_PROVIDERS/);
+});
+
+test('wiki page names produce canonical direct routes and legacy names normalize safely', () => {
+  const helpers = loadClientHelpers();
+  assert.equal(helpers.normalizeWikiPageName(' Pulsar Timing '), 'pulsar-timing');
+  assert.equal(helpers.normalizeWikiPageName('Pulsar 🔭'), 'pulsar');
+  assert.equal(helpers.wikiPath('Pulsar Timing'), '/wiki/pulsar-timing');
+  assert.equal(helpers.wikiPageFromPath('/wiki/Pulsar%20Timing'), 'pulsar-timing');
+  assert.equal(helpers.wikiPageFromPath('/wiki/pulsar/extra'), null);
+});
+
+test('emoji sanitizer removes emojis from plain text and Markdown before rendering', () => {
+  const helpers = loadClientHelpers();
+  assert.equal(helpers.stripEmoji('Pulsar 🔭 timing'), 'Pulsar timing');
+  assert.equal(helpers.preprocessMd('[[Pulsar 🔭|Pulsar 🔭]]'), '[Pulsar](WIKILINK:pulsar)');
+});
+
+test('UI source uses only approved palettes and contains no built-in emojis', () => {
+  const allowed = new Set(['#111', '#1c1c1c', '#222', '#fff', '#eee', '#ccc']);
+  const colorSources = `${styleSource}\n${appSource}`;
+  for (const color of colorSources.match(/#[0-9a-f]{3,8}\b/gi) || []) {
+    assert.ok(allowed.has(color.toLowerCase()), `Unexpected color literal: ${color}`);
+  }
+  assert.doesNotMatch(colorSources, /rgba\(/i);
+  assert.doesNotMatch(`${indexSource}\n${appSource}\n${serverSource}`, /\p{Extended_Pictographic}/u);
+  assert.match(indexSource, /href="\/style\.css"/);
+  assert.match(indexSource, /src="\/app\.js"/);
+});
+
+test('sidebar owns page and source upload controls, with ChatGPT settings in the icon bar', () => {
+  assert.match(indexSource, /class="sidebar-actions"/);
+  assert.match(indexSource, /New Page/);
+  assert.match(indexSource, /Upload Sources/);
+  assert.match(indexSource, /id="chatgpt-settings-button"/);
+  assert.match(indexSource, /class="icon-btn chatgpt-settings-icon"/);
+  assert.doesNotMatch(indexSource, /id="topbar"/);
+  assert.match(styleSource, /#iconbar\s*\{[\s\S]*background: var\(--surface\)/);
+  assert.match(styleSource, /#sidebar\s*\{[\s\S]*background: var\(--surface\)/);
+});
+
+test('chat switches the existing sidebar instead of rendering a third chat sidebar', () => {
+  assert.match(indexSource, /id="sidebar-chat" class="chat-sidebar sidebar-pane"/);
+  const chatPanel = indexSource.split('<!-- Chat panel -->')[1].split('<!-- Graph panel -->')[0];
+  assert.doesNotMatch(chatPanel, /<aside class="chat-sidebar"/);
+  assert.match(appSource, /classList\.toggle\('chat-mode', name === 'chat'\)/);
+  assert.match(styleSource, /#sidebar\.chat-mode #sidebar-chat\s*\{\s*display: flex/);
+  assert.doesNotMatch(styleSource, /\.chat-sidebar\s*\{[^}]*max-height:\s*132px/s);
 });

@@ -59,6 +59,7 @@ app.use(express.static(PUB_DIR));
 app.use('/vendor/d3', express.static(path.join(ROOT_DIR, 'node_modules', 'd3', 'dist')));
 app.use('/vendor/marked', express.static(path.join(ROOT_DIR, 'node_modules', 'marked', 'lib')));
 app.use('/vendor/pdfjs', express.static(path.join(ROOT_DIR, 'node_modules', 'pdfjs-dist')));
+app.get('/wiki/:page', (_req, res) => res.sendFile(path.join(PUB_DIR, 'index.html')));
 
 function parseCookies(header) {
   return Object.fromEntries(String(header || '').split(';').map(part => {
@@ -419,7 +420,7 @@ const HOST = '127.0.0.1';
 server.listen(PORT, HOST, () => {
   const address = server.address();
   boundPort = typeof address === 'object' && address ? address.port : PORT;
-  console.log(`\n🔭 PulsarWiki → http://${HOST}:${boundPort}\n`);
+  console.log(`\nPulsarWiki -> http://${HOST}:${boundPort}\n`);
 });
 
 async function shutdown() {

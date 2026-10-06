@@ -1,17 +1,45 @@
 // Markdown rendering
 marked.setOptions({ breaks: true, gfm: true });
 
+const EMOJI_PATTERN = /(?:\p{Extended_Pictographic}|\p{Regional_Indicator}(?:\p{Regional_Indicator})?|[#*0-9]\uFE0F?\u20E3)(?:\uFE0F|\u200D(?:\p{Extended_Pictographic}|\p{Regional_Indicator}))*/gu;
+
+function stripEmoji(value) {
+  return String(value ?? '')
+    .replace(EMOJI_PATTERN, '')
+    .replace(/[\uFE0F\u200D]/g, '')
+    .replace(/ {2,}/g, ' ');
+}
+
+function normalizeWikiPageName(name) {
+  return stripEmoji(name).trim().toLowerCase().replace(/\s+/g, '-');
+}
+
+function wikiPath(name) {
+  return `/wiki/${encodeURIComponent(normalizeWikiPageName(name))}`;
+}
+
+function wikiPageFromPath(pathname) {
+  const match = /^\/wiki\/([^/]+)\/?$/.exec(pathname);
+  if (!match) return null;
+  try {
+    const name = normalizeWikiPageName(decodeURIComponent(match[1]));
+    return name || null;
+  } catch {
+    return null;
+  }
+}
+
 function preprocessMd(text) {
-  return String(text || '').replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, page, label) => {
-    const display = label || page;
-    return `[${display}](WIKILINK:${page.toLowerCase().trim()})`;
+  return stripEmoji(text).replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, page, label) => {
+    const display = stripEmoji(label || page).trim();
+    return `[${display}](WIKILINK:${normalizeWikiPageName(page)})`;
   });
 }
 
 function postProcessHtml(html) {
   return html.replace(
     /href="WIKILINK:([^"]+)"/g,
-    (_, page) => `href="#wiki/${encodeURIComponent(page)}" class="wiki-link" data-page="${escHtml(page)}"`
+    (_, page) => `href="${wikiPath(page)}" class="wiki-link" data-page="${escHtml(normalizeWikiPageName(page))}"`
   );
 }
 
@@ -179,6 +207,7 @@ const dom = {
 function showPanel(name) {
   state.panel = name;
   const navigationPanel = name === 'document' ? 'files' : name;
+  $('sidebar').classList.toggle('chat-mode', name === 'chat');
   document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === `panel-${name}`));
   document.querySelectorAll('.tab-btn').forEach(button => button.classList.toggle('active', button.dataset.panel === navigationPanel));
   document.querySelectorAll('.icon-btn[data-panel]').forEach(button => button.classList.toggle('active', button.dataset.panel === navigationPanel));
@@ -231,14 +260,24 @@ dom.sidebarBody.addEventListener('click', event => {
   if (item && dom.sidebarBody.contains(item)) openPage(item.dataset.page);
 });
 
-async function openPage(name) {
+function updateWikiHistory(page, mode) {
+  if (mode === 'none') return;
+  const target = wikiPath(page);
+  if (location.pathname === target && !location.hash) return;
+  history[mode === 'replace' ? 'replaceState' : 'pushState'](null, '', target);
+}
+
+async function openPage(name, { historyMode = 'push' } = {}) {
+  const page = normalizeWikiPageName(name);
+  if (!page) return;
+  updateWikiHistory(page, historyMode);
   showPanel('wiki');
-  highlightSidebarItem(name);
-  state.currentPage = name;
-  dom.wikiBc.innerHTML = `<button class="breadcrumb-link" type="button" data-action="show-wiki">Wiki</button><span>›</span><span>${escHtml(name)}</span>`;
-  dom.wikiBody.innerHTML = '<div class="wiki-loading">Loading…</div>';
+  highlightSidebarItem(page);
+  state.currentPage = page;
+  dom.wikiBc.innerHTML = `<button class="breadcrumb-link" type="button" data-action="show-wiki">Wiki</button><span>/</span><span>${escHtml(page)}</span>`;
+  dom.wikiBody.innerHTML = '<div class="wiki-loading">Loading...</div>';
   try {
-    const data = await api.getWikiPage(name);
+    const data = await api.getWikiPage(page);
     dom.wikiBody.innerHTML = `<div class="md-body">${renderMd(data.content)}</div>`;
     dom.wikiBody.querySelectorAll('a.wiki-link').forEach(link => link.addEventListener('click', event => {
       event.preventDefault();
@@ -246,7 +285,8 @@ async function openPage(name) {
     }));
     $('panel-wiki').scrollTop = 0;
   } catch (error) {
-    dom.wikiBody.innerHTML = `<div class="wiki-empty"><p class="wiki-empty-copy">${escHtml(error.message)}</p></div>`;
+    const message = error.message === 'Not found' ? `Page not found: ${page}` : error.message;
+    dom.wikiBody.innerHTML = `<div class="wiki-empty"><p class="wiki-empty-copy">${escHtml(message)}</p></div>`;
   }
 }
 
@@ -255,6 +295,7 @@ dom.wikiBc.addEventListener('click', event => {
 });
 
 dom.searchInput.addEventListener('input', () => {
+  dom.searchInput.value = stripEmoji(dom.searchInput.value);
   clearTimeout(state.searchTimer);
   const query = dom.searchInput.value.trim();
   if (!query) { hideSearch(); return; }
@@ -284,11 +325,11 @@ dom.searchResults.addEventListener('click', event => {
   hideSearch();
 });
 
-const GROUP_COLORS = ['#888','#f0f0f0','#c0c0c0','#909090','#606060','#404040'];
-const GROUP_COLORS_LIGHT = ['#888','#111','#333','#555','#777','#999'];
+const GROUP_COLORS = ['#fff', '#222', '#1c1c1c', '#fff', '#222', '#1c1c1c'];
+const GROUP_COLORS_LIGHT = ['#111', '#ccc', '#eee', '#111', '#ccc', '#eee'];
 
 function setGraphStatus(message = '') {
-  dom.graphStatus.textContent = message;
+  dom.graphStatus.textContent = stripEmoji(message);
   dom.graphStatus.classList.toggle('visible', Boolean(message));
 }
 
@@ -352,7 +393,7 @@ function drawGraph(data) {
   if (legend) {
     legend.innerHTML = usedGroups.map(g => `
       <div class="legend-item">
-        <div class="legend-dot" style="background:${colors[g] || '#888'}"></div>
+        <div class="legend-dot" style="background:${colors[g] || colors[0]}"></div>
         <span>${PILLAR_LABELS[g] || `Group ${g}`}</span>
       </div>`).join('');
   }
@@ -383,9 +424,8 @@ function drawGraph(data) {
   const g = svg.append('g');
 
   const link = g.append('g').selectAll('line').data(links).join('line')
-    .attr('stroke', isLight ? '#ccc' : '#333')
-    .attr('stroke-width', 1.25)
-    .attr('stroke-opacity', 0.48);
+    .attr('stroke', isLight ? '#ccc' : '#222')
+    .attr('stroke-width', 1.25);
 
   const node = g.append('g').selectAll('g').data(nodes).join('g')
     .style('cursor', 'pointer')
@@ -400,8 +440,8 @@ function drawGraph(data) {
     })
     .on('mouseover', (event, d) => {
       const tooltip = document.getElementById('graph-tooltip');
-      if (tooltip) { tooltip.textContent = d.id; tooltip.style.opacity = '1'; }
-      d3.select(event.currentTarget).select('circle').attr('stroke', isLight ? '#000' : '#fff');
+      if (tooltip) { tooltip.textContent = stripEmoji(d.id); tooltip.classList.add('visible'); }
+      d3.select(event.currentTarget).select('circle').attr('stroke', '#111');
     })
     .on('mousemove', event => {
       const tooltip = document.getElementById('graph-tooltip');
@@ -412,25 +452,24 @@ function drawGraph(data) {
     })
     .on('mouseout', (event) => { 
       const tooltip = document.getElementById('graph-tooltip');
-      if (tooltip) tooltip.style.opacity = '0'; 
-      d3.select(event.currentTarget).select('circle').attr('stroke', isLight ? '#fff' : '#0c0c0c');
+      if (tooltip) tooltip.classList.remove('visible');
+      d3.select(event.currentTarget).select('circle').attr('stroke', isLight ? '#111' : '#fff');
     });
 
   node.append('circle')
     .attr('r', nodeRadius)
     .attr('fill', d => colors[d.group] || colors[0])
-    .attr('fill-opacity', 0.9)
-    .attr('stroke', isLight ? '#fff' : '#0c0c0c')
+    .attr('stroke', isLight ? '#111' : '#fff')
     .attr('stroke-width', 2);
 
   const label = node.append('text')
-    .text(d => d.id)
+    .text(d => stripEmoji(d.id))
     .attr('y', '0.35em')
     .attr('font-size', '12px')
     .attr('font-family', 'Inter, system-ui, sans-serif')
     .attr('font-weight', '500')
-    .attr('fill', isLight ? '#333' : '#bbb')
-    .attr('stroke', isLight ? '#f5f5f5' : '#0c0c0c')
+    .attr('fill', isLight ? '#111' : '#fff')
+    .attr('stroke', isLight ? '#fff' : '#111')
     .attr('stroke-width', 3)
     .attr('stroke-linejoin', 'round')
     .attr('paint-order', 'stroke')
@@ -519,7 +558,7 @@ async function loadFiles() {
     <button class="file-card" type="button" data-file-index="${index}" aria-label="Open ${escHtml(f.name)}">
       <div class="file-card-topline">
         <div class="file-card-icon">${fileIcon(f.ext)}</div>
-        <span class="file-card-ext">${f.ext || 'file'}</span>
+        <span class="file-card-ext">${escHtml(f.ext || 'file')}</span>
       </div>
       <div class="file-card-name">${escHtml(f.name)}</div>
       <div class="file-card-meta">${fmtSize(f.size)} · View document</div>
@@ -555,13 +594,13 @@ async function openRawFile(name, ext, file = {}, updateHash = true) {
 
   showPanel('document');
   if (updateHash) history.replaceState(null, '', `#file/${encodeURIComponent(name)}`);
-  $('document-title').textContent = name;
+  $('document-title').textContent = stripEmoji(name);
   $('document-file-icon').innerHTML = fileIcon(normalizedExt);
   $('document-meta').innerHTML = `<span>${normalizedExt || 'FILE'}</span>${file.size != null ? `<span>${fmtSize(file.size)}</span>` : ''}`;
   $('document-download').href = url;
   $('document-download').setAttribute('download', name);
   dom.pdfToolbar.hidden = normalizedExt !== 'pdf';
-  setDocumentStatus(`Opening ${normalizedExt ? normalizedExt.toUpperCase() : 'document'}…`);
+  setDocumentStatus(`Opening ${normalizedExt ? normalizedExt.toUpperCase() : 'document'}...`);
 
   try {
     if (normalizedExt === 'pdf') {
@@ -577,21 +616,24 @@ async function openRawFile(name, ext, file = {}, updateHash = true) {
     if (['md', 'markdown'].includes(normalizedExt)) {
       dom.documentStage.innerHTML = `<article class="document-reading-surface md-body">${renderMd(content)}</article>`;
       dom.documentStage.querySelectorAll('a.wiki-link').forEach(a => {
-        a.addEventListener('click', () => openPage(a.dataset.page));
+        a.addEventListener('click', event => {
+          event.preventDefault();
+          openPage(a.dataset.page);
+        });
       });
       return;
     }
 
     if (['txt', 'log', 'csv', 'json', 'xml', 'yaml', 'yml'].includes(normalizedExt)) {
       dom.documentStage.innerHTML = `<div class="document-reading-surface document-plain-text"><pre></pre></div>`;
-      dom.documentStage.querySelector('pre').textContent = content;
+      dom.documentStage.querySelector('pre').textContent = stripEmoji(content);
       return;
     }
 
     setDocumentStatus('Preview not available', `Download ${name} to open it in another application.`, true);
   } catch (error) {
     if (session !== state.documentSession) return;
-    setDocumentStatus('Could not open this document', error.message, true);
+    setDocumentStatus('Could not open this document', stripEmoji(error.message), true);
   }
 }
 
@@ -729,14 +771,14 @@ dom.dropzone.addEventListener('drop', e => {
 dom.fileInput.addEventListener('change', () => uploadFiles(Array.from(dom.fileInput.files)));
 
 async function uploadFiles(files) {
-  dom.uploadProgress.textContent = `Uploading ${files.length} file(s)…`;
+  dom.uploadProgress.textContent = `Uploading ${files.length} file(s)...`;
   for (const file of files) {
-    dom.uploadProgress.textContent = `Uploading ${file.name}…`;
+    dom.uploadProgress.textContent = `Uploading ${stripEmoji(file.name)}...`;
     await api.uploadFile(file, p => {
-      dom.uploadProgress.textContent = `Uploading ${file.name} — ${Math.round(p*100)}%`;
+      dom.uploadProgress.textContent = `Uploading ${stripEmoji(file.name)} - ${Math.round(p * 100)}%`;
     });
   }
-  dom.uploadProgress.textContent = '✓ Upload complete';
+  dom.uploadProgress.textContent = 'Upload complete';
   setTimeout(() => { closeUploadModal(); loadFiles(); }, 1200);
 }
 
@@ -750,7 +792,7 @@ $('new-page-cancel').onclick = () => { dom.newPageModal.style.display = 'none'; 
 dom.newPageModal.addEventListener('click', e => { if (e.target === dom.newPageModal) dom.newPageModal.style.display = 'none'; });
 
 $('new-page-create').onclick = async () => {
-  const name = dom.newPageName.value.trim().toLowerCase().replace(/\s+/g, '-');
+  const name = normalizeWikiPageName(dom.newPageName.value);
   if (!name) return;
   const res = await api.createWikiPage(name);
   if (res.error) { alert(res.error); return; }
@@ -762,6 +804,7 @@ $('new-page-create').onclick = async () => {
 dom.newPageName.addEventListener('keydown', e => {
   if (e.key === 'Enter') $('new-page-create').click();
 });
+dom.newPageName.addEventListener('input', () => { dom.newPageName.value = stripEmoji(dom.newPageName.value); });
 
 // ── Theme toggle ───────────────────────────────────────────────────
 let theme = localStorage.getItem('pw-theme') || 'dark';
@@ -792,12 +835,12 @@ async function refreshWiki() {
   const pages = await api.getWikiList();
   buildSidebar(pages);
   // Refresh current page if open
-  if (state.currentPage) openPage(state.currentPage);
+  if (state.currentPage) openPage(state.currentPage, { historyMode: 'none' });
 }
 
 // ── Utility ────────────────────────────────────────────────────────
 function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return stripEmoji(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function escAttr(s) { return String(s).replace(/'/g,"\\'"); }
 
@@ -806,6 +849,27 @@ window.app = { showPanel };
 window.openPage = openPage;
 window.openRawFile = openRawFile;
 window.hideSearch = hideSearch;
+
+function handleWikiRoute({ migrateLegacyHash = false } = {}) {
+  let page = wikiPageFromPath(location.pathname);
+  if (page && location.pathname !== wikiPath(page)) history.replaceState(null, '', wikiPath(page));
+  if (!page && location.hash.startsWith('#wiki/')) {
+    try { page = normalizeWikiPageName(decodeURIComponent(location.hash.slice(6))); } catch { page = ''; }
+    if (page && migrateLegacyHash) history.replaceState(null, '', wikiPath(page));
+  }
+  if (!page) return false;
+  void openPage(page, { historyMode: 'none' });
+  return true;
+}
+
+window.addEventListener('popstate', () => {
+  if (!handleWikiRoute()) {
+    state.currentPage = null;
+    highlightSidebarItem(null);
+    showPanel('wiki');
+  }
+});
+window.addEventListener('hashchange', () => { handleWikiRoute({ migrateLegacyHash: true }); });
 
 // ── ChatGPT subscription chat ─────────────────────────────────────
 // OAuth credentials stay on the server; this client receives sanitized state.
@@ -827,9 +891,9 @@ function agentReady() {
 function updateAgentUi() {
   const status = state.chatgpt || {};
   const backendConnected = Boolean(state.wsReady && state.backendReady);
-  dom.chatgptSettingsLabel.textContent = status.ready
+  dom.chatgptSettingsLabel.textContent = stripEmoji(status.ready
     ? `ChatGPT · ${status.selectedModel}`
-    : (status.savedAccount ? 'Reconnect ChatGPT' : 'Connect ChatGPT');
+    : (status.savedAccount ? 'Reconnect ChatGPT' : 'Connect ChatGPT'));
   dom.wsDot.classList.toggle('active', Boolean(status.ready && backendConnected));
   dom.wsDot.title = status.ready
     ? (backendConnected ? 'ChatGPT and agent service connected' : 'Agent service disconnected')
@@ -844,7 +908,7 @@ function updateAgentUi() {
     } else if (!state.activeThreadId) {
       dom.chatStatus.textContent = 'Create or select a saved chat.';
     } else if (!backendConnected) {
-      dom.chatStatus.textContent = 'Connecting to the agent service…';
+      dom.chatStatus.textContent = 'Connecting to the agent service...';
     } else {
       dom.chatStatus.textContent = 'Press Enter to send · Shift+Enter for new line';
     }
@@ -866,27 +930,64 @@ function renderThreads() {
     const select = document.createElement('button');
     select.type = 'button';
     select.className = 'chat-thread-select';
-    select.textContent = thread.title;
-    select.title = thread.title;
+    select.textContent = stripEmoji(thread.title);
+    select.title = stripEmoji(thread.title);
     select.addEventListener('click', () => { void selectThread(thread.id); });
+    const menuWrap = document.createElement('div');
+    menuWrap.className = 'chat-thread-menu-wrap';
+    const actions = document.createElement('div');
+    actions.className = 'chat-thread-actions';
+    actions.hidden = true;
+    actions.setAttribute('role', 'menu');
+
+    const rename = document.createElement('button');
+    rename.type = 'button';
+    rename.textContent = 'Rename';
+    rename.setAttribute('role', 'menuitem');
+    rename.addEventListener('click', event => {
+      event.stopPropagation();
+      closeThreadMenus();
+      const title = window.prompt('New chat name:', thread.title);
+      if (title?.trim()) void renameThread(thread.id, stripEmoji(title));
+    });
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'chat-thread-delete';
+    remove.textContent = 'Delete';
+    remove.setAttribute('role', 'menuitem');
+    remove.addEventListener('click', event => {
+      event.stopPropagation();
+      closeThreadMenus();
+      if (window.confirm('Delete this local saved chat?')) void deleteThread(thread.id);
+    });
+    actions.append(rename, remove);
+
     const menu = document.createElement('button');
     menu.type = 'button';
     menu.className = 'chat-thread-menu';
-    menu.textContent = '•••';
-    menu.title = 'Rename or delete this chat';
+    menu.textContent = '\u22ef';
+    menu.setAttribute('aria-label', `Chat options for ${stripEmoji(thread.title)}`);
+    menu.setAttribute('aria-expanded', 'false');
+    menu.title = 'Chat options';
     menu.addEventListener('click', event => {
       event.stopPropagation();
-      const action = window.prompt('Type “rename” to rename this chat, or “delete” to remove it.');
-      if (action?.trim().toLowerCase() === 'rename') {
-        const title = window.prompt('New chat name:', thread.title);
-        if (title?.trim()) void renameThread(thread.id, title);
-      } else if (action?.trim().toLowerCase() === 'delete' && window.confirm('Delete this local saved chat?')) {
-        void deleteThread(thread.id);
-      }
+      const willOpen = actions.hidden;
+      closeThreadMenus();
+      actions.hidden = !willOpen;
+      menu.setAttribute('aria-expanded', String(willOpen));
     });
-    row.append(select, menu);
+    menuWrap.append(menu, actions);
+    row.append(select, menuWrap);
     dom.chatThreadList.appendChild(row);
   }
+}
+
+function closeThreadMenus() {
+  document.querySelectorAll('.chat-thread-actions:not([hidden])').forEach(actions => {
+    actions.hidden = true;
+    actions.previousElementSibling?.setAttribute('aria-expanded', 'false');
+  });
 }
 
 function clearChatMessages() {
@@ -927,7 +1028,7 @@ async function selectThread(id, { refresh = true } = {}) {
 
 async function createThread() {
   if (state.aiRunning) return;
-  const title = window.prompt('Name this chat (optional):') || 'New chat';
+  const title = stripEmoji(window.prompt('Name this chat (optional):') || 'New chat');
   const thread = await api.createThread(title);
   state.activeThreadId = thread.id;
   await refreshThreads();
@@ -963,12 +1064,12 @@ function accountLabel(account) {
 
 function renderChatGPTSettings() {
   const status = state.chatgpt || {};
-  dom.chatgptAccount.textContent = accountLabel(status.account);
+  dom.chatgptAccount.textContent = stripEmoji(accountLabel(status.account));
   dom.chatgptModel.replaceChildren();
   for (const model of status.models || []) {
     const option = document.createElement('option');
     option.value = model.id;
-    option.textContent = model.name;
+    option.textContent = stripEmoji(model.name);
     dom.chatgptModel.appendChild(option);
   }
   dom.chatgptModel.value = status.selectedModel || '';
@@ -993,12 +1094,12 @@ function renderChatGPTSettings() {
   } else {
     dom.chatgptConnectionStatus.textContent = 'Connect an eligible ChatGPT subscription.';
   }
-  if (status.error) dom.chatgptError.textContent = status.error.message || 'ChatGPT is temporarily unavailable.';
+  if (status.error) dom.chatgptError.textContent = stripEmoji(status.error.message || 'ChatGPT is temporarily unavailable.');
 }
 
 function openChatGPTSettings(message = '') {
   renderChatGPTSettings();
-  dom.chatgptError.textContent = message || state.chatgpt?.error?.message || '';
+  dom.chatgptError.textContent = stripEmoji(message || state.chatgpt?.error?.message || '');
   dom.chatgptSettingsModal.style.display = 'flex';
 }
 
@@ -1014,7 +1115,7 @@ async function refreshChatGPTStatus({ open = false, message = '' } = {}) {
   } catch (error) {
     state.chatgpt = state.chatgpt || { connected: false, savedAccount: false, ready: false, models: [] };
     updateAgentUi();
-    if (open) openChatGPTSettings(error.message);
+    if (open) openChatGPTSettings(stripEmoji(error.message));
   }
 }
 
@@ -1026,7 +1127,7 @@ async function saveChatGPTModel() {
     updateAgentUi();
     renderChatGPTSettings();
   } catch (error) {
-    dom.chatgptError.textContent = error.message;
+    dom.chatgptError.textContent = stripEmoji(error.message);
   } finally {
     dom.chatgptModelSave.disabled = false;
   }
@@ -1043,7 +1144,7 @@ async function disconnectChatGPT() {
       dom.chatgptError.textContent = 'The local session was cleared, but OpenAI could not confirm remote revocation.';
     }
   } catch (error) {
-    dom.chatgptError.textContent = error.message;
+    dom.chatgptError.textContent = stripEmoji(error.message);
   } finally {
     dom.chatgptDisconnect.disabled = false;
   }
@@ -1058,7 +1159,7 @@ async function forgetChatGPTAccount() {
     updateAgentUi();
     renderChatGPTSettings();
   } catch (error) {
-    dom.chatgptError.textContent = error.message;
+    dom.chatgptError.textContent = stripEmoji(error.message);
   } finally {
     dom.chatgptForget.disabled = false;
   }
@@ -1071,7 +1172,7 @@ async function useAnotherChatGPTAccount() {
     await api.forgetChatGPTAccount();
     window.location.assign('/auth/chatgpt/start');
   } catch (error) {
-    dom.chatgptError.textContent = error.message;
+    dom.chatgptError.textContent = stripEmoji(error.message);
     dom.chatgptNewAccount.disabled = false;
   }
 }
@@ -1112,7 +1213,7 @@ function connectDirectAgentWS() {
 }
 
 function sendChat() {
-  const text = dom.chatInput.value.trim();
+  const text = stripEmoji(dom.chatInput.value).trim();
   if (!text || state.aiRunning || !agentReady()) return;
   dom.chatInput.value = '';
   resizeTextarea();
@@ -1121,7 +1222,7 @@ function sendChat() {
   dom.chatInput.disabled = true;
   dom.chatSend.disabled = true;
   dom.chatAbort.style.display = 'flex';
-  dom.chatStatus.textContent = 'ChatGPT is thinking…';
+  dom.chatStatus.textContent = 'ChatGPT is thinking...';
   const message = document.createElement('div');
   message.className = 'chat-msg ai';
   message.innerHTML = '<div class="chat-avatar">AI</div><div class="chat-bubble"><div class="chat-response"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div><div class="chat-activity" hidden><details open><summary>Wiki activity</summary><pre></pre></details></div></div>';
@@ -1143,13 +1244,13 @@ function handleToolStatus(event) {
   if (!aiTarget) return;
   aiTarget.activity.hidden = false;
   const label = event.status === 'completed' ? 'completed' : (event.status === 'failed' ? 'failed' : 'running');
-  const detail = event.status === 'failed' && event.detail ? ` (${event.detail})` : '';
-  aiTarget.activityOutput.textContent += (event.name || 'wiki tool') + ': ' + label + detail + '\n';
+  const detail = event.status === 'failed' && event.detail ? ` (${stripEmoji(event.detail)})` : '';
+  aiTarget.activityOutput.textContent += stripEmoji(event.name || 'wiki tool') + ': ' + label + detail + '\n';
   scrollChat();
 }
 
 function handleAiError(message) {
-  const text = '> ⚠ ' + (message.text || 'The agent request failed.');
+  const text = '> ' + stripEmoji(message.text || 'The agent request failed.');
   if (aiTarget) handleAiChunk('\n\n' + text);
   else appendChatMsg('ai', text);
   if (['reauthorization-required', 'plan-permission-required'].includes(message.code)) {
@@ -1182,6 +1283,13 @@ function appendChatMsg(role, text) {
   scrollChat();
 }
 
+document.addEventListener('click', event => {
+  if (!event.target.closest('.chat-thread-menu-wrap')) closeThreadMenus();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeThreadMenus();
+});
+
 dom.chatgptSettingsButton.addEventListener('click', () => { void refreshChatGPTStatus({ open: true }); });
 dom.chatgptClose.addEventListener('click', closeChatGPTSettings);
 dom.chatgptModelSave.addEventListener('click', () => { void saveChatGPTModel(); });
@@ -1193,7 +1301,10 @@ dom.chatgptSettingsModal.addEventListener('click', event => {
   if (event.target === dom.chatgptSettingsModal) closeChatGPTSettings();
 });
 dom.chatNewThread.addEventListener('click', () => { void createThread(); });
-dom.chatInput.addEventListener('input', resizeTextarea);
+dom.chatInput.addEventListener('input', () => {
+  dom.chatInput.value = stripEmoji(dom.chatInput.value);
+  resizeTextarea();
+});
 dom.chatInput.addEventListener('keydown', event => {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault();
@@ -1219,15 +1330,14 @@ dom.chatAbort.addEventListener('click', () => {
   try {
     await refreshThreads({ createIfEmpty: true });
   } catch (error) {
-    dom.chatStatus.textContent = error.message;
+    dom.chatStatus.textContent = stripEmoji(error.message);
   }
 
   const pages = await api.getWikiList();
   buildSidebar(pages);
-  // If hash present, open that page
+  const routedToWiki = handleWikiRoute({ migrateLegacyHash: true });
   const hash = location.hash;
-  if (hash.startsWith('#wiki/')) openPage(decodeURIComponent(hash.slice(6)));
-  if (hash.startsWith('#file/')) {
+  if (!routedToWiki && hash.startsWith('#file/')) {
     const name = decodeURIComponent(hash.slice(6));
     const files = await api.getRawList();
     const file = files.find(item => item.name === name);

@@ -56,6 +56,12 @@ test('direct-agent WebSocket requires protocol 4 and thread-scoped chat payloads
   const cookie = page.headers['set-cookie']?.[0]?.split(';')[0];
   assert.match(cookie || '', /^pulsarwiki_session=/);
 
+  for (const pathname of ['/wiki/pulsar', '/wiki/not-a-page']) {
+    const wikiPage = await request(serverUrl + pathname);
+    assert.equal(wikiPage.statusCode, 200);
+    assert.match(wikiPage.headers['content-type'] || '', /text\/html/);
+  }
+
   const mutationBody = JSON.stringify({ model: '' });
   const mutationHeaders = { Cookie: cookie, 'Content-Type': 'application/json' };
   const missingOrigin = await request(`${serverUrl}/api/chatgpt/model`, {

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>PulsarWiki</title>
   <meta name="description" content="A visual interface for the PulsarWiki knowledge base — browse, search, chat and explore the pulsar astronomy graph."/>
-  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="/style.css"/>
 </head>
 <body>
 <div id="app">
@@ -24,6 +24,11 @@
     <button class="icon-btn" id="ib-files" title="Source Files" data-panel="files">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
     </button>
+    <button class="icon-btn chatgpt-settings-icon" id="chatgpt-settings-button" type="button" title="ChatGPT subscription settings" aria-label="ChatGPT subscription settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06-2 2-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V20h-3v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06-2-2 .06-.06A1.65 1.65 0 0 0 7.4 15a1.65 1.65 0 0 0-1.51-1H5.8v-3h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06 2-2 .06.06A1.65 1.65 0 0 0 10.89 6.5h.01A1.65 1.65 0 0 0 12 5V4.8h3V5a1.65 1.65 0 0 0 1 1.5 1.65 1.65 0 0 0 1.82-.33l.06-.06 2 2-.06.06A1.65 1.65 0 0 0 19.5 10v.01A1.65 1.65 0 0 0 21 11h.2v3H21a1.65 1.65 0 0 0-1.6 1z"/></svg>
+      <span class="dot-online" id="ws-dot"></span>
+      <span class="sr-only" id="chatgpt-settings-label">Connect ChatGPT</span>
+    </button>
     <div class="icon-spacer"></div>
     <button class="icon-btn" id="ib-theme" title="Toggle theme">
       <svg id="theme-icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -33,60 +38,45 @@
 
   <!-- Sidebar -->
   <aside id="sidebar">
-    <div class="sidebar-header">
+    <div id="sidebar-wiki" class="sidebar-pane">
+      <div class="sidebar-header">
       <div class="sidebar-title">PulsarWiki</div>
       <div class="search-wrap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input id="search-input" type="text" placeholder="Search wiki…" autocomplete="off"/>
       </div>
+      <div class="sidebar-actions" aria-label="Wiki actions">
+        <button class="sidebar-action" id="btn-new-page" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Page
+        </button>
+        <button class="sidebar-action" id="btn-upload" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+          Upload Sources
+        </button>
+      </div>
+      </div>
+      <div class="sidebar-body" id="sidebar-body">
+        <!-- Populated by JS -->
+      </div>
     </div>
-    <div class="sidebar-body" id="sidebar-body">
-      <!-- Populated by JS -->
-    </div>
+    <aside id="sidebar-chat" class="chat-sidebar sidebar-pane" aria-label="Saved chats">
+      <div class="chat-sidebar-header">
+        <div class="sidebar-title">PulsarWiki</div>
+        <div class="chat-sidebar-actions">
+          <span class="chat-sidebar-label">Saved chats</span>
+          <button class="sidebar-action chat-new-thread" id="chat-new-thread" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New chat
+          </button>
+        </div>
+      </div>
+      <div class="chat-thread-list" id="chat-thread-list"></div>
+    </aside>
   </aside>
 
   <!-- Main -->
   <div id="main">
-    <!-- Topbar -->
-    <header id="topbar">
-      <div class="topbar-logo">
-        🔭 <span>PulsarWiki</span>
-      </div>
-      <div class="topbar-tabs">
-        <button class="tab-btn active" data-panel="wiki">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-          Wiki
-        </button>
-        <button class="tab-btn" data-panel="chat">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          Chat
-        </button>
-        <button class="tab-btn" data-panel="graph">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><circle cx="12" cy="12" r="2"/><line x1="7" y1="12" x2="10" y2="12"/><line x1="14" y1="12" x2="17.2" y2="6.8"/><line x1="14.2" y1="12.8" x2="17.2" y2="17.5"/></svg>
-          Graph
-        </button>
-        <button class="tab-btn" data-panel="files">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-          Files
-        </button>
-      </div>
-      <div class="topbar-spacer"></div>
-      <div class="topbar-actions">
-        <button class="topbar-btn" id="btn-new-page">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          New Page
-        </button>
-        <button class="topbar-btn" id="btn-upload">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
-          Upload
-        </button>
-        <button class="chatgpt-status-btn" id="chatgpt-settings-button" type="button" title="ChatGPT subscription settings">
-          <span class="dot-online" id="ws-dot"></span>
-          <span id="chatgpt-settings-label">Connect ChatGPT</span>
-        </button>
-      </div>
-    </header>
-
     <!-- Search results overlay -->
     <div id="search-results"></div>
 
@@ -110,13 +100,6 @@
       <!-- Chat panel -->
       <div class="panel" id="panel-chat">
         <div class="chat-layout">
-          <aside class="chat-sidebar" aria-label="Saved chats">
-            <div class="chat-sidebar-header">
-              <span>Saved chats</span>
-              <button class="chat-new-thread" id="chat-new-thread" type="button">New chat</button>
-            </div>
-            <div class="chat-thread-list" id="chat-thread-list"></div>
-          </aside>
           <section class="chat-conversation">
         <div id="chat-messages">
           <div class="chat-msg ai">
@@ -235,9 +218,7 @@
 <!-- ChatGPT subscription settings -->
 <div class="setup-overlay" id="chatgpt-settings-modal" style="display:none">
   <section class="setup-dialog chatgpt-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="chatgpt-settings-title">
-    <div class="setup-kicker">PulsarWiki AI</div>
     <h2 id="chatgpt-settings-title">Connect ChatGPT</h2>
-    <p>Use an eligible ChatGPT subscription. PulsarWiki stores the connection only on this computer and never exposes its tokens to the browser.</p>
     <div class="chatgpt-account" id="chatgpt-account"></div>
     <p class="chatgpt-connection-status" id="chatgpt-connection-status"></p>
     <div class="chatgpt-connect-actions">
@@ -247,7 +228,6 @@
     <label class="chatgpt-field" id="chatgpt-model-field">Subscription model
       <select id="chatgpt-model"></select>
     </label>
-    <p class="setup-note">Models are supplied by the connected subscription. <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer">View ChatGPT usage</a>.</p>
     <div class="setup-error" id="chatgpt-error" role="alert"></div>
     <div class="setup-actions">
       <button class="btn btn-danger" id="chatgpt-forget" type="button">Forget account</button>
@@ -293,6 +273,6 @@
 
 <script src="/vendor/marked/marked.umd.js"></script>
 <script src="/vendor/d3/d3.min.js"></script>
-<script src="app.js"></script>
+<script src="/app.js"></script>
 </body>
 </html>
