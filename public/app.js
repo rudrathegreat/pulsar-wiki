@@ -47,6 +47,11 @@ function renderMd(content) {
   return postProcessHtml(marked.parse(preprocessMd(content)));
 }
 
+function wikiLinkForInAppNavigation(event) {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return null;
+  return event.target?.closest?.('a.wiki-link[data-page]') || null;
+}
+
 async function readJsonResponse(response, apiName) {
   const body = await response.text();
   let data;
@@ -1283,6 +1288,13 @@ function appendChatMsg(role, text) {
   scrollChat();
 }
 
+function handleChatWikiLink(event) {
+  const link = wikiLinkForInAppNavigation(event);
+  if (!link || !dom.chatMessages.contains(link)) return;
+  event.preventDefault();
+  void openPage(link.dataset.page);
+}
+
 document.addEventListener('click', event => {
   if (!event.target.closest('.chat-thread-menu-wrap')) closeThreadMenus();
 });
@@ -1301,6 +1313,7 @@ dom.chatgptSettingsModal.addEventListener('click', event => {
   if (event.target === dom.chatgptSettingsModal) closeChatGPTSettings();
 });
 dom.chatNewThread.addEventListener('click', () => { void createThread(); });
+dom.chatMessages.addEventListener('click', handleChatWikiLink);
 dom.chatInput.addEventListener('input', () => {
   dom.chatInput.value = stripEmoji(dom.chatInput.value);
   resizeTextarea();
@@ -1341,6 +1354,10 @@ dom.chatAbort.addEventListener('click', () => {
     const name = decodeURIComponent(hash.slice(6));
     const files = await api.getRawList();
     const file = files.find(item => item.name === name);
-    if (file) openRawFile(file.name, file.ext, file, false);
+    if (file) {
+      await openRawFile(file.name, file.ext, file, false);
+      return;
+    }
   }
+  if (!routedToWiki) await openPage('index', { historyMode: 'replace' });
 })();

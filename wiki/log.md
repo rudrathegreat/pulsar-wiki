@@ -13,3 +13,6 @@ All major updates to the wiki are recorded here.
 - 2026-10-06: Created pulsar-glitches page covering glitch definition, detection, scientific significance, Vela, and open questions; updated wiki index.
 | 2026-10-06 | Application UI | Updated rendered chat-link styling, saved-chat spacing and control sizing, and light-mode sidebar/icon-bar contrast. |
 | 2026-10-06 | Application UI | Updated the ChatGPT settings window so all light-mode text and controls use black text. |
+| 2026-10-06 | Application UI | Made all rendered AI chat links explicitly white with grey underlines in dark mode, matching the wiki-link treatment. |
+| 2026-10-06 | Application UI | Fixed internal wiki links in streamed and saved chat responses so ordinary clicks open pages within PulsarWiki while modified clicks retain normal browser behaviour. |
+| 2026-10-06 | Application UI | Made `wiki/index.md` the default page on a plain PulsarWiki launch while preserving direct wiki and source-file routes. |

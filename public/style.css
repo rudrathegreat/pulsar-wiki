@@ -690,16 +690,25 @@ body {
   border-color: var(--text-1);
 }
 
-.chat-msg.ai .chat-bubble a {
-  color: var(--text-1);
-  text-decoration: none;
-  border-bottom: 1px solid var(--border);
+.chat-msg.ai .chat-bubble a,
+.chat-msg.ai .chat-bubble a:visited {
+  color: #fff !important;
+  text-decoration: none !important;
+  border-bottom: 1px solid #ccc !important;
   padding-bottom: 1px;
   transition: border-color var(--transition), color var(--transition);
 }
 
-.chat-msg.ai .chat-bubble a:hover {
-  border-color: var(--text-1);
+.chat-msg.ai .chat-bubble a:hover,
+.chat-msg.ai .chat-bubble a:focus-visible {
+  color: #fff !important;
+  border-bottom-color: #fff !important;
+}
+
+[data-theme="light"] .chat-msg.ai .chat-bubble a,
+[data-theme="light"] .chat-msg.ai .chat-bubble a:visited {
+  color: #111 !important;
+  border-bottom-color: #ccc !important;
 }
 
 .md-body a:not(.wiki-link) {

@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const marked = require('marked');
 
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
 const indexSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
@@ -36,10 +37,13 @@ function loadClientHelpers() {
   const context = {
     fetch: async () => response(200),
     XMLHttpRequest: class {},
-    marked: { setOptions() {}, parse(value) { return value; } },
+    marked,
+    escHtml(value) {
+      return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    },
   };
   vm.createContext(context);
-  vm.runInContext(`${helperSource}\nglobalThis.__helpers = { stripEmoji, normalizeWikiPageName, wikiPath, wikiPageFromPath, preprocessMd };`, context);
+  vm.runInContext(`${helperSource}\nglobalThis.__helpers = { stripEmoji, normalizeWikiPageName, wikiPath, wikiPageFromPath, preprocessMd, renderMd, wikiLinkForInAppNavigation };`, context);
   return context.__helpers;
 }
 
@@ -112,10 +116,47 @@ test('wiki page names produce canonical direct routes and legacy names normalize
   assert.equal(helpers.wikiPageFromPath('/wiki/pulsar/extra'), null);
 });
 
+test('a plain app launch opens the wiki index after explicit routes are considered', () => {
+  const bootstrap = appSource.slice(appSource.indexOf('(async function init()'));
+  const directRoute = bootstrap.indexOf('handleWikiRoute({ migrateLegacyHash: true })');
+  const fileRoute = bootstrap.indexOf("hash.startsWith('#file/')");
+  const defaultRoute = bootstrap.indexOf("openPage('index', { historyMode: 'replace' })");
+  assert.ok(directRoute !== -1 && directRoute < defaultRoute);
+  assert.ok(fileRoute !== -1 && fileRoute < defaultRoute);
+  assert.match(bootstrap, /if \(!routedToWiki\) await openPage\('index', \{ historyMode: 'replace' \}\)/);
+});
+
 test('emoji sanitizer removes emojis from plain text and Markdown before rendering', () => {
   const helpers = loadClientHelpers();
   assert.equal(helpers.stripEmoji('Pulsar 🔭 timing'), 'Pulsar timing');
   assert.equal(helpers.preprocessMd('[[Pulsar 🔭|Pulsar 🔭]]'), '[Pulsar](WIKILINK:pulsar)');
+});
+
+test('chat wiki links render canonical routes and only plain primary clicks navigate in-app', () => {
+  const helpers = loadClientHelpers();
+  const html = helpers.renderMd('Here\u2019s the wiki page: [[psr-j0437-4715|PSR J0437\u22124715]].');
+  assert.match(html, /href="\/wiki\/psr-j0437-4715"/);
+  assert.match(html, /class="wiki-link"/);
+  assert.match(html, /data-page="psr-j0437-4715"/);
+
+  const wikiLink = { dataset: { page: 'psr-j0437-4715' } };
+  const plainClick = {
+    defaultPrevented: false,
+    button: 0,
+    metaKey: false,
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    target: { closest: selector => selector === 'a.wiki-link[data-page]' ? wikiLink : null },
+  };
+  assert.equal(helpers.wikiLinkForInAppNavigation(plainClick), wikiLink);
+  assert.equal(helpers.wikiLinkForInAppNavigation({ ...plainClick, ctrlKey: true }), null);
+  assert.equal(helpers.wikiLinkForInAppNavigation({ ...plainClick, button: 1 }), null);
+  assert.equal(helpers.wikiLinkForInAppNavigation({ ...plainClick, target: { closest: () => null } }), null);
+
+  assert.match(appSource, /handleAiChunk[\s\S]*renderMd\(aiTarget\.buffer\)/);
+  assert.match(appSource, /appendChatMsg[\s\S]*renderMd\(text\)/);
+  assert.match(appSource, /dom\.chatMessages\.addEventListener\('click', handleChatWikiLink\)/);
 });
 
 test('UI source uses only approved palettes and contains no built-in emojis', () => {
