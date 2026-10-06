@@ -41,4 +41,4 @@ Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pul
 - [[pulsar-catalog]]: A directory of physical parameters for known pulsars.
 
 ---
-*Last updated: 2026-04-27*
+*Last updated: 2026-10-06*

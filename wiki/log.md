@@ -11,3 +11,5 @@ All major updates to the wiki are recorded here.
 | 2026-04-27 | psrchive.pdf, papers.txt | Ingested PSRCHIVE manual and research bibliography. Created `psrchive` page and expanded `gamma-ray-pulsar` and `radio-telescope` with Fermi LAT results and software pipeline details. |
 | 2026-04-27 | Catalog & Bibliography Expansion | Created concept pages for `magnetar`, `supernova-remnant`, `radio-frequency-interference`, `astrometry`, and `polarimetry`. Created `discovery-surveys` page connecting pulsars to search programmes. Added individual profiles for `vela-pulsar` and `psr-j0437-4715`. |
 - 2026-10-06: Created pulsar-glitches page covering glitch definition, detection, scientific significance, Vela, and open questions; updated wiki index.
+| 2026-10-06 | Application UI | Updated rendered chat-link styling, saved-chat spacing and control sizing, and light-mode sidebar/icon-bar contrast. |
+| 2026-10-06 | Application UI | Updated the ChatGPT settings window so all light-mode text and controls use black text. |
