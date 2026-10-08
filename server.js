@@ -58,6 +58,7 @@ app.use((_req, res, next) => {
 app.use(express.static(PUB_DIR));
 app.use('/vendor/d3', express.static(path.join(ROOT_DIR, 'node_modules', 'd3', 'dist')));
 app.use('/vendor/marked', express.static(path.join(ROOT_DIR, 'node_modules', 'marked', 'lib')));
+app.use('/vendor/katex', express.static(path.join(ROOT_DIR, 'node_modules', 'katex', 'dist')));
 app.use('/vendor/pdfjs', express.static(path.join(ROOT_DIR, 'node_modules', 'pdfjs-dist')));
 app.get('/wiki/:page', (_req, res) => res.sendFile(path.join(PUB_DIR, 'index.html')));
 

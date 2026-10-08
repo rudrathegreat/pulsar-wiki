@@ -36,15 +36,47 @@ function preprocessMd(text) {
   });
 }
 
-function postProcessHtml(html) {
-  return html.replace(
+function protectLatex(text) {
+  const expressions = [];
+  const pattern = /(```[^\n]*\n[\s\S]*?```|~~~[^\n]*\n[\s\S]*?~~~|`+[^`\n]*`+)|(\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$\$[\s\S]*?\$\$|(?<!\\)\$(?!\s)(?:\\.|[^$\n\\])+(?<!\s)(?<!\\)\$)/g;
+  const protectedText = text.replace(pattern, (match, code, math) => {
+    if (code) return match;
+    const token = `PULSARWIKIMATH${expressions.length}TOKEN`;
+    expressions.push(math);
+    return token;
+  });
+  return { text: protectedText, expressions };
+}
+
+function postProcessHtml(html, expressions = []) {
+  let processed = html.replace(
     /href="WIKILINK:([^"]+)"/g,
     (_, page) => `href="${wikiPath(page)}" class="wiki-link" data-page="${escHtml(normalizeWikiPageName(page))}"`
   );
+  expressions.forEach((expression, index) => {
+    const safeExpression = expression.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    processed = processed.replaceAll(`PULSARWIKIMATH${index}TOKEN`, safeExpression);
+  });
+  return processed;
 }
 
 function renderMd(content) {
-  return postProcessHtml(marked.parse(preprocessMd(content)));
+  const protectedContent = protectLatex(preprocessMd(content));
+  return postProcessHtml(marked.parse(protectedContent.text), protectedContent.expressions);
+}
+
+function typesetMath(root) {
+  if (!root || typeof renderMathInElement !== 'function') return;
+  renderMathInElement(root, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '\\(', right: '\\)', display: false },
+      { left: '$', right: '$', display: false },
+    ],
+    throwOnError: false,
+    ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+  });
 }
 
 function wikiLinkForInAppNavigation(event) {
@@ -284,6 +316,7 @@ async function openPage(name, { historyMode = 'push' } = {}) {
   try {
     const data = await api.getWikiPage(page);
     dom.wikiBody.innerHTML = `<div class="md-body">${renderMd(data.content)}</div>`;
+    typesetMath(dom.wikiBody);
     dom.wikiBody.querySelectorAll('a.wiki-link').forEach(link => link.addEventListener('click', event => {
       event.preventDefault();
       openPage(link.dataset.page);
@@ -620,6 +653,7 @@ async function openRawFile(name, ext, file = {}, updateHash = true) {
 
     if (['md', 'markdown'].includes(normalizedExt)) {
       dom.documentStage.innerHTML = `<article class="document-reading-surface md-body">${renderMd(content)}</article>`;
+      typesetMath(dom.documentStage);
       dom.documentStage.querySelectorAll('a.wiki-link').forEach(a => {
         a.addEventListener('click', event => {
           event.preventDefault();
@@ -1242,6 +1276,7 @@ function handleAiChunk(text) {
   if (!aiTarget || typeof text !== 'string') return;
   aiTarget.buffer += text;
   aiTarget.el.innerHTML = '<div class="md-body" style="padding:0">' + renderMd(aiTarget.buffer) + '</div>';
+  typesetMath(aiTarget.el);
   scrollChat();
 }
 
@@ -1284,6 +1319,7 @@ function appendChatMsg(role, text) {
   const el = document.createElement('div');
   el.className = 'chat-msg ' + role;
   el.innerHTML = '<div class="chat-avatar">' + (role === 'user' ? 'U' : 'AI') + '</div><div class="chat-bubble">' + (role === 'user' ? escHtml(text) : renderMd(text)) + '</div>';
+  if (role !== 'user') typesetMath(el);
   dom.chatMessages.appendChild(el);
   scrollChat();
 }

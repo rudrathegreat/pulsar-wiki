@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const katex = require('katex');
 const marked = require('marked');
 
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
@@ -43,7 +44,7 @@ function loadClientHelpers() {
     },
   };
   vm.createContext(context);
-  vm.runInContext(`${helperSource}\nglobalThis.__helpers = { stripEmoji, normalizeWikiPageName, wikiPath, wikiPageFromPath, preprocessMd, renderMd, wikiLinkForInAppNavigation };`, context);
+  vm.runInContext(`${helperSource}\nglobalThis.__helpers = { stripEmoji, normalizeWikiPageName, wikiPath, wikiPageFromPath, preprocessMd, renderMd, typesetMath, wikiLinkForInAppNavigation };`, context);
   return context.__helpers;
 }
 
@@ -157,6 +158,22 @@ test('chat wiki links render canonical routes and only plain primary clicks navi
   assert.match(appSource, /handleAiChunk[\s\S]*renderMd\(aiTarget\.buffer\)/);
   assert.match(appSource, /appendChatMsg[\s\S]*renderMd\(text\)/);
   assert.match(appSource, /dom\.chatMessages\.addEventListener\('click', handleChatWikiLink\)/);
+});
+
+test('LaTeX delimiters survive Markdown rendering and KaTeX assets are local', () => {
+  const helpers = loadClientHelpers();
+  const html = helpers.renderMd('Display: \\[ \\Delta t = x_1^2 \\] and inline $f^{-2}$. `code $x$`');
+  assert.match(html, /\\\[ \\Delta t = x_1\^2 \\\]/);
+  assert.match(html, /\$f\^\{-2\}\$/);
+  assert.match(html, /<code>code \$x\$<\/code>/);
+  assert.match(indexSource, /href="\/vendor\/katex\/katex\.min\.css"/);
+  assert.match(indexSource, /src="\/vendor\/katex\/katex\.min\.js"/);
+  assert.match(indexSource, /src="\/vendor\/katex\/contrib\/auto-render\.min\.js"/);
+  assert.match(serverSource, /app\.use\('\/vendor\/katex'/);
+  assert.match(appSource, /typesetMath\(dom\.wikiBody\)/);
+  assert.match(appSource, /typesetMath\(dom\.documentStage\)/);
+  assert.match(appSource, /typesetMath\(aiTarget\.el\)/);
+  assert.doesNotThrow(() => katex.renderToString('\\Delta t = x_1^2 + f^{-2}', { throwOnError: true }));
 });
 
 test('UI source uses only approved palettes and contains no built-in emojis', () => {
