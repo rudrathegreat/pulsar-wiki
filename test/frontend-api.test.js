@@ -86,6 +86,25 @@ test('frontend disconnect and forget requests use their dedicated account routes
   ]);
 });
 
+test('handover generation and reviewed publishing use dedicated APIs', async () => {
+  const requests = [];
+  const api = loadApi(async (url, options = {}) => {
+    requests.push({ url, options });
+    if (url.endsWith('/generate')) return response(200, { draft: '# Project Handover' });
+    return response(200, { ok: true, page: 'project-handover' });
+  });
+
+  const selection = { projectName: 'Timing study', pages: ['pulsar-timing'], sources: ['paper.pdf'] };
+  assert.match((await api.generateHandover(selection)).draft, /Project Handover/);
+  assert.equal((await api.publishHandover('# Project Handover')).page, 'project-handover');
+  assert.deepEqual(requests.map(request => [request.url, request.options.method]), [
+    ['/api/handover/generate', 'POST'],
+    ['/api/handover/publish', 'POST'],
+  ]);
+  assert.deepEqual(JSON.parse(requests[0].options.body), selection);
+  assert.deepEqual(JSON.parse(requests[1].options.body), { content: '# Project Handover', reviewed: true });
+});
+
 test('frontend surfaces safe server failures', async () => {
   const api = loadApi(async () => response(403, { error: 'Reconnect ChatGPT and approve subscription use.' }));
   await assert.rejects(api.getChatGPTStatus(), /Reconnect ChatGPT/);
@@ -206,4 +225,19 @@ test('chat switches the existing sidebar instead of rendering a third chat sideb
   assert.match(appSource, /classList\.toggle\('chat-mode', name === 'chat'\)/);
   assert.match(styleSource, /#sidebar\.chat-mode #sidebar-chat\s*\{\s*display: flex/);
   assert.doesNotMatch(styleSource, /\.chat-sidebar\s*\{[^}]*max-height:\s*132px/s);
+});
+
+test('project handover is a selection-based, review-gated wiki workflow', () => {
+  for (const id of [
+    'ib-handover', 'panel-handover', 'handover-wiki-options', 'handover-file-options',
+    'handover-editor', 'handover-preview', 'handover-reviewed', 'handover-publish',
+  ]) assert.match(indexSource, new RegExp(`id="${id}"`));
+  assert.match(indexSource, /I have reviewed this handover/);
+  assert.match(indexSource, /Papers, notebooks, annotations and supporting files/);
+  assert.match(appSource, /if \(!state\.chatgpt\?\.ready\)/);
+  assert.match(appSource, /handover-reviewed'[\s\S]*handover-publish/);
+  assert.match(serverSource, /app\.post\('\/api\/handover\/generate', requireLocalMutation/);
+  assert.match(serverSource, /Do not call apply_wiki_changes and do not modify any file/);
+  assert.match(serverSource, /req\.body\?\.reviewed !== true/);
+  assert.match(serverSource, /wikiTools\.applyWikiChanges\([\s\S]*name: 'project-handover'[\s\S]*name: 'index'/);
 });

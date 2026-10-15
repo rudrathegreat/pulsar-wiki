@@ -165,6 +165,16 @@ const api = {
   async getSourceJob(id) {
     return readJsonResponse(await fetch(`/api/sources/jobs/${encodeURIComponent(id)}`), 'Wiki update');
   },
+  async generateHandover(payload) {
+    return readJsonResponse(await fetch('/api/handover/generate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    }), 'Project handover');
+  },
+  async publishHandover(content) {
+    return readJsonResponse(await fetch('/api/handover/publish', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, reviewed: true }),
+    }), 'Project handover');
+  },
   async getGraph() { return readJsonResponse(await fetch('/api/graph'), 'Wiki graph'); },
   async search(query) { return readJsonResponse(await fetch(`/api/search?q=${encodeURIComponent(query)}`), 'Search'); },
   async uploadFile(file, onProgress) {
@@ -215,6 +225,7 @@ const state = {
   documentSession: 0,
   currentDocument: null,
   pdf: { lib: null, doc: null, page: 1, scale: 1, fitWidth: true, renderTask: null, renderId: 0, resizeTimer: null },
+  handover: { loaded: false, generating: false, publishing: false, selectedPages: new Set(), selectedSources: new Set(), draft: '' },
 };
 
 const $ = id => document.getElementById(id);
@@ -282,10 +293,11 @@ function showPanel(name) {
   document.querySelectorAll('.icon-btn[data-panel]').forEach(button => button.classList.toggle('active', button.dataset.panel === navigationPanel));
   if (name === 'graph') showGraph();
   if (name === 'files') loadFiles();
+  if (name === 'handover') loadHandoverWorkspace();
 }
 
 const PILLAR_LABELS = [
-  'Other', 'Foundational Physics', 'Taxonomy & Evolution', 'Observational Methods', 'Facilities & Tools', 'Notable Objects',
+  'Other', 'Foundational Physics', 'Taxonomy & Evolution', 'Observational Methods', 'Facilities & Tools', 'Notable Objects', 'Project Continuity',
 ];
 
 function buildSidebar(pages) {
@@ -641,6 +653,204 @@ async function loadFiles() {
     });
   });
 }
+
+// Project handover
+function handoverMaterialKind(file) {
+  const ext = String(file.ext || '').toLowerCase();
+  if (ext === 'pdf') return 'Paper';
+  if (ext === 'ipynb') return 'Notebook';
+  if (['py', 'r'].includes(ext)) return 'Analysis';
+  if (['csv', 'tsv', 'json'].includes(ext)) return 'Data';
+  if (/annot|note|comment/i.test(file.name)) return 'Annotation';
+  return 'Supporting';
+}
+
+function handoverOptionMarkup(type, name, detail, checked) {
+  return `<label class="handover-option">
+    <input type="checkbox" data-handover-type="${type}" data-handover-name="${escHtml(name)}" ${checked ? 'checked' : ''}/>
+    <strong title="${escHtml(name)}">${escHtml(name)}</strong>
+    <small>${escHtml(detail)}</small>
+  </label>`;
+}
+
+function setHandoverStep(step) {
+  document.querySelectorAll('[data-handover-step]').forEach(item => {
+    item.classList.toggle('active', Number(item.dataset.handoverStep) <= step);
+  });
+}
+
+function setHandoverStatus(message = '', error = false) {
+  const status = $('handover-status');
+  status.textContent = stripEmoji(message);
+  status.classList.toggle('error', error);
+}
+
+function updateHandoverSelection() {
+  const total = state.handover.selectedPages.size + state.handover.selectedSources.size;
+  $('handover-selection-count').textContent = `${total} selected`;
+  $('handover-generate').disabled = !total || state.handover.generating || state.handover.publishing;
+  for (const type of ['wiki', 'raw']) {
+    const options = document.querySelectorAll(`[data-handover-type="${type}"]`);
+    const selected = type === 'wiki' ? state.handover.selectedPages : state.handover.selectedSources;
+    const toggle = document.querySelector(`[data-handover-toggle="${type}"]`);
+    if (toggle) toggle.textContent = options.length && selected.size === options.length ? 'Clear all' : 'Select all';
+  }
+}
+
+async function loadHandoverWorkspace(force = false) {
+  if (state.handover.loaded && !force) return;
+  state.handover.loaded = true;
+  try {
+    const [pages, files] = await Promise.all([api.getWikiList(), api.getRawList()]);
+    const selectablePages = pages.filter(page => !['log', 'project-handover'].includes(page.name));
+    const availablePageNames = new Set(selectablePages.map(page => page.name));
+    const availableSourceNames = new Set(files.map(file => file.name));
+    state.handover.selectedPages = new Set([...state.handover.selectedPages].filter(name => availablePageNames.has(name)));
+    state.handover.selectedSources = new Set([...state.handover.selectedSources].filter(name => availableSourceNames.has(name)));
+
+    $('handover-wiki-options').innerHTML = selectablePages.length
+      ? selectablePages.sort((a, b) => a.name.localeCompare(b.name)).map(page => handoverOptionMarkup('wiki', page.name, 'Wiki', state.handover.selectedPages.has(page.name))).join('')
+      : '<div class="handover-loading">No wiki pages are available.</div>';
+    $('handover-file-options').innerHTML = files.length
+      ? files.sort((a, b) => a.name.localeCompare(b.name)).map(file => handoverOptionMarkup('raw', file.name, handoverMaterialKind(file), state.handover.selectedSources.has(file.name))).join('')
+      : '<div class="handover-loading">No research materials are available.</div>';
+    $('handover-open-page').disabled = !pages.some(page => page.name === 'project-handover');
+    updateHandoverSelection();
+  } catch (error) {
+    state.handover.loaded = false;
+    $('handover-wiki-options').innerHTML = '<div class="handover-loading">Could not load wiki pages.</div>';
+    $('handover-file-options').innerHTML = '<div class="handover-loading">Could not load research materials.</div>';
+    setHandoverStatus(error.message, true);
+  }
+}
+
+function setHandoverView(view) {
+  const previewing = view === 'preview';
+  $('handover-edit-tab').classList.toggle('active', !previewing);
+  $('handover-edit-tab').setAttribute('aria-selected', String(!previewing));
+  $('handover-preview-tab').classList.toggle('active', previewing);
+  $('handover-preview-tab').setAttribute('aria-selected', String(previewing));
+  $('handover-editor').hidden = previewing;
+  $('handover-preview').hidden = !previewing;
+  if (previewing) {
+    $('handover-preview').innerHTML = renderMd($('handover-editor').value);
+    typesetMath($('handover-preview'));
+  }
+}
+
+async function generateHandover() {
+  const projectName = $('handover-project-name').value.trim();
+  if (!projectName) {
+    setHandoverStatus('Add a project name before generating the handover.', true);
+    $('handover-project-name').focus();
+    return;
+  }
+  if (!state.handover.selectedPages.size && !state.handover.selectedSources.size) {
+    setHandoverStatus('Select at least one workspace item.', true);
+    return;
+  }
+  if (!state.chatgpt?.ready) {
+    setHandoverStatus('Connect your ChatGPT subscription before generating a draft.', true);
+    void refreshChatGPTStatus({ open: true, message: 'Connect ChatGPT to generate a project handover.' });
+    return;
+  }
+
+  state.handover.generating = true;
+  $('handover-generate').textContent = 'Reading workspace and drafting...';
+  updateHandoverSelection();
+  setHandoverStep(2);
+  setHandoverStatus('AI is tracing the selected evidence. This can take a minute.');
+  try {
+    const result = await api.generateHandover({
+      projectName,
+      context: $('handover-context').value.trim(),
+      pages: [...state.handover.selectedPages],
+      sources: [...state.handover.selectedSources],
+    });
+    state.handover.draft = result.draft;
+    $('handover-editor').value = result.draft;
+    $('handover-empty').hidden = true;
+    $('handover-editor').hidden = false;
+    $('handover-review').hidden = false;
+    $('handover-reviewed').checked = false;
+    $('handover-publish').disabled = true;
+    setHandoverView('edit');
+    setHandoverStep(3);
+    setHandoverStatus('Draft ready. Edit it as needed, verify every claim and reference, then confirm your review.');
+  } catch (error) {
+    setHandoverStep(1);
+    setHandoverStatus(error.message, true);
+  } finally {
+    state.handover.generating = false;
+    $('handover-generate').textContent = state.handover.draft ? 'Regenerate from selection' : 'Generate handover draft';
+    updateHandoverSelection();
+  }
+}
+
+async function publishHandover() {
+  if (!$('handover-reviewed').checked) return;
+  const content = $('handover-editor').value.trim();
+  if (!content) {
+    setHandoverStatus('The reviewed handover is empty.', true);
+    return;
+  }
+  state.handover.publishing = true;
+  $('handover-publish').disabled = true;
+  $('handover-publish').textContent = 'Publishing...';
+  setHandoverStatus('Saving the reviewed guide, index entry and audit log together.');
+  try {
+    await api.publishHandover(content);
+    state.handover.draft = content;
+    setHandoverStep(4);
+    setHandoverStatus('Published. The reviewed guide is now part of the wiki.');
+    $('handover-publish').textContent = 'Published';
+    $('handover-reviewed').checked = false;
+    $('handover-open-page').disabled = false;
+    buildSidebar(await api.getWikiList());
+  } catch (error) {
+    $('handover-publish').textContent = 'Publish reviewed guide';
+    setHandoverStatus(error.message, true);
+  } finally {
+    state.handover.publishing = false;
+    $('handover-publish').disabled = !$('handover-reviewed').checked;
+  }
+}
+
+for (const containerId of ['handover-wiki-options', 'handover-file-options']) {
+  $(containerId).addEventListener('change', event => {
+    const input = event.target.closest('[data-handover-type][data-handover-name]');
+    if (!input) return;
+    const selected = input.dataset.handoverType === 'wiki' ? state.handover.selectedPages : state.handover.selectedSources;
+    if (input.checked) selected.add(input.dataset.handoverName); else selected.delete(input.dataset.handoverName);
+    updateHandoverSelection();
+  });
+}
+
+document.querySelectorAll('[data-handover-toggle]').forEach(button => button.addEventListener('click', () => {
+  const type = button.dataset.handoverToggle;
+  const options = [...document.querySelectorAll(`[data-handover-type="${type}"]`)];
+  const selected = type === 'wiki' ? state.handover.selectedPages : state.handover.selectedSources;
+  const shouldSelect = selected.size !== options.length;
+  selected.clear();
+  options.forEach(option => { option.checked = shouldSelect; if (shouldSelect) selected.add(option.dataset.handoverName); });
+  updateHandoverSelection();
+}));
+
+$('handover-generate').addEventListener('click', () => { void generateHandover(); });
+$('handover-edit-tab').addEventListener('click', () => setHandoverView('edit'));
+$('handover-preview-tab').addEventListener('click', () => setHandoverView('preview'));
+$('handover-editor').addEventListener('input', () => {
+  state.handover.draft = $('handover-editor').value;
+  $('handover-reviewed').checked = false;
+  $('handover-publish').disabled = true;
+  $('handover-publish').textContent = 'Publish reviewed guide';
+  if (!$('handover-preview').hidden) setHandoverView('preview');
+});
+$('handover-reviewed').addEventListener('change', () => {
+  $('handover-publish').disabled = !$('handover-reviewed').checked || state.handover.publishing;
+});
+$('handover-publish').addEventListener('click', () => { void publishHandover(); });
+$('handover-open-page').addEventListener('click', () => { void openPage('project-handover'); });
 
 const SOURCE_FILTERS = [
   { key: 'author', label: 'Author', example: 'author:"Jocelyn Bell Burnell"' },

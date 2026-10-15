@@ -272,6 +272,26 @@ test('invalid empty submissions are rejected without a diagnostic record', async
   assert.equal(store.get(thread.id).failures.length, 0);
 });
 
+test('task-scoped agent turns expose only explicitly allowed tools', async t => {
+  const store = temporaryStore(t);
+  let exposedTools = [];
+  const service = new AgentService({
+    threadStore: store,
+    authService: { async inferenceConfig() { return { accessToken: 'token', model: 'model' }; } },
+    wikiTools: {
+      definitions() { return [{ name: 'read_source' }, { name: 'apply_wiki_changes' }]; },
+      execute() { throw new Error('must not be called'); },
+    },
+    instructions: 'snapshot',
+    providerFactory: () => ({
+      async runTurn(input) { exposedTools = input.tools; return { text: 'Read-only result' }; },
+    }),
+  });
+  const thread = service.createThread('Scoped tools');
+  await service.runTurn({ threadId: thread.id, text: 'Draft only', allowedTools: ['read_source'] });
+  assert.deepEqual(exposedTools, [{ name: 'read_source' }]);
+});
+
 test('ChatGPT replays reasoning and namespaced calls through a reasoning-only response to the final message', async () => {
   const requests = [];
   const options = [];

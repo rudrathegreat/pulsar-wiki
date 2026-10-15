@@ -48,6 +48,20 @@ test('wiki tools tolerate common provider argument aliases and treat a missing p
   assert.equal(tools.searchWiki({ searchQuery: 'residual' }).results[0].page, 'timing');
 });
 
+test('wiki tools extract notebook code, Markdown, and plain-text outputs for handovers', async t => {
+  const { raw, tools } = fixture(t);
+  fs.writeFileSync(path.join(raw, 'analysis.ipynb'), JSON.stringify({
+    cells: [
+      { cell_type: 'markdown', source: ['# Method\n', 'Barycentre the observations.'], outputs: [] },
+      { cell_type: 'code', source: ['fit_timing_model(data)'], outputs: [{ text: ['RMS: 1.2 us'] }] },
+    ],
+  }));
+  const notebook = await tools.readSource({ name: 'analysis.ipynb' });
+  assert.match(notebook.content, /Cell 1 \(markdown\)/);
+  assert.match(notebook.content, /fit_timing_model\(data\)/);
+  assert.match(notebook.content, /RMS: 1\.2 us/);
+});
+
 test('wiki writes require an index update, preserve raw, append log, and roll back a failed batch', t => {
   const { wiki, raw, tools } = fixture(t);
   assert.throws(

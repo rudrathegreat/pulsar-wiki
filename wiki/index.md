@@ -40,5 +40,8 @@ Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pul
 - [[crab-pulsar]]: The multi-wavelength remnant of SN 1054.
 - [[pulsar-catalog]]: A directory of physical parameters for known pulsars.
 
+## Project Continuity
+- [[project-handover]]: A researcher-reviewed guide to project context, evidence, methods, decisions, open questions, and next steps.
+
 ---
-*Last updated: 2026-10-06*
+*Last updated: 2026-10-15*

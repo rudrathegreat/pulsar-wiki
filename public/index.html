@@ -25,6 +25,9 @@
     <button class="icon-btn" id="ib-files" title="Source Files" data-panel="files">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
     </button>
+    <button class="icon-btn" id="ib-handover" title="Project Handover" aria-label="Project Handover" data-panel="handover">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 4V2h6v2M8 9h8M8 13h5M15 16l2 2 3-4"/></svg>
+    </button>
     <button class="icon-btn chatgpt-settings-icon" id="chatgpt-settings-button" type="button" title="ChatGPT subscription settings" aria-label="ChatGPT subscription settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06-2 2-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V20h-3v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06-2-2 .06-.06A1.65 1.65 0 0 0 7.4 15a1.65 1.65 0 0 0-1.51-1H5.8v-3h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06 2-2 .06.06A1.65 1.65 0 0 0 10.89 6.5h.01A1.65 1.65 0 0 0 12 5V4.8h3V5a1.65 1.65 0 0 0 1 1.5 1.65 1.65 0 0 0 1.82-.33l.06-.06 2 2-.06.06A1.65 1.65 0 0 0 19.5 10v.01A1.65 1.65 0 0 0 21 11h.2v3H21a1.65 1.65 0 0 0-1.6 1z"/></svg>
       <span class="dot-online" id="ws-dot"></span>
@@ -222,6 +225,95 @@
             </header>
             <div class="files-grid" id="files-grid"><!-- populated by JS --></div>
           </section>
+        </div>
+      </div>
+
+      <!-- Project handover panel -->
+      <div class="panel" id="panel-handover">
+        <div class="handover-shell">
+          <header class="handover-header">
+            <div>
+              <p class="sources-eyebrow">Research continuity</p>
+              <h2>Project Handover</h2>
+              <p class="handover-subtitle">Turn the accumulated workspace into a reviewed guide that a new researcher can act on.</p>
+            </div>
+            <button class="handover-link-button" id="handover-open-page" type="button">Open published guide</button>
+          </header>
+
+          <ol class="handover-steps" aria-label="Handover workflow">
+            <li class="active" data-handover-step="1"><span>1</span><div><strong>Select</strong><small>Choose evidence</small></div></li>
+            <li data-handover-step="2"><span>2</span><div><strong>Generate</strong><small>Organise with AI</small></div></li>
+            <li data-handover-step="3"><span>3</span><div><strong>Review</strong><small>Edit and verify</small></div></li>
+            <li data-handover-step="4"><span>4</span><div><strong>Publish</strong><small>Update the wiki</small></div></li>
+          </ol>
+
+          <div class="handover-layout">
+            <section class="handover-card handover-materials" aria-labelledby="handover-materials-title">
+              <div class="handover-card-header">
+                <div><span class="handover-kicker">Source set</span><h3 id="handover-materials-title">What should be carried forward?</h3></div>
+                <span class="handover-count" id="handover-selection-count">0 selected</span>
+              </div>
+
+              <label class="handover-field">Project name
+                <input id="handover-project-name" type="text" maxlength="120" placeholder="e.g. MeerKAT timing campaign"/>
+              </label>
+              <label class="handover-field">Context for the next researcher <span>Optional</span>
+                <textarea id="handover-context" rows="3" maxlength="2000" placeholder="Add scope, deadlines, ownership, or details that may not yet be in the workspace."></textarea>
+              </label>
+
+              <div class="handover-selector" id="handover-wiki-selector">
+                <div class="handover-selector-header">
+                  <div><strong>Wiki pages</strong><small>Methods, decisions, findings and context</small></div>
+                  <button type="button" data-handover-toggle="wiki">Select all</button>
+                </div>
+                <div class="handover-options" id="handover-wiki-options"><div class="handover-loading">Loading wiki pages...</div></div>
+              </div>
+
+              <div class="handover-selector" id="handover-file-selector">
+                <div class="handover-selector-header">
+                  <div><strong>Research materials</strong><small>Papers, notebooks, annotations and supporting files</small></div>
+                  <button type="button" data-handover-toggle="raw">Select all</button>
+                </div>
+                <div class="handover-options" id="handover-file-options"><div class="handover-loading">Loading research materials...</div></div>
+              </div>
+
+              <div class="handover-ai-note">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+                <p>AI will organise only the material you select. It will flag missing evidence and unresolved questions instead of inventing answers.</p>
+              </div>
+              <button class="handover-primary" id="handover-generate" type="button">Generate handover draft</button>
+            </section>
+
+            <section class="handover-card handover-draft" aria-labelledby="handover-draft-title">
+              <div class="handover-card-header">
+                <div><span class="handover-kicker">Review workspace</span><h3 id="handover-draft-title">Handover draft</h3></div>
+                <div class="handover-view-tabs" role="tablist" aria-label="Draft view">
+                  <button class="active" id="handover-edit-tab" type="button" role="tab" aria-selected="true">Edit</button>
+                  <button id="handover-preview-tab" type="button" role="tab" aria-selected="false">Preview</button>
+                </div>
+              </div>
+
+              <div class="handover-empty" id="handover-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-5"/></svg>
+                <strong>Your draft will appear here</strong>
+                <p>Select the material that matters. PulsarWiki will trace the evidence, organise the project story, and surface gaps for your review.</p>
+              </div>
+              <textarea id="handover-editor" class="handover-editor" aria-label="Handover Markdown draft" spellcheck="true" hidden></textarea>
+              <div id="handover-preview" class="handover-preview md-body" hidden></div>
+              <div class="handover-status" id="handover-status" role="status" aria-live="polite"></div>
+
+              <div class="handover-review" id="handover-review" hidden>
+                <label>
+                  <input id="handover-reviewed" type="checkbox"/>
+                  <span><strong>I have reviewed this handover</strong><small>I checked claims, references, assumptions, decisions, open questions, and next steps.</small></span>
+                </label>
+                <div class="handover-publish-row">
+                  <span>Publishes as <code>project-handover.md</code></span>
+                  <button class="handover-primary" id="handover-publish" type="button" disabled>Publish reviewed guide</button>
+                </div>
+              </div>
+            </section>
+          </div>
         </div>
       </div>
 

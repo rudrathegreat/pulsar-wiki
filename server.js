@@ -184,6 +184,29 @@ function safeBase(name) {
   return path.basename(name).replace(/\.\./g, '');
 }
 
+function selectedWorkspaceItems(values, available, maximum, label) {
+  if (!Array.isArray(values)) return [];
+  const unique = [...new Set(values.map(value => String(value || '').trim()).filter(Boolean))];
+  if (unique.length > maximum) throw new AgentServiceError(`Select no more than ${maximum} ${label}.`, 'handover-selection-too-large');
+  if (unique.some(value => !available.has(value))) throw new AgentServiceError(`One or more selected ${label} are no longer in this workspace.`, 'handover-selection-stale');
+  return unique;
+}
+
+function cleanGeneratedMarkdown(value) {
+  const content = String(value || '').trim();
+  const fenced = content.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/i);
+  return (fenced ? fenced[1] : content).trim();
+}
+
+function indexWithProjectHandover(content, date) {
+  let next = String(content || '').replace(/\*Last updated:\s*[^*]+\*/i, `*Last updated: ${date}*`);
+  if (next.includes('[[project-handover]]')) return next;
+  const section = '## Project Continuity\n- [[project-handover]]: A reviewed guide to project context, evidence, methods, decisions, open questions, and next steps.\n\n';
+  const footer = next.lastIndexOf('\n---\n');
+  if (footer >= 0) return `${next.slice(0, footer + 1)}\n${section}${next.slice(footer + 1)}`;
+  return `${next.replace(/\s*$/, '\n\n')}${section}`;
+}
+
 function parseWikiLinks(content) {
   const links = [];
   const expression = /\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g;
@@ -375,6 +398,82 @@ app.get('/api/sources/jobs/:id', requireLocalSession, (req, res) => {
   const job = ingestJobs.get(req.params.id);
   if (!job) return res.status(404).json({ error: 'Ingest job not found.' });
   return res.json(publicIngestJob(job));
+});
+
+// --- Project handover ---
+app.post('/api/handover/generate', requireLocalMutation, async (req, res) => {
+  try {
+    const availablePages = new Set(wikiTools.listWikiPages().filter(name => !['log', 'project-handover'].includes(name)));
+    const availableSources = new Set(wikiTools.listSources().map(source => source.name));
+    const pages = selectedWorkspaceItems(req.body?.pages, availablePages, 30, 'wiki pages');
+    const sources = selectedWorkspaceItems(req.body?.sources, availableSources, 20, 'research materials');
+    if (!pages.length && !sources.length) return res.status(400).json({ error: 'Select at least one wiki page or research material.' });
+
+    const projectName = String(req.body?.projectName || 'Research project').replace(/[\r\n]+/g, ' ').trim().slice(0, 120) || 'Research project';
+    const context = String(req.body?.context || '').trim().slice(0, 2000);
+    const thread = agentService.createThread(`Handover draft: ${projectName}`);
+    const prompt = `Prepare a comprehensive project handover document for "${projectName}" from the explicitly selected workspace material below.
+
+Selected wiki pages (read each with read_wiki_page):
+${pages.length ? pages.map(name => `- ${name}`).join('\n') : '- None selected'}
+
+Selected research materials in raw/ (read each supported file with read_source; preserve a reference even if its format cannot be extracted):
+${sources.length ? sources.map(name => `- ${name}`).join('\n') : '- None selected'}
+
+Researcher-provided context:
+${context || 'No additional context was provided.'}
+
+Return only a polished Markdown draft. Do not call apply_wiki_changes and do not modify any file. Use exactly this page header format:
+# Project Handover
+
+**Summary**: One or two sentences that identify the project and purpose of the guide.
+
+**Sources**: A comma-separated list of every selected raw source filename, or "Selected wiki pages only" if none were selected.
+
+**Last updated**: ${new Date().toISOString().slice(0, 10)}
+
+---
+
+Then organise the evidence into clear sections covering: project overview and current state; people/ownership details if evidenced; selected material inventory with original wiki links and raw filenames; important methodologies and computational analyses (including reproducibility instructions when recorded); assumptions and limitations; important decisions with rationale; results and interpretation; outstanding research questions; unresolved issues and risks; and prioritised next steps for a new student or collaborator. Preserve wiki references as [[page-name]] and raw references as literal filenames with (source: filename) citations. Distinguish documented facts from researcher context. Mark unsupported, missing, or uncertain claims as "Needs verification". Do not infer decisions, results, owners, commands, paths, or scientific conclusions that are not recorded. End with "## Review record", an unchecked reviewer line, and "## Related pages" linking the selected wiki pages. Make the document useful for continuation, not merely a list of files.`;
+
+    await agentService.runTurn({
+      threadId: thread.id,
+      text: prompt,
+      onDelta() {}, onTool() {}, signal: AbortSignal.timeout(CHAT_TIMEOUT_MS),
+      allowedTools: ['read_wiki_page', 'read_source'],
+    });
+    const completed = agentService.getThread(thread.id);
+    const draft = cleanGeneratedMarkdown(completed.messages?.at(-1)?.text);
+    if (!draft) throw new AgentServiceError('ChatGPT completed without a usable handover draft.', 'empty-response');
+    return res.json({ draft, threadId: thread.id, requiresReview: true, selected: { pages, sources } });
+  } catch (error) {
+    const publicError = asPublicError(error);
+    const status = ['handover-selection-too-large', 'handover-selection-stale', 'invalid-message'].includes(publicError.code) ? 400 : 503;
+    return res.status(status).json({ error: publicError.text, code: publicError.code });
+  }
+});
+
+app.post('/api/handover/publish', requireLocalMutation, (req, res) => {
+  try {
+    if (req.body?.reviewed !== true) return res.status(400).json({ error: 'Researcher review is required before publishing.' });
+    const content = String(req.body?.content || '').trim();
+    if (!content || content.length > 1024 * 1024) return res.status(400).json({ error: 'Provide a handover draft smaller than 1 MB.' });
+    const required = ['# Project Handover', '**Summary**:', '**Sources**:', '**Last updated**:', '## Related pages'];
+    const missing = required.filter(marker => !content.includes(marker));
+    if (missing.length) return res.status(400).json({ error: `The reviewed draft is missing required page structure: ${missing.join(', ')}` });
+
+    const date = new Date().toISOString().slice(0, 10);
+    const indexPath = path.join(WIKI_DIR, 'index.md');
+    const index = indexWithProjectHandover(fs.existsSync(indexPath) ? fs.readFileSync(indexPath, 'utf8') : '# LLM Wiki Index\n', date);
+    const result = wikiTools.applyWikiChanges({
+      changes: [{ name: 'project-handover', content: `${content}\n` }, { name: 'index', content: index }],
+      logSummary: 'Published the researcher-reviewed Project Handover guide and updated the wiki index.',
+    });
+    return res.json({ ...result, page: 'project-handover' });
+  } catch (error) {
+    const publicError = asPublicError(error);
+    return res.status(400).json({ error: publicError.text, code: publicError.code });
+  }
 });
 
 // --- Graph and search API ---

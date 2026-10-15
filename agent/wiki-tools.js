@@ -43,7 +43,7 @@ const TOOL_DEFINITIONS = Object.freeze([
   },
   {
     name: 'read_source',
-    description: 'Read a bounded local text or PDF excerpt from raw/. PDF text is extracted locally; raw files are never changed.',
+    description: 'Read a bounded local text, Markdown, data, notebook, or PDF excerpt from raw/. PDF and notebook text is extracted locally; raw files are never changed.',
     inputSchema: {
       type: 'object',
       properties: { name: { type: 'string' }, offset: { type: 'integer' }, maxChars: { type: 'integer' } },
@@ -187,8 +187,28 @@ class WikiTools {
     const filePath = this.sourcePath(name);
     if (!this.fs.existsSync(filePath)) throw new WikiToolError('Source file not found.', 'source-not-found');
     const extension = path.extname(filePath).toLowerCase();
-    if (extension === '.txt' || extension === '.md') return this.fs.readFileSync(filePath, 'utf8');
-    if (extension !== '.pdf') throw new WikiToolError('Only text, Markdown, and PDF sources can be read.', 'unsupported-source');
+    if (['.txt', '.md', '.markdown', '.csv', '.tsv', '.json', '.yaml', '.yml', '.log', '.tex', '.py', '.r'].includes(extension)) {
+      return this.fs.readFileSync(filePath, 'utf8');
+    }
+    if (extension === '.ipynb') {
+      try {
+        const notebook = JSON.parse(this.fs.readFileSync(filePath, 'utf8'));
+        const cells = Array.isArray(notebook.cells) ? notebook.cells : [];
+        return cells.map((cell, index) => {
+          const source = Array.isArray(cell.source) ? cell.source.join('') : String(cell.source || '');
+          const outputs = Array.isArray(cell.outputs) ? cell.outputs.flatMap(output => {
+            if (Array.isArray(output.text)) return output.text.join('');
+            if (typeof output.text === 'string') return output.text;
+            const plain = output.data?.['text/plain'];
+            return Array.isArray(plain) ? plain.join('') : (typeof plain === 'string' ? plain : '');
+          }).filter(Boolean).join('\n') : '';
+          return `## Cell ${index + 1} (${cell.cell_type || 'unknown'})\n${source}${outputs ? `\n\nOutput:\n${outputs}` : ''}`;
+        }).join('\n\n');
+      } catch {
+        throw new WikiToolError('PulsarWiki could not extract text from that notebook.', 'notebook-extraction-failed');
+      }
+    }
+    if (extension !== '.pdf') throw new WikiToolError('This source type cannot be read as text.', 'unsupported-source');
 
     const stat = this.fs.statSync(filePath);
     const cached = this.pdfCache.get(filePath);

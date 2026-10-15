@@ -66,7 +66,7 @@ class AgentService {
     this.threadStore.delete(id);
   }
 
-  async runTurn({ threadId, text, onDelta, onTool, signal }) {
+  async runTurn({ threadId, text, onDelta, onTool, signal, allowedTools = null }) {
     if (typeof text !== 'string' || !text.trim()) throw new AgentServiceError('A chat message is required.', 'invalid-message');
     if (signal?.aborted) throw new AgentServiceError('The chat request was stopped.', 'aborted');
 
@@ -78,11 +78,13 @@ class AgentService {
     try {
       connection = await this.authService.inferenceConfig();
       const adapter = this.providerFactory({ accessToken: connection.accessToken });
+      const allowedToolNames = Array.isArray(allowedTools) ? new Set(allowedTools) : null;
+      const toolDefinitions = this.wikiTools.definitions().filter(tool => !allowedToolNames || allowedToolNames.has(tool.name));
       const result = await adapter.runTurn({
         model: connection.model,
         instructions,
         messages: [...this.threadStore.context(threadId), { role: 'user', text: userText }],
-        tools: this.wikiTools.definitions(),
+        tools: toolDefinitions,
         signal,
         onDelta,
         onTool: event => {
@@ -91,7 +93,10 @@ class AgentService {
           toolEvents.push(publicEvent);
           onTool?.(publicEvent);
         },
-        executeTool: (name, args) => this.wikiTools.execute(name, args),
+        executeTool: (name, args) => {
+          if (allowedToolNames && !allowedToolNames.has(name)) throw new AgentServiceError('This tool is not available for the current task.', 'tool-not-allowed');
+          return this.wikiTools.execute(name, args);
+        },
       });
       if (signal?.aborted) throw new AgentServiceError('The chat request was stopped.', 'aborted');
       if (!result?.text?.trim()) {
