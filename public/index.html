@@ -148,16 +148,81 @@
 
       <!-- Files panel -->
       <div class="panel" id="panel-files">
-        <div class="files-header">
-          <h2>Source Files</h2>
-          <span class="badge" id="files-count">0</span>
-          <div class="files-header-spacer"></div>
-          <button class="upload-btn" id="files-upload-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
-            Add File
-          </button>
+        <div class="sources-shell">
+          <header class="sources-header">
+            <div>
+              <p class="sources-eyebrow">Research workspace</p>
+              <h2>Sources</h2>
+            </div>
+            <div class="source-job-status" id="source-job-status" role="status" aria-live="polite"></div>
+          </header>
+
+          <div class="source-tabs" role="tablist" aria-label="Source views">
+            <button class="source-tab active" id="source-tab-add" type="button" role="tab" aria-selected="true" aria-controls="source-view-add" data-source-view="add">Add sources</button>
+            <button class="source-tab" id="source-tab-saved" type="button" role="tab" aria-selected="false" aria-controls="source-view-saved" data-source-view="saved">Saved sources <span class="badge" id="files-count">0</span></button>
+          </div>
+
+          <section class="source-view active" id="source-view-add" role="tabpanel" aria-labelledby="source-tab-add">
+            <div class="source-intro">
+              <h3>Find the research you need</h3>
+              <p>Ask a research question, enter keywords, or paste a paper title, DOI, arXiv ID, or ADS link. Searches use arXiv and NASA ADS.</p>
+            </div>
+
+            <form class="source-search-form" id="source-search-form">
+              <div class="source-search-box" id="source-search-box">
+                <svg class="source-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input id="source-search-input" type="text" autocomplete="off" spellcheck="false" aria-autocomplete="list" aria-controls="source-filter-suggestions" placeholder="Ask a question or enter a title, DOI, arXiv ID, or ADS link"/>
+                <span class="source-query-intent" id="source-query-intent">Smart search</span>
+                <button class="source-search-submit" id="source-search-submit" type="submit">Search</button>
+                <div class="source-filter-suggestions" id="source-filter-suggestions" role="listbox"></div>
+              </div>
+              <div class="source-search-help">
+                <span>Refine in the search bar:</span>
+                <button type="button" data-filter-example="author:&quot;&quot;">author:</button>
+                <button type="button" data-filter-example="year:">year:</button>
+                <button type="button" data-filter-example="object:&quot;&quot;">object:</button>
+                <button type="button" data-filter-example="category:">category:</button>
+                <button type="button" data-filter-example="source:">source:</button>
+              </div>
+            </form>
+
+            <div class="source-methods" aria-label="Ways to add a source">
+              <article class="source-method">
+                <span class="source-method-number">01</span>
+                <div><strong>Explore a question</strong><p>Use natural language or keywords to search astronomy literature.</p></div>
+              </article>
+              <article class="source-method">
+                <span class="source-method-number">02</span>
+                <div><strong>Find a known paper</strong><p>Paste a title, DOI, arXiv ID, or ADS link for a precise lookup.</p></div>
+              </article>
+              <button class="source-method source-upload-method" id="files-upload-btn" type="button">
+                <span class="source-method-number">03</span>
+                <div><strong>Upload a file</strong><p>Add PDF, text, or Markdown from your computer.</p></div>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </button>
+            </div>
+
+            <div class="source-search-status" id="source-search-status" role="status" aria-live="polite"></div>
+            <section class="source-results-section" id="source-results-section" hidden>
+              <header class="source-results-header">
+                <div><p class="sources-eyebrow">Discover</p><h3 id="source-results-title">Search results</h3></div>
+                <button class="source-import-button" id="source-import-selected" type="button" disabled>Import selected <span id="source-selected-count">0</span></button>
+              </header>
+              <div class="source-results" id="source-results"></div>
+            </section>
+          </section>
+
+          <section class="source-view" id="source-view-saved" role="tabpanel" aria-labelledby="source-tab-saved" hidden>
+            <header class="saved-sources-header">
+              <div><h3>Saved sources</h3><p>Documents in the current research workspace.</p></div>
+              <button class="upload-btn" id="saved-upload-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+                Upload file
+              </button>
+            </header>
+            <div class="files-grid" id="files-grid"><!-- populated by JS --></div>
+          </section>
         </div>
-        <div class="files-grid" id="files-grid"><!-- populated by JS --></div>
       </div>
 
       <!-- In-app document viewer -->

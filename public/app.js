@@ -149,6 +149,22 @@ const api = {
     }), 'Wiki page');
   },
   async getRawList() { return readJsonResponse(await fetch('/api/raw'), 'Source files'); },
+  async searchSources(query, limit = 20) {
+    return readJsonResponse(await fetch('/api/sources/search', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, limit }),
+    }), 'Paper search');
+  },
+  async getRelatedSources(id) {
+    return readJsonResponse(await fetch(`/api/sources/${encodeURIComponent(id)}/related`), 'Related papers');
+  },
+  async importSources(ids) {
+    return readJsonResponse(await fetch('/api/sources/import', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
+    }), 'Paper import');
+  },
+  async getSourceJob(id) {
+    return readJsonResponse(await fetch(`/api/sources/jobs/${encodeURIComponent(id)}`), 'Wiki update');
+  },
   async getGraph() { return readJsonResponse(await fetch('/api/graph'), 'Wiki graph'); },
   async search(query) { return readJsonResponse(await fetch(`/api/search?q=${encodeURIComponent(query)}`), 'Search'); },
   async uploadFile(file, onProgress) {
@@ -179,6 +195,12 @@ const state = {
   wikiPages: [],
   currentPage: null,
   rawFiles: [],
+  sourceView: 'add',
+  sourceResults: [],
+  selectedSourceIds: new Set(),
+  activeSourceId: null,
+  sourceFilters: [],
+  sourceJobTimer: null,
   graphData: null,
   graphInit: false,
   graph: { simulation: null, resizeObserver: null, svg: null, zoom: null, width: 0, height: 0 },
@@ -226,6 +248,16 @@ const dom = {
   get chatgptError() { return $('chatgpt-error'); },
   get filesGrid() { return $('files-grid'); },
   get filesCount() { return $('files-count'); },
+  get sourceSearchForm() { return $('source-search-form'); },
+  get sourceSearchInput() { return $('source-search-input'); },
+  get sourceQueryIntent() { return $('source-query-intent'); },
+  get sourceFilterSuggestions() { return $('source-filter-suggestions'); },
+  get sourceSearchStatus() { return $('source-search-status'); },
+  get sourceResultsSection() { return $('source-results-section'); },
+  get sourceResults() { return $('source-results'); },
+  get sourceSelectedCount() { return $('source-selected-count'); },
+  get sourceImportSelected() { return $('source-import-selected'); },
+  get sourceJobStatus() { return $('source-job-status'); },
   get uploadModal() { return $('upload-modal'); },
   get newPageModal() { return $('new-page-modal'); },
   get dropzone() { return $('dropzone'); },
@@ -610,6 +642,307 @@ async function loadFiles() {
   });
 }
 
+const SOURCE_FILTERS = [
+  { key: 'author', label: 'Author', example: 'author:"Jocelyn Bell Burnell"' },
+  { key: 'year', label: 'Publication year', example: 'year:2024' },
+  { key: 'from', label: 'Published from', example: 'from:2020' },
+  { key: 'to', label: 'Published through', example: 'to:2026' },
+  { key: 'title', label: 'Exact title', example: 'title:"pulsar timing arrays"' },
+  { key: 'object', label: 'Astronomical object', example: 'object:"Crab pulsar"' },
+  { key: 'category', label: 'arXiv category', example: 'category:astro-ph.HE' },
+  { key: 'source', label: 'Data source', example: 'source:arxiv' },
+  { key: 'doi', label: 'DOI', example: 'doi:10.1234/example' },
+  { key: 'bibcode', label: 'ADS bibcode', example: 'bibcode:2024ApJ...' },
+];
+
+function sourceIntent(value) {
+  const query = String(value || '').trim();
+  if (!query) return { label: 'Smart search', intent: 'empty' };
+  if (/https?:\/\//i.test(query) || /\b10\.\d{4,9}\//i.test(query) || /\b(?:arxiv:)?\d{4}\.\d{4,5}\b/i.test(query) || /\b(?:doi|bibcode|title):/i.test(query)) {
+    return { label: 'Exact lookup', intent: 'specific' };
+  }
+  if (/\?$/.test(query) || /^(what|when|where|which|who|why|how|does|do|can|is|are)\b/i.test(query)) {
+    return { label: 'Research question', intent: 'research-question' };
+  }
+  return { label: 'Keyword search', intent: 'keywords' };
+}
+
+function setSourceView(name) {
+  state.sourceView = name === 'saved' ? 'saved' : 'add';
+  document.querySelectorAll('[data-source-view]').forEach(button => {
+    const active = button.dataset.sourceView === state.sourceView;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', String(active));
+  });
+  document.querySelectorAll('.source-view').forEach(view => {
+    const active = view.id === `source-view-${state.sourceView}`;
+    view.classList.toggle('active', active);
+    view.hidden = !active;
+  });
+  if (state.sourceView === 'saved') loadFiles();
+}
+
+function formatPaperDate(value) {
+  if (!value) return 'Date unavailable';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? stripEmoji(value) : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
+}
+
+function authorSummary(authors) {
+  if (!Array.isArray(authors) || !authors.length) return 'Authors unavailable';
+  if (authors.length <= 3) return authors.map(stripEmoji).join(', ');
+  return `${authors.slice(0, 3).map(stripEmoji).join(', ')} +${authors.length - 3}`;
+}
+
+function sourceProviderMark(provider) {
+  return provider === 'NASA ADS' ? 'ADS' : 'arXiv';
+}
+
+function resultPaperMarkup(paper) {
+  const selected = state.selectedSourceIds.has(paper.id);
+  const unavailable = !paper.canImport;
+  return `
+    <article class="source-result${state.activeSourceId === paper.id ? ' expanded' : ''}" data-source-id="${escHtml(paper.id)}">
+      <div class="source-result-main">
+        <label class="source-result-check${unavailable ? ' disabled' : ''}" title="${unavailable ? 'No open arXiv PDF is available for import' : 'Select paper for import'}">
+          <input type="checkbox" data-source-select="${escHtml(paper.id)}" ${selected ? 'checked' : ''} ${unavailable ? 'disabled' : ''}/>
+          <span></span>
+        </label>
+        <button class="source-result-preview" type="button" data-source-preview="${escHtml(paper.id)}" aria-expanded="${state.activeSourceId === paper.id}">
+          <div class="source-result-kicker">
+            <span class="source-provider">${escHtml(sourceProviderMark(paper.provider))}</span>
+            <span>${escHtml(formatPaperDate(paper.published))}</span>
+            <span>${escHtml(paper.publication || 'Publication unavailable')}</span>
+          </div>
+          <h4>${escHtml(paper.title)}</h4>
+          <p class="source-result-authors">${escHtml(authorSummary(paper.authors))}</p>
+          <p class="source-result-abstract">${escHtml(paper.abstract || 'No abstract is available for this record.')}</p>
+          <div class="source-result-footer">
+            <span>${paper.citationCount == null ? 'Citation data unavailable' : `${paper.citationCount} citations`}</span>
+            <span>${paper.canImport ? 'Open PDF available' : 'Preview only'}</span>
+            <strong>${state.activeSourceId === paper.id ? 'Close preview' : 'Preview and discover'}</strong>
+          </div>
+        </button>
+      </div>
+      <div class="source-result-detail" id="source-detail-${escHtml(paper.id)}" ${state.activeSourceId === paper.id ? '' : 'hidden'}></div>
+    </article>`;
+}
+
+function renderSourceResults(results) {
+  state.sourceResults = Array.isArray(results) ? results : [];
+  dom.sourceResultsSection.hidden = false;
+  $('source-results-title').textContent = `${state.sourceResults.length} paper${state.sourceResults.length === 1 ? '' : 's'} found`;
+  dom.sourceResults.innerHTML = state.sourceResults.length
+    ? state.sourceResults.map(resultPaperMarkup).join('')
+    : '<div class="source-empty"><strong>No matching papers found</strong><p>Try fewer terms, a broader date range, or remove a filter.</p></div>';
+  updateSourceSelection();
+}
+
+function updateSourceSelection() {
+  const count = state.selectedSourceIds.size;
+  dom.sourceSelectedCount.textContent = count;
+  dom.sourceImportSelected.disabled = count === 0;
+  dom.sourceImportSelected.classList.toggle('active', count > 0);
+}
+
+function relatedPaperMarkup(paper) {
+  const disabled = !paper.canImport;
+  return `<label class="related-paper${disabled ? ' disabled' : ''}">
+    <input type="checkbox" data-related-select="${escHtml(paper.id)}" ${state.selectedSourceIds.has(paper.id) ? 'checked' : ''} ${disabled ? 'disabled' : ''}/>
+    <span class="related-paper-copy"><strong>${escHtml(paper.title)}</strong><small>${escHtml(sourceProviderMark(paper.provider))} · ${escHtml(formatPaperDate(paper.published))} · ${escHtml(authorSummary(paper.authors))}</small></span>
+    <span class="related-paper-action">${disabled ? 'Preview only' : 'Add'}</span>
+  </label>`;
+}
+
+async function showSourceDetail(id) {
+  if (state.activeSourceId === id) {
+    state.activeSourceId = null;
+    renderSourceResults(state.sourceResults);
+    return;
+  }
+  state.activeSourceId = id;
+  renderSourceResults(state.sourceResults);
+  const detail = $(`source-detail-${id}`);
+  if (!detail) return;
+  const paper = state.sourceResults.find(item => item.id === id);
+  detail.innerHTML = `
+    <div class="source-preview-panel">
+      <div class="source-preview-meta">
+        ${paper?.doi ? `<span><strong>DOI</strong>${escHtml(paper.doi)}</span>` : ''}
+        ${paper?.arxivId ? `<span><strong>arXiv</strong>${escHtml(paper.arxivId)}</span>` : ''}
+        ${paper?.bibcode ? `<span><strong>ADS bibcode</strong>${escHtml(paper.bibcode)}</span>` : ''}
+      </div>
+      ${paper?.recordUrl ? `<a class="source-record-link" href="${escHtml(paper.recordUrl)}" target="_blank" rel="noreferrer">Open publication record</a>` : ''}
+    </div>
+    <div class="source-related-loading"><span class="document-spinner"></span> Discovering citations, references, and shared topics...</div>`;
+  try {
+    const data = await api.getRelatedSources(id);
+    if (state.activeSourceId !== id) return;
+    const groups = data.groups || [];
+    detail.innerHTML = `
+      <div class="source-preview-panel">
+        <div class="source-preview-meta">
+          ${paper?.doi ? `<span><strong>DOI</strong>${escHtml(paper.doi)}</span>` : ''}
+          ${paper?.arxivId ? `<span><strong>arXiv</strong>${escHtml(paper.arxivId)}</span>` : ''}
+          ${paper?.bibcode ? `<span><strong>ADS bibcode</strong>${escHtml(paper.bibcode)}</span>` : ''}
+        </div>
+        ${paper?.recordUrl ? `<a class="source-record-link" href="${escHtml(paper.recordUrl)}" target="_blank" rel="noreferrer">Open publication record</a>` : ''}
+      </div>
+      <section class="source-related">
+        <div class="source-related-heading"><p class="sources-eyebrow">Discover</p><h5>Related to this paper</h5></div>
+        ${groups.map(group => `<div class="source-related-group"><h6>${escHtml(group.label)}</h6>${group.results?.length ? group.results.map(relatedPaperMarkup).join('') : '<p class="source-related-empty">No records available from this source.</p>'}</div>`).join('')}
+      </section>`;
+  } catch (error) {
+    detail.querySelector('.source-related-loading').textContent = stripEmoji(error.message);
+  }
+}
+
+async function runSourceSearch() {
+  const query = dom.sourceSearchInput.value.trim();
+  if (!query) {
+    dom.sourceSearchInput.focus();
+    return;
+  }
+  dom.sourceFilterSuggestions.classList.remove('visible');
+  dom.sourceSearchStatus.className = 'source-search-status visible loading';
+  dom.sourceSearchStatus.innerHTML = '<span class="document-spinner"></span><span>Searching arXiv and NASA ADS...</span>';
+  $('source-search-submit').disabled = true;
+  state.selectedSourceIds.clear();
+  state.activeSourceId = null;
+  try {
+    const data = await api.searchSources(query);
+    state.sourceFilters = data.filters || SOURCE_FILTERS;
+    renderSourceResults(data.results);
+    const warning = data.warnings?.length ? ` ${data.warnings.join(' ')}` : '';
+    const intent = data.query?.intent === 'specific' ? 'Exact lookup' : data.query?.intent === 'research-question' ? 'Research question' : 'Keyword search';
+    dom.sourceSearchStatus.className = `source-search-status visible${warning ? ' warning' : ''}`;
+    dom.sourceSearchStatus.textContent = `${intent} complete.${warning}`;
+  } catch (error) {
+    dom.sourceSearchStatus.className = 'source-search-status visible error';
+    dom.sourceSearchStatus.textContent = stripEmoji(error.message);
+  } finally {
+    $('source-search-submit').disabled = false;
+  }
+}
+
+function updateFilterSuggestions() {
+  const input = dom.sourceSearchInput;
+  const caret = input.selectionStart ?? input.value.length;
+  const before = input.value.slice(0, caret);
+  const token = before.match(/(?:^|\s)([a-z]*:?[^\s]*)$/i)?.[1] || '';
+  const keyPart = token.split(':')[0].toLowerCase();
+  const shouldSuggest = token.includes(':') || keyPart.length >= 2;
+  const matches = shouldSuggest ? (state.sourceFilters.length ? state.sourceFilters : SOURCE_FILTERS)
+    .filter(filter => filter.key.startsWith(keyPart)).slice(0, 6) : [];
+  dom.sourceFilterSuggestions.innerHTML = matches.map(filter => `
+    <button type="button" role="option" data-filter-key="${escHtml(filter.key)}" data-filter-value="${escHtml(filter.example)}">
+      <strong>${escHtml(filter.key)}:</strong><span>${escHtml(filter.label)}</span><code>${escHtml(filter.example)}</code>
+    </button>`).join('');
+  dom.sourceFilterSuggestions.classList.toggle('visible', matches.length > 0);
+}
+
+function insertSourceFilter(value) {
+  const input = dom.sourceSearchInput;
+  const caret = input.selectionStart ?? input.value.length;
+  const before = input.value.slice(0, caret);
+  const match = before.match(/(?:^|\s)([a-z]*:?[^\s]*)$/i);
+  const start = match ? caret - match[1].length : caret;
+  const prefix = start > 0 && !/\s/.test(input.value[start - 1]) ? ' ' : '';
+  input.value = `${input.value.slice(0, start)}${prefix}${value}${input.value.slice(caret)}`;
+  const emptyQuotes = value.indexOf('""');
+  const nextCaret = start + prefix.length + value.length - (emptyQuotes === -1 ? 0 : 1);
+  input.focus();
+  input.setSelectionRange(nextCaret, nextCaret);
+  dom.sourceFilterSuggestions.classList.remove('visible');
+  dom.sourceQueryIntent.textContent = sourceIntent(input.value).label;
+}
+
+async function importSelectedSources() {
+  const ids = [...state.selectedSourceIds];
+  if (!ids.length) return;
+  dom.sourceImportSelected.disabled = true;
+  dom.sourceImportSelected.textContent = `Importing ${ids.length}...`;
+  dom.sourceJobStatus.className = 'source-job-status visible running';
+  dom.sourceJobStatus.textContent = 'Downloading selected PDFs to the workspace...';
+  try {
+    const result = await api.importSources(ids);
+    const imported = result.imported?.length || 0;
+    const failed = result.failed?.length || 0;
+    state.selectedSourceIds.clear();
+    renderSourceResults(state.sourceResults);
+    await loadFiles();
+    setSourceView('saved');
+    dom.sourceJobStatus.className = `source-job-status visible${failed ? ' warning' : ''}`;
+    dom.sourceJobStatus.textContent = `${imported} paper${imported === 1 ? '' : 's'} saved${failed ? `; ${failed} could not be imported` : ''}. Background wiki review queued.`;
+    if (result.ingestJob?.id) monitorSourceJob(result.ingestJob.id);
+  } catch (error) {
+    dom.sourceJobStatus.className = 'source-job-status visible error';
+    dom.sourceJobStatus.textContent = stripEmoji(error.message);
+  } finally {
+    dom.sourceImportSelected.innerHTML = 'Import selected <span id="source-selected-count">0</span>';
+    updateSourceSelection();
+  }
+}
+
+function monitorSourceJob(id) {
+  clearInterval(state.sourceJobTimer);
+  const update = async () => {
+    try {
+      const job = await api.getSourceJob(id);
+      const messages = {
+        queued: 'PDF saved. Background wiki review is queued.',
+        running: 'PDF saved. AI is reviewing the source in the background.',
+        'awaiting-connection': 'PDF saved. Connect ChatGPT to start the background wiki review.',
+        completed: 'Background wiki review is ready in Saved chats.',
+        failed: job.error || 'The PDF was saved, but the background wiki review failed.',
+      };
+      dom.sourceJobStatus.className = `source-job-status visible ${job.status}`;
+      dom.sourceJobStatus.textContent = messages[job.status] || 'Background wiki review is queued.';
+      if (['completed', 'failed', 'awaiting-connection'].includes(job.status)) {
+        clearInterval(state.sourceJobTimer);
+        if (job.status === 'completed') {
+          refreshWiki();
+          loadThreads();
+        }
+      }
+    } catch {
+      clearInterval(state.sourceJobTimer);
+    }
+  };
+  void update();
+  state.sourceJobTimer = setInterval(update, 2500);
+}
+
+document.querySelectorAll('[data-source-view]').forEach(button => button.addEventListener('click', () => setSourceView(button.dataset.sourceView)));
+dom.sourceSearchForm.addEventListener('submit', event => { event.preventDefault(); void runSourceSearch(); });
+dom.sourceSearchInput.addEventListener('input', () => {
+  dom.sourceQueryIntent.textContent = sourceIntent(dom.sourceSearchInput.value).label;
+  updateFilterSuggestions();
+});
+dom.sourceSearchInput.addEventListener('click', updateFilterSuggestions);
+dom.sourceFilterSuggestions.addEventListener('mousedown', event => {
+  const option = event.target.closest('[data-filter-value]');
+  if (!option) return;
+  event.preventDefault();
+  insertSourceFilter(option.dataset.filterValue);
+});
+document.querySelectorAll('[data-filter-example]').forEach(button => button.addEventListener('click', () => insertSourceFilter(button.dataset.filterExample)));
+document.addEventListener('click', event => {
+  if (!event.target.closest('#source-search-box')) dom.sourceFilterSuggestions.classList.remove('visible');
+});
+dom.sourceResults.addEventListener('change', event => {
+  const checkbox = event.target.closest('[data-source-select], [data-related-select]');
+  if (!checkbox) return;
+  if (checkbox.checked) state.selectedSourceIds.add(checkbox.dataset.sourceSelect || checkbox.dataset.relatedSelect);
+  else state.selectedSourceIds.delete(checkbox.dataset.sourceSelect || checkbox.dataset.relatedSelect);
+  updateSourceSelection();
+});
+dom.sourceResults.addEventListener('click', event => {
+  const preview = event.target.closest('[data-source-preview]');
+  if (preview) void showSourceDetail(preview.dataset.sourcePreview);
+});
+dom.sourceImportSelected.addEventListener('click', () => { void importSelectedSources(); });
+
 function setDocumentStatus(message, detail = '', isError = false) {
   dom.documentStage.innerHTML = `
     <div class="document-status${isError ? ' error' : ''}">
@@ -796,6 +1129,7 @@ function closeUploadModal() { dom.uploadModal.style.display = 'none'; }
 
 $('btn-upload').onclick = openUploadModal;
 $('files-upload-btn').onclick = openUploadModal;
+$('saved-upload-btn').onclick = openUploadModal;
 $('modal-cancel').onclick = closeUploadModal;
 dom.uploadModal.addEventListener('click', e => { if (e.target === dom.uploadModal) closeUploadModal(); });
 
@@ -810,15 +1144,24 @@ dom.dropzone.addEventListener('drop', e => {
 dom.fileInput.addEventListener('change', () => uploadFiles(Array.from(dom.fileInput.files)));
 
 async function uploadFiles(files) {
+  if (!files.length) return;
   dom.uploadProgress.textContent = `Uploading ${files.length} file(s)...`;
-  for (const file of files) {
-    dom.uploadProgress.textContent = `Uploading ${stripEmoji(file.name)}...`;
-    await api.uploadFile(file, p => {
-      dom.uploadProgress.textContent = `Uploading ${stripEmoji(file.name)} - ${Math.round(p * 100)}%`;
-    });
+  let latestJob = null;
+  try {
+    for (const file of files) {
+      dom.uploadProgress.textContent = `Uploading ${stripEmoji(file.name)}...`;
+      const result = await api.uploadFile(file, p => {
+        dom.uploadProgress.textContent = `Uploading ${stripEmoji(file.name)} - ${Math.round(p * 100)}%`;
+      });
+      latestJob = result.ingestJob || latestJob;
+    }
+    dom.uploadProgress.textContent = 'Upload complete';
+    await loadFiles();
+    if (latestJob?.id) monitorSourceJob(latestJob.id);
+    setTimeout(() => { closeUploadModal(); setSourceView('saved'); }, 700);
+  } catch (error) {
+    dom.uploadProgress.textContent = stripEmoji(error.message);
   }
-  dom.uploadProgress.textContent = 'Upload complete';
-  setTimeout(() => { closeUploadModal(); loadFiles(); }, 1200);
 }
 
 // ── New page modal ─────────────────────────────────────────────────
@@ -1386,6 +1729,11 @@ dom.chatAbort.addEventListener('click', () => {
   buildSidebar(pages);
   const routedToWiki = handleWikiRoute({ migrateLegacyHash: true });
   const hash = location.hash;
+  if (!routedToWiki && (hash === '#sources' || hash === '#sources/saved')) {
+    showPanel('files');
+    setSourceView(hash.endsWith('/saved') ? 'saved' : 'add');
+    return;
+  }
   if (!routedToWiki && hash.startsWith('#file/')) {
     const name = decodeURIComponent(hash.slice(6));
     const files = await api.getRawList();

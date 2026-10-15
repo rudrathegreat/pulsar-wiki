@@ -12,6 +12,7 @@ const { ChatGPTAuthError, ChatGPTAuthService } = require('./agent/chatgpt-auth')
 const { ThreadStore, ThreadStoreError } = require('./agent/thread-store');
 const { WikiTools, WikiToolError } = require('./agent/wiki-tools');
 const { ProviderError } = require('./agent/providers');
+const { FILTERS: SOURCE_FILTERS, SourceDiscoveryService } = require('./agent/source-discovery');
 
 const app = express();
 const server = http.createServer(app);
@@ -47,6 +48,76 @@ const agentService = new AgentService({
   wikiTools,
   instructions: loadInstructions(),
 });
+const sourceDiscovery = new SourceDiscoveryService({ rawDir: RAW_DIR });
+const ingestJobs = new Map();
+
+function publicIngestJob(job) {
+  return {
+    id: job.id,
+    status: job.status,
+    files: job.files,
+    threadId: job.threadId || null,
+    error: job.error || null,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+  };
+}
+
+async function runIngestJob(job) {
+  if (!job || ['running', 'completed'].includes(job.status)) return;
+  let status;
+  try { status = await chatgptAuth.status(); } catch { status = null; }
+  if (!status?.ready) {
+    job.status = 'awaiting-connection';
+    job.updatedAt = new Date().toISOString();
+    return;
+  }
+  job.status = 'running';
+  job.updatedAt = new Date().toISOString();
+  try {
+    const names = job.files.map(file => file.name);
+    const thread = agentService.createThread(`Ingest ${names.length === 1 ? names[0] : `${names.length} sources`}`);
+    job.threadId = thread.id;
+    const descriptions = job.files.map(file => {
+      const details = [file.name];
+      if (file.title) details.push(`title: ${file.title}`);
+      if (file.doi) details.push(`DOI: ${file.doi}`);
+      if (file.arxivId) details.push(`arXiv: ${file.arxivId}`);
+      return `- ${details.join('; ')}`;
+    }).join('\n');
+    await agentService.runTurn({
+      threadId: thread.id,
+      text: `New research sources were imported into raw/:\n${descriptions}\n\nBegin the canonical ingest workflow for these sources and update the research workspace as allowed by GEMINI.md. Read every source in full and preserve source citations. If the workflow requires user review before edits, present the key takeaways in this saved chat and clearly state what confirmation is needed.`,
+      onDelta() {}, onTool() {}, signal: AbortSignal.timeout(CHAT_TIMEOUT_MS),
+    });
+    job.status = 'completed';
+  } catch (error) {
+    job.status = 'failed';
+    job.error = asPublicError(error).text;
+  }
+  job.updatedAt = new Date().toISOString();
+}
+
+function queueSourceIngest(files) {
+  const normalized = (files || []).filter(file => file?.name).map(file => ({
+    name: safeBase(file.name),
+    title: typeof file.title === 'string' ? file.title.slice(0, 500) : null,
+    doi: typeof file.doi === 'string' ? file.doi.slice(0, 200) : null,
+    arxivId: typeof file.arxivId === 'string' ? file.arxivId.slice(0, 100) : null,
+  }));
+  if (!normalized.length) return null;
+  const timestamp = new Date().toISOString();
+  const job = { id: crypto.randomUUID(), status: 'queued', files: normalized, threadId: null, error: null, createdAt: timestamp, updatedAt: timestamp };
+  ingestJobs.set(job.id, job);
+  setImmediate(() => { void runIngestJob(job); });
+  return publicIngestJob(job);
+}
+
+function resumePendingIngestJobs() {
+  for (const job of ingestJobs.values()) {
+    if (['queued', 'awaiting-connection'].includes(job.status)) setImmediate(() => { void runIngestJob(job); });
+  }
+}
 
 app.use(express.json({ limit: '10mb' }));
 app.use((_req, res, next) => {
@@ -153,6 +224,7 @@ app.get('/auth/chatgpt/callback', async (req, res) => {
   try {
     const status = await chatgptAuth.handleCallback(req.query);
     const result = status.planEnabled ? 'connected' : 'plan-permission-required';
+    if (status.planEnabled) resumePendingIngestJobs();
     res.redirect(302, `/?chatgpt=${result}`);
   } catch (error) {
     const code = asPublicError(error).code;
@@ -259,8 +331,50 @@ app.post('/api/upload', (req, res) => {
   const filePath = path.join(RAW_DIR, name);
   const writeStream = fs.createWriteStream(filePath);
   req.pipe(writeStream);
-  writeStream.on('finish', () => res.json({ ok: true, name }));
+  writeStream.on('finish', () => res.json({ ok: true, name, ingestJob: queueSourceIngest([{ name }]) }));
   writeStream.on('error', error => res.status(500).json({ error: error.message }));
+});
+
+// --- Research source discovery and import ---
+app.get('/api/sources/filters', requireLocalSession, (_req, res) => {
+  res.json({ filters: SOURCE_FILTERS, adsConfigured: Boolean(process.env.NASA_ADS_API_TOKEN) });
+});
+
+app.post('/api/sources/search', requireLocalSession, async (req, res) => {
+  const query = String(req.body?.query || '').trim();
+  if (!query) return res.status(400).json({ error: 'Enter a research question, keywords, title, DOI, or paper link.' });
+  try {
+    return res.json(await sourceDiscovery.search(query, { limit: req.body?.limit }));
+  } catch (error) {
+    return res.status(502).json({ error: error.message || 'The paper search could not be completed.' });
+  }
+});
+
+app.get('/api/sources/:id/related', requireLocalSession, async (req, res) => {
+  try { return res.json(await sourceDiscovery.related(req.params.id)); }
+  catch (error) { return res.status(400).json({ error: error.message || 'Related papers could not be loaded.' }); }
+});
+
+app.post('/api/sources/import', requireLocalMutation, async (req, res) => {
+  try {
+    const result = await sourceDiscovery.import(req.body?.ids);
+    const files = result.imported.map(item => ({
+      name: item.name,
+      title: item.source.title,
+      doi: item.source.doi,
+      arxivId: item.source.arxivId,
+    }));
+    const ingestJob = files.length ? queueSourceIngest(files) : null;
+    return res.status(result.imported.length ? 201 : 422).json({ ...result, ingestJob });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'The selected papers could not be imported.' });
+  }
+});
+
+app.get('/api/sources/jobs/:id', requireLocalSession, (req, res) => {
+  const job = ingestJobs.get(req.params.id);
+  if (!job) return res.status(404).json({ error: 'Ingest job not found.' });
+  return res.json(publicIngestJob(job));
 });
 
 // --- Graph and search API ---
