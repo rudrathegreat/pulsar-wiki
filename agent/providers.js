@@ -133,7 +133,7 @@ function createChatGPTAdapter({ accessToken, client } = {}) {
   const openai = client || new OpenAI({ apiKey: accessToken, baseURL: 'https://api.openai.com/v1', maxRetries: 0 });
   return {
     async runTurn({ model, instructions, messages, tools, executeTool, onDelta, onTool, signal }) {
-      let input = messages.map(message => ({ role: message.role, content: message.text }));
+      let input = messages.map(message => ({ role: message.role, content: message.content || message.text }));
       const outputTypes = [];
       let responseSteps = 0;
       try {

@@ -6,6 +6,7 @@ const WebSocket = require('ws');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { pipeline } = require('node:stream/promises');
 const chokidar = require('chokidar');
 const { AgentService, AgentServiceError } = require('./agent/agent-service');
 const { ChatGPTAuthError, ChatGPTAuthService } = require('./agent/chatgpt-auth');
@@ -13,6 +14,9 @@ const { ThreadStore, ThreadStoreError } = require('./agent/thread-store');
 const { WikiTools, WikiToolError } = require('./agent/wiki-tools');
 const { ProviderError } = require('./agent/providers');
 const { FILTERS: SOURCE_FILTERS, SourceDiscoveryService } = require('./agent/source-discovery');
+const { ReadingStore } = require('./agent/reading-store');
+const { ReadingService } = require('./agent/reading-service');
+const { createReadingRouter } = require('./agent/reading-router');
 
 const app = express();
 const server = http.createServer(app);
@@ -49,6 +53,10 @@ const agentService = new AgentService({
   instructions: loadInstructions(),
 });
 const sourceDiscovery = new SourceDiscoveryService({ rawDir: RAW_DIR });
+const readingService = new ReadingService({
+  store: new ReadingStore({ dataDir: path.join(DATA_DIR, 'reading') }),
+  wikiTools, authService: chatgptAuth, discovery: sourceDiscovery, instructions: loadInstructions(),
+});
 const ingestJobs = new Map();
 
 function publicIngestJob(job) {
@@ -119,6 +127,7 @@ function resumePendingIngestJobs() {
   }
 }
 
+app.use('/api/reading/import', express.json({ limit: '110mb' }));
 app.use(express.json({ limit: '10mb' }));
 app.use((_req, res, next) => {
   // The browser never sees this per-launch secret, but automatically includes
@@ -349,14 +358,28 @@ app.get('/api/raw/:file', (req, res) => {
   return res.sendFile(filePath);
 });
 
-app.post('/api/upload', (req, res) => {
-  const name = safeBase(req.headers['x-filename'] || 'upload.bin');
+app.post('/api/upload', requireLocalMutation, async (req, res) => {
+  let name;
+  try { name = safeBase(decodeURIComponent(req.headers['x-filename'] || 'upload.bin')); }
+  catch { return res.status(400).json({ error: 'Invalid filename.' }); }
   const filePath = path.join(RAW_DIR, name);
-  const writeStream = fs.createWriteStream(filePath);
-  req.pipe(writeStream);
-  writeStream.on('finish', () => res.json({ ok: true, name, ingestJob: queueSourceIngest([{ name }]) }));
-  writeStream.on('error', error => res.status(500).json({ error: error.message }));
+  if (fs.existsSync(filePath)) return res.status(409).json({ error: 'A source with this filename already exists. Rename the new file; original sources cannot be overwritten.' });
+  const uploadDir = path.join(DATA_DIR, 'uploads');
+  fs.mkdirSync(uploadDir, { recursive: true });
+  const temporary = path.join(uploadDir, `${crypto.randomUUID()}.upload`);
+  try {
+    await pipeline(req, fs.createWriteStream(temporary, { flags: 'wx' }));
+    // Publish a completed upload exclusively; interruption cannot leave a partial immutable source.
+    fs.linkSync(temporary, filePath);
+    return res.json({ ok: true, name, ingestJob: queueSourceIngest([{ name }]) });
+  } catch (error) {
+    if (!res.headersSent && !res.destroyed) res.status(error.code === 'EEXIST' ? 409 : 500).json({ error: 'The source could not be saved without overwriting an existing file.' });
+  } finally {
+    try { fs.unlinkSync(temporary); } catch { /* a failed temporary file can be removed on the next maintenance pass */ }
+  }
 });
+
+app.use('/api/reading', createReadingRouter({ service: readingService, requireLocalSession, requireLocalMutation, onImport: queueSourceIngest }));
 
 // --- Research source discovery and import ---
 app.get('/api/sources/filters', requireLocalSession, (_req, res) => {
@@ -638,6 +661,7 @@ server.listen(PORT, HOST, () => {
 });
 
 async function shutdown() {
+  readingService.close();
   await watcher.close();
   for (const client of wss.clients) client.close();
   await new Promise(resolve => server.close(resolve));

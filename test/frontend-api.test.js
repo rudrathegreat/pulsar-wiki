@@ -11,6 +11,8 @@ const marked = require('marked');
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
 const indexSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 const styleSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'style.css'), 'utf8');
+const readingSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'reading.js'), 'utf8');
+const readingStyle = fs.readFileSync(path.join(__dirname, '..', 'public', 'reading.css'), 'utf8');
 const serverSource = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
 
 function loadApi(fetch) {
@@ -197,12 +199,15 @@ test('LaTeX delimiters survive Markdown rendering and KaTeX assets are local', (
 
 test('UI source uses only approved palettes and contains no built-in emojis', () => {
   const allowed = new Set(['#111', '#1c1c1c', '#222', '#fff', '#eee', '#ccc']);
-  const colorSources = `${styleSource}\n${appSource}`;
+  const colorSources = `${styleSource}\n${appSource}\n${readingSource}`;
   for (const color of colorSources.match(/#[0-9a-f]{3,8}\b/gi) || []) {
     assert.ok(allowed.has(color.toLowerCase()), `Unexpected color literal: ${color}`);
   }
   assert.doesNotMatch(colorSources, /rgba\(/i);
-  assert.doesNotMatch(`${indexSource}\n${appSource}\n${serverSource}`, /\p{Extended_Pictographic}/u);
+  assert.doesNotMatch(`${indexSource}\n${appSource}\n${readingSource}\n${serverSource}`, /\p{Extended_Pictographic}/u);
+  const annotationColors = new Set([...allowed, '#f4d35e', '#8dd3a8', '#8ec5ff', '#efa8ca']);
+  for (const color of readingStyle.match(/#[0-9a-f]{3,8}\b/gi) || []) assert.ok(annotationColors.has(color.toLowerCase()), `Unexpected annotation color: ${color}`);
+  for (const token of ['yellow', 'green', 'blue', 'pink']) assert.match(readingStyle, new RegExp(`--highlight-${token}:`));
   assert.match(indexSource, /href="\/style\.css"/);
   assert.match(indexSource, /src="\/app\.js"/);
 });

@@ -56,6 +56,15 @@ test('direct-agent WebSocket requires protocol 4 and thread-scoped chat payloads
   const cookie = page.headers['set-cookie']?.[0]?.split(';')[0];
   assert.match(cookie || '', /^pulsarwiki_session=/);
 
+  const privateReading = await request(serverUrl + '/api/reading', { headers: { Cookie: cookie } });
+  assert.equal(privateReading.statusCode, 200);
+  assert.match(privateReading.headers['cache-control'] || '', /no-store/);
+  assert.equal((await request(serverUrl + '/api/reading')).statusCode, 403);
+  for (const asset of ['/reading.js', '/reading.css']) {
+    const response = await request(serverUrl + asset);
+    assert.equal(response.statusCode, 200);
+  }
+
   for (const pathname of ['/wiki/pulsar', '/wiki/not-a-page']) {
     const wikiPage = await request(serverUrl + pathname);
     assert.equal(wikiPage.statusCode, 200);

@@ -6,6 +6,7 @@
   <title>PulsarWiki</title>
   <meta name="description" content="A visual interface for the PulsarWiki knowledge base — browse, search, chat and explore the pulsar astronomy graph."/>
   <link rel="stylesheet" href="/style.css"/>
+  <link rel="stylesheet" href="/reading.css"/>
   <link rel="stylesheet" href="/vendor/katex/katex.min.css"/>
 </head>
 <body>
@@ -24,6 +25,9 @@
     </button>
     <button class="icon-btn" id="ib-files" title="Source Files" data-panel="files">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+    </button>
+    <button class="icon-btn" id="ib-reading" title="Reading library" aria-label="Reading library" data-panel="reading">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 6c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V5c-3-1-6-1-9 1zM12 6v15"/></svg>
     </button>
     <button class="icon-btn" id="ib-handover" title="Project Handover" aria-label="Project Handover" data-panel="handover">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 4V2h6v2M8 9h8M8 13h5M15 16l2 2 3-4"/></svg>
@@ -317,6 +321,11 @@
         </div>
       </div>
 
+      <div class="panel" id="panel-reading">
+        <header class="reading-library-header"><div><p>Research workspace</p><h2>Reading library</h2><p>Private passages, connected ideas, and reviewed artifacts.</p></div><button type="button" class="btn" id="reading-open-files">Open a paper</button></header>
+        <div id="reading-library-content"></div>
+      </div>
+
       <!-- In-app document viewer -->
       <div class="panel" id="panel-document">
         <header class="document-header">
@@ -358,14 +367,26 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
             </button>
             <button class="document-icon-btn toolbar-text-btn" id="pdf-fit" type="button">Fit width</button>
+            <button class="document-icon-btn toolbar-text-btn" id="reading-rotate" type="button" title="Rotate clockwise">Rotate</button>
+          </div>
+          <div class="toolbar-group reading-tools">
+            <input type="search" id="reading-find" placeholder="Find in paper" aria-label="Find in paper"/>
+            <button class="document-icon-btn toolbar-text-btn" id="reading-find-next" type="button">Find next</button>
+            <button class="document-icon-btn toolbar-text-btn" id="reading-region" type="button" aria-pressed="false">Select region</button>
+            <button class="document-icon-btn toolbar-text-btn" id="reading-thumbnails-toggle" type="button" aria-pressed="false">Pages</button>
+            <button class="document-icon-btn toolbar-text-btn" id="reading-notes-toggle" type="button" aria-expanded="true">Reading notes</button>
           </div>
         </div>
 
+        <div class="reading-document-body">
+        <nav id="reading-thumbnails" aria-label="Paper pages" hidden></nav>
         <div class="document-stage" id="document-stage">
           <div class="document-status" id="document-status">
             <span class="document-spinner"></span>
             <span>Preparing document…</span>
           </div>
+        </div>
+        <aside id="reading-notes" aria-label="Reading notes" hidden></aside>
         </div>
       </div>
 
@@ -433,6 +454,18 @@
 <script src="/vendor/katex/katex.min.js"></script>
 <script src="/vendor/katex/contrib/auto-render.min.js"></script>
 <script src="/vendor/d3/d3.min.js"></script>
+<dialog id="reading-dialog" aria-labelledby="reading-dialog-title"><header><h2 id="reading-dialog-title"></h2><button type="button" class="btn" id="reading-dialog-close" aria-label="Close dialog">Close</button></header><div id="reading-dialog-body"></div><div id="reading-dialog-error" role="alert"></div></dialog>
+<div id="reading-selection-toolbar" role="toolbar" aria-label="Annotate selection" hidden>
+  <button type="button" data-selection-color="yellow" class="reading-swatch" aria-label="Highlight yellow">Yellow</button>
+  <button type="button" data-selection-color="green" class="reading-swatch" aria-label="Highlight green">Green</button>
+  <button type="button" data-selection-color="blue" class="reading-swatch" aria-label="Highlight blue">Blue</button>
+  <button type="button" data-selection-color="pink" class="reading-swatch" aria-label="Highlight pink">Pink</button>
+  <button type="button" id="reading-selection-note">Add note</button>
+  <button type="button" id="reading-selection-ask">Ask AI</button>
+  <button type="button" id="reading-selection-reattach">Reattach old highlight</button>
+</div>
+<div id="reading-toast" role="status" aria-live="polite" hidden></div>
+<script src="/reading.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

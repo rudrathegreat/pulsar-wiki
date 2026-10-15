@@ -57,7 +57,7 @@ function postProcessHtml(html, expressions = []) {
     const safeExpression = expression.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     processed = processed.replaceAll(`PULSARWIKIMATH${index}TOKEN`, safeExpression);
   });
-  return processed;
+  return typeof window !== 'undefined' && window.ActiveReading ? window.ActiveReading.sanitizeHtml(processed) : processed;
 }
 
 function renderMd(content) {
@@ -294,6 +294,7 @@ function showPanel(name) {
   if (name === 'graph') showGraph();
   if (name === 'files') loadFiles();
   if (name === 'handover') loadHandoverWorkspace();
+  if (name === 'reading') window.ActiveReading?.library();
 }
 
 const PILLAR_LABELS = [
@@ -361,6 +362,7 @@ async function openPage(name, { historyMode = 'push' } = {}) {
     const data = await api.getWikiPage(page);
     dom.wikiBody.innerHTML = `<div class="md-body">${renderMd(data.content)}</div>`;
     typesetMath(dom.wikiBody);
+    window.ActiveReading?.backlinks(page, dom.wikiBody);
     dom.wikiBody.querySelectorAll('a.wiki-link').forEach(link => link.addEventListener('click', event => {
       event.preventDefault();
       openPage(link.dataset.page);
@@ -1163,6 +1165,7 @@ function setDocumentStatus(message, detail = '', isError = false) {
 }
 
 async function openRawFile(name, ext, file = {}, updateHash = true) {
+  window.ActiveReading?.close();
   const normalizedExt = String(ext || '').toLowerCase();
   const url = `/api/raw/${encodeURIComponent(name)}`;
   const session = ++state.documentSession;
@@ -1244,14 +1247,19 @@ async function openPdf(url, session) {
   state.pdf.doc = pdf;
   $('pdf-page-input').max = pdf.numPages;
   $('pdf-page-count').textContent = `/ ${pdf.numPages}`;
+  if (window.ActiveReading) {
+    await window.ActiveReading.open(pdf, state.currentDocument.name, session);
+    return;
+  }
   await renderPdfPage(1, true);
 }
 
 function clampPdfScale(value) {
-  return Math.min(3, Math.max(0.5, value));
+  return Math.min(3, Math.max(0.25, value));
 }
 
 async function renderPdfPage(pageNumber, fitWidth = state.pdf.fitWidth) {
+  if (window.ActiveReading?.isOpen()) return window.ActiveReading.navigate(pageNumber, fitWidth);
   const pdf = state.pdf.doc;
   if (!pdf) return;
   const renderId = ++state.pdf.renderId;
@@ -1939,13 +1947,14 @@ dom.chatAbort.addEventListener('click', () => {
   buildSidebar(pages);
   const routedToWiki = handleWikiRoute({ migrateLegacyHash: true });
   const hash = location.hash;
+  if (!routedToWiki && await window.ActiveReading?.route(hash)) return;
   if (!routedToWiki && (hash === '#sources' || hash === '#sources/saved')) {
     showPanel('files');
     setSourceView(hash.endsWith('/saved') ? 'saved' : 'add');
     return;
   }
   if (!routedToWiki && hash.startsWith('#file/')) {
-    const name = decodeURIComponent(hash.slice(6));
+    const name = decodeURIComponent(hash.slice(6).split('?')[0]);
     const files = await api.getRawList();
     const file = files.find(item => item.name === name);
     if (file) {

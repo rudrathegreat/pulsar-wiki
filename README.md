@@ -67,6 +67,30 @@ All agent writes use one validated local operation:
 
 Open **Files** to preview source material without leaving PulsarWiki. PDFs use the local PDF.js viewer with page navigation, zoom, and fit-to-width controls.
 
+## AI-assisted active reading
+
+Open a PDF from **Files** to read continuous pages with selectable text, page thumbnails, rotation, paper search, and a collapsible reading panel. The **Reading library** icon opens passages and drafts across all papers.
+
+Select text and choose yellow, green, blue, or pink to highlight it. **Add note** opens personal comments; **Edit / comment** also lets you change colours and optional, comma-separated categories. Colours do not assign scientific meaning. Use **Select region** and drag a rectangle around an equation, figure, or scanned passage. Add a transcription when needed; automatic OCR is not included.
+
+The reading panel supports filtering by paper, colour, category, comment presence, and text. Check individual passages to build an input selection across papers. Check individual comments or previous AI responses only when you want them included. Collections preserve passage order, theme labels, and collection notes, with a table for comparison. **Link** connects a passage to an existing wiki page or another highlight. Connected wiki pages display private reading backlinks.
+
+**Ask AI** offers passage, equation, method, assumption, concept, custom-question, evidence-comparison, and connection assistance. Review the exact passages, optional nearby context, checked comments, additional wiki pages, and selected visual inputs before submitting to the connected ChatGPT model. Reading tasks have no filesystem-write or general source-reading tools. No whole-paper text is added to selection-based summaries. Image capability depends on the subscription model; if unsupported, turn off image input and enter a transcription. Requests can be stopped, inspected, or explicitly retried with their preserved inputs.
+
+**Search & discover** provides local ranked search over wiki pages, supported source text, highlights, and notes. External discovery sends the displayed, editable query to arXiv and NASA ADS. Results remain saved locally after previews expire. Abstract-only candidates are labelled accordingly and cannot establish verified full-text support. Select candidates for a researcher-initiated evidence comparison, or explicitly import a PDF. Existing automatic AI ingestion on upload/import is retained; it is the exception to the reader's explicit-AI rule.
+
+**Create artifact** makes a private, editable Markdown draft without calling AI. Choose a paper reading summary, multi-paper synthesis, evidence comparison, or update to an existing concept page. Optionally request an AI draft from the captured inputs. Inspect source references and the rendered preview; concept updates show a line diff. Publishing requires researcher review and updates the wiki page, index, and append-only log through the validated wiki writer. Existing pages cannot be overwritten by a new artifact, and concept updates reject stale page versions.
+
+Published artifacts contain selected source excerpts, page links, source hashes, explicitly included researcher comments, and provenance for included AI interpretations. Visual crops remain private; their source location and any transcription are retained. Other private comments are excluded. Later edits mark dependent drafts as outdated; regeneration is explicit. Revision-qualified passage links preserve original selections even after reattachment or deletion.
+
+Reading records, snapshots, and visual selections are stored locally in ignored `.pulsarwiki/reading/`. They survive ChatGPT disconnects and account changes, but do not travel with a Git clone. Use **Export private backup** and **Import backup** to transfer records; backups contain private annotations and selected images. Browser imports accept up to 100 MB, merge absent records, and reject conflicts rather than overwriting existing histories. Keep the original source files alongside a backup. Changed or missing PDFs are flagged, and **Reattach old highlight** explicitly associates a new selection while preserving historical evidence.
+
+Source uploads are exclusive and publish only after the upload completes. Use a different filename for a different paper; existing source files cannot be overwritten.
+
+### Active-reading verification
+
+Run `npm test` (or `npm.cmd test` in PowerShell). Tests cover persistence and rollback, revision conflicts, private-input isolation, citation validation, task cancellation, artifact publishing, historical passage links, image inputs, cross-page selection logic, and coordinate round trips using a real workspace PDF. AI tests use a mocked provider and do not spend subscription usage. Browser visual verification and a live subscription image request require an available browser and connected model.
+
 ## Troubleshooting
 
 If sign-in is declined or expires, open the ChatGPT settings dialog and reconnect. If plan permission is missing, reconnect and approve direct plan usage. Ineligible subscriptions and usage limits cannot fall back to API-key billing; check the account or its [ChatGPT usage page](https://chatgpt.com/settings/usage).

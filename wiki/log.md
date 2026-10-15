@@ -17,3 +17,4 @@ All major updates to the wiki are recorded here.
 | 2026-10-06 | Application UI | Fixed internal wiki links in streamed and saved chat responses so ordinary clicks open pages within PulsarWiki while modified clicks retain normal browser behaviour. |
 | 2026-10-06 | Application UI | Made `wiki/index.md` the default page on a plain PulsarWiki launch while preserving direct wiki and source-file routes. |
 | 2026-10-15 | Project Handover | Added a researcher-selected, AI-organised, review-gated project handover workflow; created the `project-handover` wiki page and updated the index. |
+| 2026-10-15 | Application active reading / README.md | Added continuous PDF reading, coloured highlights, comments, region selections, collections, passage links, optional bounded AI assistance, local and external search, and reviewed reading artifacts; documented the workflow in `active-reading` and updated the index. |
