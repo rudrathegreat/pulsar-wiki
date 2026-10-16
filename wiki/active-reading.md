@@ -1,6 +1,6 @@
 # AI-Assisted Active Reading
 
-**Summary**: A guide to private paper annotations, researcher-initiated AI assistance, and reviewed artifacts built from selected evidence.
+**Summary**: A guide to private paper annotations, researcher-initiated AI assistance, automatic wiki notes, and library artifacts built from selected evidence.
 
 **Sources**: README.md (application documentation; no scientific source ingestion).
 
@@ -28,9 +28,11 @@ Completed assistance displays a blue highlight and an AI-generated comment besid
 
 Connect to related knowledge checks wiki prose first. If it finds no close match, it searches arXiv and NASA ADS using terms from the highlighted passage and compares paper titles and abstracts against those terms. References can be saved with the highlight. Researcher comments are excluded from the search; external papers remain abstract-only candidates. NASA ADS requires a configured API token. (source: README.md)
 
-## Create reviewed wiki artifacts
+## Add notes to the wiki
 
-Add to wiki offers one page selector, defaulting to the paper summary when available; select Add to prepare the passage as an update to the chosen page. Create artifact in the Reading library retains paper reading summary, collection synthesis, evidence comparison, and concept-page update options. Drafts can be written manually or with requested AI assistance. Paper summaries cover selected passages rather than claiming to summarise the entire paper. Review the draft, source references, selected private material, and any concept-page diff before publishing. Publication updates the wiki index and operation log. (source: README.md)
+Add to wiki defaults to the paper summary or filename-based notes page, even when the page does not exist. Select Add to have the connected agent generate and save a concise, cited note automatically. The agent receives explicit instructions to preserve source meaning and uncertainty, distinguish evidence from interpretation, use only selected inputs, and retain existing notes and citations. The application inserts the note into the latest page, creates a missing page when generation succeeds, and updates its sources, date, index, and log together. The helper shows progress and a link to the updated page, without a Markdown editor, diff, or review/publish step. Failed or stopped requests leave the wiki unchanged and offer a retry. (source: README.md)
+
+Create artifact in the Reading library retains paper reading summary, collection synthesis, evidence comparison, and concept-page update options. These private drafts keep their separate editing, optional AI generation, preview, and reviewed publication workflow. (source: README.md)
 
 Published provenance retains selected excerpts, source hashes, page links, included interpretations, and the relationship to AI assistance. Private records preserve earlier selection revisions when a highlight is changed, deleted, or reattached. Back up local reading data separately from Git and retain the original papers. (source: README.md)
 

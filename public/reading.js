@@ -1,4 +1,4 @@
-/* Local active-reading workspace. AI and publication are explicit, separate actions. */
+/* Local active-reading workspace. Add to wiki integrates and saves selected notes automatically. */
 (() => {
   'use strict';
   const el = id => document.getElementById(id);
@@ -7,7 +7,7 @@
   const colors = ['yellow', 'green', 'pink'];
   const colorName = color => color === 'blue' ? 'Blue · AI assistance' : color;
   r.highlightsEnabled = true;
-  const actions = { explain: 'Explain passage', equation: 'Explain equation', methodology: 'Explain methodology', assumptions: 'Examine assumptions', concept: 'Explain concept', question: 'Ask a question', evidence: 'Compare evidence', links: 'Suggest connections' };
+  const actions = { 'wiki-note': 'Add to wiki', explain: 'Explain passage', equation: 'Explain equation', methodology: 'Explain methodology', assumptions: 'Examine assumptions', concept: 'Explain concept', question: 'Ask a question', evidence: 'Compare evidence', links: 'Suggest connections' };
   const artifactNames = { summary: 'Paper reading summary', synthesis: 'Collection synthesis', evidence: 'Evidence comparison', concept: 'Concept-page update' };
   const yieldUI = () => typeof window.scheduler?.yield === 'function' ? window.scheduler.yield() : new Promise(resolve => setTimeout(resolve, 0));
   const renderQueue = new Map();
@@ -520,7 +520,7 @@
   }
   function host() { return state.panel === 'reading' ? el('reading-library-content') : el('reading-notes'); }
   function assistanceFor(h) {
-    return live('tasks').filter(t => t.status === 'completed' && t.response && !t.artifactId && !['summary', 'synthesis', 'artifact'].includes(t.action) && t.snapshot.highlights.some(source => source.id === h.id && source.documentId === h.documentId && source.text === h.text && JSON.stringify(source.anchors) === JSON.stringify(h.anchors)));
+    return live('tasks').filter(t => t.status === 'completed' && t.response && !t.artifactId && !['summary', 'synthesis', 'artifact', 'wiki-note'].includes(t.action) && t.snapshot.highlights.some(source => source.id === h.id && source.documentId === h.documentId && source.text === h.text && JSON.stringify(source.anchors) === JSON.stringify(h.anchors)));
   }
   function highlightColor(h) { return assistanceFor(h).length ? 'blue' : h.color === 'blue' ? 'yellow' : h.color; }
   function filteredHighlights() {
@@ -700,7 +700,8 @@
   }
   async function watchTask(task) {
     clearTimeout(r.polling); r.task = task.id; r.artifact = null; r.tab = 'assistance';
-    dialog('Reading assistance', `<p class="reading-muted">${e(task.question || 'Assistance based on your selected passages')}</p><p id="reading-task-status" role="status"></p><div class="reading-actions"><button type="button" id="reading-task-cancel">Stop request</button></div><details><summary>Inspect inputs</summary>${snapshotView(task.snapshot)}</details><div id="reading-task-live" class="reading-task-progress"></div><div id="reading-task-complete" class="reading-task-response md-body"></div>`);
+    const automatic = task.action === 'wiki-note';
+    dialog(automatic ? 'Adding note to wiki' : 'Reading assistance', `<p class="reading-muted">${e(automatic ? `Updating ${task.targetPage}?` : task.question || 'Assistance based on your selected passages')}</p><p id="reading-task-status" role="status"></p><div class="reading-actions"><button type="button" id="reading-task-cancel">Stop request</button></div>${automatic ? '' : `<details><summary>Inspect inputs</summary>${snapshotView(task.snapshot)}</details>`}<div id="reading-task-live" class="reading-task-progress"></div><div id="reading-task-complete" class="reading-task-response md-body"></div>`);
     const helper = activeHelper(); const viewVersion = helper?.viewVersion;
     const isCurrentView = () => helper ? activeHelper() === helper && helper.viewVersion === viewVersion : !activeHelper() && el('reading-dialog').open && Boolean(el('reading-task-status'));
     el('reading-task-cancel').addEventListener('click', guard(async () => { await request(`/tasks/${task.id}`, 'DELETE'); }));
@@ -709,13 +710,20 @@
         const current = await request(`/tasks/${task.id}`);
         if (r.task !== task.id) return;
         if (isCurrentView() && el('reading-task-status')) el('reading-task-status').textContent = `${current.status}${current.model ? ` · ${current.model}` : ''}${current.error ? `: ${current.error}` : ''}`;
-        if (isCurrentView() && el('reading-task-live')) el('reading-task-live').textContent = current.progress || '';
+        if (isCurrentView() && el('reading-task-live')) el('reading-task-live').textContent = automatic ? '' : current.progress || '';
         if (['queued', 'running'].includes(current.status)) { r.polling = setTimeout(poll, 900); return; }
         await refresh(); renderWorkspace(); for (const p of r.pages.values()) paintHighlights(p);
+        if (automatic && current.publication) buildSidebar(await api.getWikiList());
         if (!isCurrentView()) return;
         if (el('reading-task-cancel')) el('reading-task-cancel').hidden = true;
         if (el('reading-task-live')) el('reading-task-live').textContent = '';
-        if (el('reading-task-complete')) { el('reading-task-complete').innerHTML = current.response ? safeMarkdown(current.response, current.snapshot) : `<p>${e(current.error || 'The request did not complete.')}</p>`; typesetMath(el('reading-task-complete')); }
+        if (el('reading-task-complete')) {
+          el('reading-task-complete').innerHTML = automatic
+            ? current.publication ? `<p>Note added to <a href="/wiki/${encodeURIComponent(current.publication.page)}">${e(current.publication.page)}</a>.</p>${current.warning ? `<p>${e(current.warning)}</p>` : ''}` : `<p>${e(current.error || 'The wiki was not updated.')}</p><button type="button" id="reading-task-retry">Try again</button>`
+            : current.response ? safeMarkdown(current.response, current.snapshot) : `<p>${e(current.error || 'The request did not complete.')}</p>`;
+          typesetMath(el('reading-task-complete'));
+          if (automatic && !current.publication) el('reading-task-retry').addEventListener('click', guard(async () => { await watchTask(await request(`/tasks/${task.id}/retry`, 'POST', {})); }));
+        }
         positionHelper();
         if (current.artifactId && current.status === 'completed' && !current.artifactApplied) notify('The draft changed while AI was working. The new response is saved in Assistance; your edited draft was preserved.', true);
         if (current.artifactApplied && current.status === 'completed' && formIsOpen() && el('reading-task-complete')) await artifactDialog(current.artifactId);
@@ -759,7 +767,9 @@
     }
     return pages.find(page => names.includes(page.name))?.name
       || pages.find(page => names.some(name => page.name === `${name}-summary` || page.name === `summary-${name}`))?.name
-      || '';
+      || summaries.flatMap(artifact => [...artifact.publications].reverse())[0]?.page
+      || names.find(name => name && !['index', 'log'].includes(name))
+      || `paper-${documentId}-notes`;
   }
   async function newArtifactDialog(addToWiki = false) {
     if (!selectedHighlights().length) throw new Error('Select one or more highlights to create an artifact.');
@@ -768,13 +778,28 @@
     if (helper && (activeHelper() !== helper || helper.viewVersion !== viewVersion)) return;
     const destinations = pages.filter(page => !['index', 'log'].includes(page.name));
     const defaultPage = addToWiki ? paperSummaryPage(destinations) : '';
-    const destinationField = `<label class="reading-field">Wiki page<select id="reading-new-artifact-target"><option value="">Choose a wiki page</option>${destinations.map(page => `<option value="${e(page.name)}" ${page.name === defaultPage ? 'selected' : ''}>${e(page.name)}</option>`).join('')}</select></label>`;
-    dialog(addToWiki ? 'Add highlighted passage to wiki' : 'Create a reading artifact', `${addToWiki ? destinationField : `<p class="reading-muted">Create a private draft from selected material. AI generation and wiki publication are separate actions.</p><label class="reading-field">Artifact type<select id="reading-new-artifact-type">${Object.entries(artifactNames).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select></label><label class="reading-field">Title<input id="reading-new-artifact-title" maxlength="200" placeholder="e.g. Timing-noise assumptions across selected papers"/></label><label class="reading-field">Existing concept page (only for concept updates)<select id="reading-new-artifact-target"><option value="">Choose a page</option>${pages.filter(p => !['index', 'log'].includes(p.name)).map(p => `<option>${e(p.name)}</option>`).join('')}</select></label>`}<label class="reading-check"><input type="checkbox" id="reading-new-artifact-images" ${selectedHighlights().some(h => h.image) ? 'checked' : ''}/>Include selected visual regions if AI is requested</label><details><summary>Review selected private inputs</summary>${snapshotView(previewSnapshot({ ...selectedPayload(), includeContext: false, includeImages: true }))}</details><div class="reading-actions"><button type="button" id="reading-new-artifact-create">${addToWiki ? 'Add' : 'Create private draft'}</button></div>`);
+    const createDefault = addToWiki && !destinations.some(page => page.name === defaultPage);
+    if (createDefault) destinations.unshift({ name: defaultPage });
+    const destinationField = `<label class="reading-field">Wiki page<select id="reading-new-artifact-target">${destinations.map(page => `<option value="${e(page.name)}" ${page.name === defaultPage ? 'selected' : ''}>${e(page.name)}${createDefault && page.name === defaultPage ? ' (create on Add)' : ''}</option>`).join('')}</select></label>`;
+    dialog(addToWiki ? 'Add highlighted passage to wiki' : 'Create a reading artifact', `${addToWiki ? destinationField : `<p class="reading-muted">Create a private draft from selected material. AI generation and wiki publication are separate actions.</p><label class="reading-field">Artifact type<select id="reading-new-artifact-type">${Object.entries(artifactNames).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select></label><label class="reading-field">Title<input id="reading-new-artifact-title" maxlength="200" placeholder="e.g. Timing-noise assumptions across selected papers"/></label><label class="reading-field">Existing concept page (only for concept updates)<select id="reading-new-artifact-target"><option value="">Choose a page</option>${pages.filter(p => !['index', 'log'].includes(p.name)).map(p => `<option>${e(p.name)}</option>`).join('')}</select></label>`}<label class="reading-check"><input type="checkbox" id="reading-new-artifact-images" ${selectedHighlights().some(h => h.image) ? 'checked' : ''}/>${addToWiki ? 'Include selected visual regions' : 'Include selected visual regions if AI is requested'}</label><details><summary>${addToWiki ? 'Selected inputs' : 'Review selected private inputs'}</summary>${snapshotView(previewSnapshot({ ...selectedPayload(), includeContext: false, includeImages: true }))}</details><div class="reading-actions"><button type="button" id="reading-new-artifact-create">${addToWiki ? 'Add' : 'Create private draft'}</button></div>`);
+    if (addToWiki) el('reading-new-artifact-target').value = defaultPage;
     el('reading-new-artifact-create').addEventListener('click', guard(async () => {
       const surface = activeHelper(); const version = surface?.viewVersion;
       const targetPage = el('reading-new-artifact-target').value;
       if (addToWiki && !destinations.some(page => page.name === targetPage)) throw new Error('Choose a wiki page.');
-      const artifact = await request('/artifacts', 'POST', { ...selectedPayload(), type: addToWiki ? 'concept' : el('reading-new-artifact-type').value, title: addToWiki ? targetPage : el('reading-new-artifact-title').value, targetPage, includeContext: false, includeImages: el('reading-new-artifact-images').checked });
+      const payload = { ...selectedPayload(), targetPage, includeContext: false, includeImages: el('reading-new-artifact-images').checked };
+      if (addToWiki) {
+        const submit = el('reading-new-artifact-create');
+        if (submit.disabled) return;
+        submit.disabled = true;
+        try {
+          const task = await request('/tasks', 'POST', { ...payload, action: 'wiki-note', createMissingPage: createDefault && targetPage === defaultPage });
+          if (surface && (activeHelper() !== surface || surface.viewVersion !== version)) { await refresh(); renderWorkspace(); return; }
+          await watchTask(task);
+        } finally { submit.disabled = false; }
+        return;
+      }
+      const artifact = await request('/artifacts', 'POST', { ...payload, type: el('reading-new-artifact-type').value, title: el('reading-new-artifact-title').value });
       await refresh(); r.tab = 'artifacts'; renderWorkspace();
       if (surface && (activeHelper() !== surface || surface.viewVersion !== version)) return;
       await artifactDialog(artifact.id);

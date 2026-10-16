@@ -40,6 +40,96 @@ async function completed(service, id) {
   throw new Error('Task did not finish');
 }
 
+test('Add automatically creates a cited paper note using explicit agent instructions and only selected inputs', async t => {
+  const f = fixture(t); const h = await highlight(f);
+  const included = f.service.saveAnnotation({ highlightId: h.id, text: 'Selected interpretation' });
+  f.service.saveAnnotation({ highlightId: h.id, text: 'Unchecked private comment' });
+  f.service.providerFactory = () => ({ async runTurn(input) {
+    f.calls.push(input);
+    return { text: `### Timing noise\n\nTiming residuals reveal noise [H:${h.id}] (source: paper.txt).` };
+  } });
+  const rawBefore = fs.readFileSync(path.join(f.rawDir, 'paper.txt'));
+  const task = await f.service.createTask({ action: 'wiki-note', targetPage: 'paper', createMissingPage: true, highlightIds: [h.id], annotationIds: [included.id] });
+  assert.equal(fs.existsSync(path.join(f.wikiDir, 'paper.md')), false, 'no placeholder page before generation succeeds');
+  const result = await completed(f.service, task.id);
+  assert.equal(result.status, 'completed'); assert.equal(result.publication.page, 'paper');
+  const content = fs.readFileSync(path.join(f.wikiDir, 'paper.md'), 'utf8');
+  assert.match(content, /### Timing noise/); assert.match(content, /\*\*Sources\*\*: paper.txt/);
+  assert.ok(content.includes(`[H:${h.id}](\/#reading/${h.documentId}/${h.id}?revision=${h.revision})`));
+  assert.match(content, /Selected interpretation/); assert.doesNotMatch(content, /Unchecked private comment|researcher reviewed before publication/);
+  assert.match(content, /automatically saved after the researcher selected Add to wiki/);
+  assert.match(fs.readFileSync(path.join(f.wikiDir, 'index.md'), 'utf8'), /\[\[paper\]\]/);
+  assert.match(fs.readFileSync(path.join(f.wikiDir, 'log.md'), 'utf8'), /Automatically added reading note to paper/);
+  assert.match(f.calls[0].instructions, /AUTOMATIC WIKI NOTE/);
+  assert.match(f.calls[0].instructions, /without a Markdown review/);
+  assert.match(f.calls[0].instructions, /Existing page content and citations must remain intact/);
+  assert.doesNotMatch(f.calls[0].messages[0].text, /Unchecked private comment/);
+  assert.deepEqual(f.calls[0].tools, []);
+  assert.equal(f.store.read().artifacts.length, 0);
+  assert.deepEqual(fs.readFileSync(path.join(f.rawDir, 'paper.txt')), rawBefore);
+});
+
+test('automatic notes preserve the latest existing content, citations and concurrent edits', async t => {
+  let finish; let received;
+  const f = fixture(t, { providerFactory: () => ({ runTurn(input) { received = input; return new Promise(resolve => { finish = resolve; }); } }) });
+  const h = await highlight(f, 'other.txt', 'An independent measurement challenges the stable rotation assumption.');
+  const task = await f.service.createTask({ action: 'wiki-note', targetPage: 'timing', highlightIds: [h.id] });
+  while (!finish) await new Promise(resolve => setTimeout(resolve, 5));
+  assert.match(received.messages[0].text, /Existing content/);
+  fs.appendFileSync(path.join(f.wikiDir, 'timing.md'), '\nConcurrent note (source: new-independent.pdf).\n');
+  finish({ text: `### Rotation assumption\n\nAn independent measurement challenges the assumption [H:${h.id}] (source: other.txt).` });
+  const result = await completed(f.service, task.id);
+  assert.equal(result.status, 'completed');
+  const content = fs.readFileSync(path.join(f.wikiDir, 'timing.md'), 'utf8');
+  assert.match(content, /Existing content/); assert.match(content, /Concurrent note \(source: new-independent.pdf\)/);
+  assert.match(content, /\*\*Sources\*\*: paper.txt, other.txt/);
+  assert.ok(content.indexOf('### Rotation assumption') < content.indexOf('## Related pages'));
+});
+
+test('failed, invalid or cancelled automatic notes leave no new page, index entry or log', async t => {
+  for (const failure of ['provider', 'citations', 'format', 'html', 'cancel']) await t.test(failure, async t => {
+    const f = fixture(t); const h = await highlight(f);
+    const index = fs.readFileSync(path.join(f.wikiDir, 'index.md'), 'utf8');
+    f.service.providerFactory = () => ({ async runTurn() {
+      if (failure === 'provider') throw new Error('Provider unavailable');
+      if (failure === 'cancel') { f.service.cancelTask(f.store.read().tasks.at(-1).id); return { text: '' }; }
+      if (failure === 'citations') return { text: '### Note\nClaim [H:invented].' };
+      return { text: `${failure === 'format' ? '# Complete page' : '### Note\n<script>bad()</script>'}\nClaim [H:${h.id}] (source: paper.txt).` };
+    } });
+    const task = await f.service.createTask({ action: 'wiki-note', targetPage: 'paper', createMissingPage: true, highlightIds: [h.id] });
+    assert.equal((await completed(f.service, task.id)).status, failure === 'cancel' ? 'cancelled' : 'failed');
+    assert.equal(fs.existsSync(path.join(f.wikiDir, 'paper.md')), false);
+    assert.equal(fs.readFileSync(path.join(f.wikiDir, 'index.md'), 'utf8'), index);
+    assert.equal(fs.existsSync(path.join(f.wikiDir, 'log.md')), false);
+  });
+});
+
+test('automatic note retries preserve destination and selected evidence and do not duplicate a saved operation', async t => {
+  const f = fixture(t); const h = await highlight(f);
+  f.service.providerFactory = () => ({ async runTurn() { throw new Error('Temporary failure'); } });
+  const task = await f.service.createTask({ action: 'wiki-note', targetPage: 'paper', createMissingPage: true, highlightIds: [h.id] });
+  assert.equal((await completed(f.service, task.id)).status, 'failed');
+  f.service.providerFactory = () => ({ async runTurn() { return { text: `### Timing noise\nNoise [H:${h.id}] (source: paper.txt).` }; } });
+  const retry = await f.service.retryTask(task.id);
+  const result = await completed(f.service, retry.id);
+  assert.equal(result.status, 'completed'); assert.equal(result.publication.page, 'paper');
+  assert.equal(retry.operationId, task.id);
+  const content = fs.readFileSync(path.join(f.wikiDir, 'paper.md'), 'utf8');
+  assert.equal(f.service.saveWikiNote(result, result.response, result.model).alreadySaved, true);
+  assert.equal(fs.readFileSync(path.join(f.wikiDir, 'paper.md'), 'utf8'), content);
+});
+
+test('automatic note wiki transactions roll back on write failure', async t => {
+  const f = fixture(t); const h = await highlight(f);
+  const index = fs.readFileSync(path.join(f.wikiDir, 'index.md'), 'utf8');
+  const faulty = Object.create(fs); faulty.renameSync = () => { throw new Error('disk'); }; f.wikiTools.fs = faulty;
+  f.service.providerFactory = () => ({ async runTurn() { return { text: `### Timing noise\nNoise [H:${h.id}] (source: paper.txt).` }; } });
+  const task = await f.service.createTask({ action: 'wiki-note', targetPage: 'paper', createMissingPage: true, highlightIds: [h.id] });
+  assert.equal((await completed(f.service, task.id)).errorCode, 'wiki-write-failed');
+  assert.equal(fs.existsSync(path.join(f.wikiDir, 'paper.md')), false);
+  assert.equal(fs.readFileSync(path.join(f.wikiDir, 'index.md'), 'utf8'), index);
+});
+
 test('reading records persist atomically, reject stale revisions, and preserve corrupt files', async t => {
   const f = fixture(t); const h = await highlight(f);
   const updated = await f.service.updateHighlight(h.id, { revision: h.revision, color: 'blue' });
@@ -261,6 +351,11 @@ test('reading routes require session and origin guards for private reads and mut
   const allowed = await fetch(url + '/documents', { method: 'POST', headers: { 'x-session': 'yes', Origin: 'http://local.test', 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'paper.txt' }) });
   assert.equal(allowed.status, 200); assert.match(allowed.headers.get('cache-control'), /no-store/);
   const h = await highlight(f);
+  assert.equal((await fetch(url + '/tasks', { method: 'POST', headers: { 'x-session': 'yes', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'wiki-note', targetPage: 'paper', createMissingPage: true, highlightIds: [h.id] }) })).status, 403);
+  f.service.providerFactory = () => ({ async runTurn() { return { text: `### Timing noise\nNoise [H:${h.id}] (source: paper.txt).` }; } });
+  const noteRequest = await fetch(url + '/tasks', { method: 'POST', headers: { 'x-session': 'yes', Origin: 'http://local.test', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'wiki-note', targetPage: 'paper', createMissingPage: true, highlightIds: [h.id] }) });
+  assert.equal(noteRequest.status, 202);
+  assert.equal((await completed(f.service, (await noteRequest.json()).id)).publication.page, 'paper');
   assert.equal((await fetch(url + `/documents/${h.documentId}/text`)).status, 403);
   const fullText = await fetch(url + `/documents/${h.documentId}/text`, { headers: { 'x-session': 'yes' } });
   assert.equal(fullText.status, 200); assert.match(fullText.headers.get('cache-control'), /no-store/);

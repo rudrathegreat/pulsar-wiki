@@ -215,7 +215,7 @@ test('sidebar deletion removes the selected highlight and undo restores it', asy
   clearTimeout(c.r.toastTimer);
 });
 
-test('add-to-wiki selection expands the helper for a reviewed draft using only that passage', async () => {
+test('add-to-wiki selection defaults the destination using only that passage', async () => {
   const c = client(); populate(c); c.r.pending = { text: 'A new selection' };
   c.r.selected.add('highlight-two'); c.r.assistanceIds.add('earlier-ai'); c.r.discoveryIds.add('earlier-paper');
   const h = { ...c.r.data.highlights[0], id: 'highlight-new' };
@@ -326,24 +326,27 @@ test('related knowledge results expand within an existing highlight helper', asy
   assert.equal(c.r.helper.expanded, true); assert.ok(!c.nodes.get('reading-dialog')?.open);
 });
 
-test('Add targets the selected existing wiki page and continues to its editor inside the helper', async () => {
+test('Add sends the selected passage for automatic saving and shows completion without a Markdown editor', async () => {
   const c = client(); populate(c); c.context.state.panel = 'document';
-  const artifact = { id: 'draft-inline', type: 'summary', title: 'Timing draft', content: '# Timing draft', targetPage: '', snapshot: { highlights: [c.r.data.highlights[0]], documents: c.r.data.documents, annotations: [], wikiPages: [], discoveries: [], responses: [] }, publications: [] };
+  const task = { id: 'wiki-note-one', action: 'wiki-note', targetPage: 'timing', status: 'completed', publication: { page: 'timing' }, response: '### Generated note', snapshot: { highlights: [c.r.data.highlights[0]], documents: c.r.data.documents, annotations: [], wikiPages: [], discoveries: [], responses: [] } };
   c.context.api = { getWikiList: async () => [{ name: 'paper' }, { name: 'timing' }] };
-  let submitted;
+  let submitted; let sidebarUpdated = false;
+  c.context.buildSidebar = () => { sidebarUpdated = true; };
   c.context.fetch = async (url, options) => {
-    if (url.endsWith('/artifacts') && options.method === 'POST') { submitted = JSON.parse(options.body); c.r.data.artifacts.push(artifact); return { ok: true, json: async () => artifact }; }
-    return { ok: true, json: async () => c.r.data };
+    if (url.endsWith('/tasks') && options.method === 'POST') { submitted = JSON.parse(options.body); return { ok: true, json: async () => task }; }
+    return { ok: true, json: async () => url.includes('/tasks/') ? task : c.r.data };
   };
   c.openHighlightHelper('highlight-one', 160, 180); await c.saveSelection('yellow', 'wiki');
   c.document.getElementById('reading-new-artifact-target').value = 'timing';
   await c.nodes.get('reading-new-artifact-create').listeners.click();
-  assert.equal(submitted.type, 'concept');
+  assert.equal(submitted.action, 'wiki-note');
   assert.equal(submitted.targetPage, 'timing');
-  assert.equal(submitted.title, 'timing');
+  assert.equal(submitted.createMissingPage, false);
   assert.deepEqual(submitted.highlightIds, ['highlight-one']);
-  assert.equal(c.nodes.get('reading-helper-title').textContent, 'Timing draft');
-  assert.match(c.nodes.get('reading-helper-body').innerHTML, /reading-artifact-editor|reading-artifact-reviewed/);
+  assert.equal(c.nodes.get('reading-helper-title').textContent, 'Adding note to wiki');
+  assert.match(c.nodes.get('reading-task-complete').innerHTML, /Note added to.*href="\/wiki\/timing"/);
+  assert.doesNotMatch(c.nodes.get('reading-helper-body').innerHTML, /reading-artifact-editor|reading-artifact-reviewed|Markdown draft|Publish reviewed/);
+  assert.equal(sidebarUpdated, true);
   assert.equal(c.r.helper.expanded, true); assert.ok(!c.nodes.get('reading-dialog')?.open);
 });
 
@@ -379,7 +382,7 @@ test('paper destination prefers its published summary and supports filename-base
   assert.equal(c.paperSummaryPage(pages), 'paper-summary');
   c.r.data.artifacts.push({ type: 'summary', updatedAt: '2026-10-16', snapshot: { documents: [c.r.data.documents[0]] }, publications: [{ page: 'timing-results' }] });
   assert.equal(c.paperSummaryPage(pages), 'timing-results');
-  assert.equal(c.paperSummaryPage([{ name: 'unrelated' }]), '');
+  assert.equal(c.paperSummaryPage([{ name: 'unrelated' }]), 'timing-results');
 });
 
 test('researcher comments toggle preserves the filters and narrows the matching passages', async () => {
@@ -570,4 +573,56 @@ test('reading a long document keeps retained page content bounded and rebuilds e
   c.releaseDistantPages(); await c.renderPage(1);
   assert.equal(c.r.pages.get(1).text, 'word-0 word-1 ');
   assert.equal(c.starts.filter(number => number === 1).length, 2);
+});
+
+
+test('Add to wiki keeps the missing paper page selected and queues automatic creation only on Add', async () => {
+  const c = client(); populate(c); c.context.state.panel = 'document';
+  c.context.api = { getWikiList: async () => [{ name: 'index' }, { name: 'log' }, { name: 'timing' }] };
+  const requests = []; let sidebarUpdated = false;
+  c.context.buildSidebar = () => { sidebarUpdated = true; };
+  const task = { id: 'new-paper-note', action: 'wiki-note', targetPage: 'paper', status: 'completed', publication: { page: 'paper' }, response: '### Note', snapshot: { highlights: [c.r.data.highlights[0]], documents: c.r.data.documents, annotations: [], wikiPages: [], discoveries: [], responses: [] } };
+  c.context.fetch = async (url, options) => {
+    if (options.method === 'POST') {
+      requests.push(JSON.parse(options.body));
+      return { ok: true, json: async () => task };
+    }
+    return { ok: true, json: async () => url.includes('/tasks/') ? task : c.r.data };
+  };
+  c.openHighlightHelper('highlight-one', 160, 180); await c.saveSelection('yellow', 'wiki');
+  assert.equal(c.nodes.get('reading-new-artifact-target').value, 'paper');
+  assert.match(c.nodes.get('reading-helper-body').innerHTML, /value="paper" selected>paper \(create on Add\)/);
+  assert.doesNotMatch(c.nodes.get('reading-helper-body').innerHTML, /Choose a wiki page|value="index"|value="log"/);
+  assert.equal(requests.length, 0);
+  await c.nodes.get('reading-new-artifact-create').listeners.click();
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].action, 'wiki-note');
+  assert.equal(requests[0].targetPage, 'paper');
+  assert.equal(requests[0].createMissingPage, true);
+  assert.equal(sidebarUpdated, true);
+  assert.match(c.nodes.get('reading-task-complete').innerHTML, /Note added to/);
+  assert.doesNotMatch(c.nodes.get('reading-helper-body').innerHTML, /reading-artifact-editor|reading-artifact-reviewed/);
+});
+
+test('paper destinations match renamed sources and always provide a safe fallback', () => {
+  const c = client(); populate(c); c.r.selected.add('highlight-one');
+  const doc = c.r.data.documents[0];
+  doc.currentName = 'Renamed Paper.pdf';
+  assert.equal(c.paperSummaryPage([{ name: 'paper-summary' }]), 'paper-summary');
+  assert.equal(c.paperSummaryPage([]), 'renamed-paper');
+  doc.currentName = 'index.pdf'; doc.aliases = ['log.pdf'];
+  assert.match(c.paperSummaryPage([]), /^paper-document-one-notes$/);
+});
+
+
+test('automatic wiki-note progress hides generated Markdown and offers retry after failure', async () => {
+  const c = client(); populate(c); c.context.state.panel = 'document';
+  c.openHighlightHelper('highlight-one', 160, 180); c.r.helper.expanded = true;
+  const task = { id: 'note-failed', action: 'wiki-note', targetPage: 'paper', status: 'failed', error: 'Could not connect.', progress: '### Partial generated Markdown', response: '', snapshot: { highlights: [c.r.data.highlights[0]], documents: c.r.data.documents, annotations: [], wikiPages: [], discoveries: [], responses: [] } };
+  c.context.fetch = async url => ({ ok: true, json: async () => url.includes('/tasks/') ? task : c.r.data });
+  await c.watchTask(task);
+  assert.equal(c.nodes.get('reading-task-live').textContent, '');
+  assert.match(c.nodes.get('reading-task-complete').innerHTML, /Could not connect/);
+  assert.match(c.nodes.get('reading-task-complete').innerHTML, /Try again/);
+  assert.doesNotMatch(c.nodes.get('reading-helper-body').innerHTML, /reading-artifact-editor|Markdown draft/);
 });

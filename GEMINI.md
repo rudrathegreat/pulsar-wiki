@@ -30,6 +30,17 @@ When the user adds a new source to `raw/` and asks you to ingest it:
 
 A single source may touch 10-15 wiki pages. That is normal.
 
+## Adding selected reading notes
+
+When the researcher selects **Add to wiki**, treat Add as authorisation to generate and save the selected note automatically. This is a selected-passage workflow, separate from full-source ingestion; do not require a Markdown review or another confirmation.
+
+1. Use only the selected passages and explicitly included comments, visual regions, and AI interpretations. Use the selected destination page as context.
+2. Write a concise note with a descriptive heading, preserving the source's meaning, qualifications, equations, and units. Do not imply the whole paper was read.
+3. Cite the supplied passage references and source filenames. Distinguish evidence from researcher interpretation and AI explanation; mark unsupported interpretations as needing verification.
+4. Preserve all existing notes and citations. The application inserts the generated note into the latest page instead of replacing that page with model output.
+5. Create a missing paper notes page when Add is selected. Update its sources, date, wiki index, and append-only log with the saved note.
+6. Show progress and a completion link in the helper. Do not open a Markdown editor, diff, or publication-review step for this action.
+
 ## Page format
 
 Every wiki page should follow this structure:
