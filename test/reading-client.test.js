@@ -14,9 +14,9 @@ function client() {
   const staticIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]));
   const element = () => ({ style: {}, dataset: {}, value: '', children: [], listeners: {}, attributes: {}, hidden: false, innerHTML: '', offsetWidth: 350, offsetHeight: 45, classList: { add() {}, remove() {}, toggle() {} }, addEventListener(type, listener) { this.listeners[type] = listener; }, querySelectorAll() { return []; }, querySelector() { return null; }, contains() { return false; }, focus() {}, setAttribute(key, value) { this.attributes[key] = value; }, showModal() { this.open = true; }, close() { this.open = false; }, append(child) { this.children.push(child); }, getBoundingClientRect() { return { left: 100, top: 100, right: 500, bottom: 900, width: 400, height: 800 }; } });
   const document = { activeElement: null, getElementById(id) { if (!staticIds.has(id) && ![...nodes.values()].some(node => node.innerHTML.includes(`id="${id}"`))) return null; if (!nodes.has(id)) nodes.set(id, element()); return nodes.get(id); }, querySelectorAll() { return []; }, addEventListener() {}, createElement(tag) { const node = element(); if (tag === 'template') node.content = { querySelectorAll() { return []; } }; return node; } };
-  const context = { document, window: { addEventListener() {}, getSelection() { return null; }, innerWidth: 1200, innerHeight: 900 }, state: { panel: 'reading' }, setTimeout, clearTimeout, URL, URLSearchParams, Node: { TEXT_NODE: 3 }, renderMd(v) { return v; }, typesetMath() {} };
+  const context = { document, window: { addEventListener() {}, getSelection() { return null; }, innerWidth: 1200, innerHeight: 900 }, state: { panel: 'reading' }, setTimeout, clearTimeout, ReadableStream, URL, URLSearchParams, Node: { TEXT_NODE: 3 }, renderMd(v) { return v; }, typesetMath() {} };
   vm.createContext(context);
-  vm.runInContext(source.replace('window.ActiveReading =', 'window.__readingTest = { r, selectedPayload, previewSnapshot, captureSelection, paintHighlights, diffHtml, renderWorkspace, filteredHighlights, library, joinHighlightRects, setHighlightsEnabled, saveSelection, deleteHighlight, undoDeletion, connectKnowledge, openHighlightHelper, closeHelper, watchTask, paperSummaryPage }; window.ActiveReading ='), context);
+  vm.runInContext(source.replace('window.ActiveReading =', 'window.__readingTest = { r, selectedPayload, previewSnapshot, captureSelection, paintHighlights, diffHtml, renderWorkspace, filteredHighlights, library, joinHighlightRects, setHighlightsEnabled, saveSelection, deleteHighlight, undoDeletion, connectKnowledge, openHighlightHelper, closeHelper, watchTask, paperSummaryPage, renderPage, releasePage, releaseDistantPages, textChunks, close, layout, findNext }; window.ActiveReading ='), context);
   return { ...context.window.__readingTest, context, nodes, document };
 }
 function populate(c) {
@@ -396,4 +396,178 @@ test('researcher comments toggle preserves the filters and narrows the matching 
   const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'reading.css'), 'utf8');
   assert.match(css, /#reading-notes\s*\{[^}]*scrollbar-gutter:stable/);
   assert.match(css, /#panel-reading\s*\{[^}]*scrollbar-gutter:stable/);
+});
+
+function renderer({ count = 6, items = 2, holdCanvas = false } = {}) {
+  const c = client(); populate(c);
+  c.context.state.panel = 'document';
+  c.context.state.pdf = { page: 1, scale: 1, fitWidth: false };
+  c.r.document = c.r.data.documents[0];
+  const starts = []; const pending = []; const chunks = [];
+  let active = 0; let maxActive = 0;
+  c.context.getPdfLibrary = async () => ({ TextLayer: class {
+    constructor({ textContentSource }) { this.reader = textContentSource.getReader(); this.textDivs = []; this.textContentItemsStr = []; }
+    async render() {
+      for (;;) {
+        const { done, value } = await this.reader.read(); if (done) break;
+        chunks.push(value.items.length);
+        for (const item of value.items) { this.textDivs.push({ dataset: {} }); this.textContentItemsStr.push(item.str); }
+      }
+    }
+    cancel() { void this.reader.cancel(); }
+    update() {}
+  } });
+  c.r.pdf = {
+    async destroy() {},
+    async getPage(number) {
+      return {
+        rotate: 0, userUnit: 1, cleanups: 0,
+        cleanup() { this.cleanups += 1; },
+        getViewport({ scale, rotation = 0 }) { return { scale, rotation, width: 600 * scale, height: 800 * scale, convertToViewportRectangle: coords => coords }; },
+        async getTextContent() { return { items: Array.from({ length: items }, (_, i) => ({ str: `word-${i} ` })), styles: {}, lang: 'en' }; },
+        render() {
+          starts.push(number); active += 1; maxActive = Math.max(maxActive, active);
+          let finish; let fail;
+          const promise = new Promise((resolve, reject) => { finish = resolve; fail = reject; }).finally(() => { active -= 1; });
+          pending.push(finish);
+          if (!holdCanvas) finish();
+          return { promise, cancel() { fail(Object.assign(new Error('cancelled'), { name: 'RenderingCancelledException' })); } };
+        },
+      };
+    },
+  };
+  for (let number = 1; number <= count; number += 1) {
+    c.r.pages.set(number, { number, near: true, rendered: false, wrap: { style: { setProperty() {} } }, canvas: { style: {}, getContext() { return {}; } }, layer: { textContent: '' }, overlay: { innerHTML: '', textContent: '', append() {} } });
+  }
+  return { ...c, starts, pending, chunks, maxActive: () => maxActive };
+}
+async function until(check) {
+  for (let i = 0; i < 200; i += 1) { if (check()) return; await new Promise(resolve => setTimeout(resolve, 2)); }
+  throw new Error('Reader did not reach the expected state');
+}
+
+test('page renders are serial, prioritise the new viewport, and skip obsolete prefetch', async () => {
+  const c = renderer({ holdCanvas: true });
+  const first = c.renderPage(1);
+  await until(() => c.starts.length === 1);
+  const distant = c.renderPage(2, true);
+  const next = c.renderPage(6, true);
+  const middle = c.renderPage(4, true);
+  c.context.state.pdf.page = 6;
+  c.r.pages.get(2).near = false;
+  c.pending.shift()(); await first;
+  await until(() => c.starts.length === 2);
+  assert.deepEqual(c.starts, [1, 6]);
+  c.pending.shift()(); await next;
+  await until(() => c.starts.length === 3);
+  c.pending.shift()(); await Promise.all([distant, middle]);
+  assert.deepEqual(c.starts, [1, 6, 4]);
+  assert.equal(c.maxActive(), 1);
+});
+
+test('offscreen text and canvas are released and can be rebuilt with identical selection offsets', async () => {
+  const c = renderer({ count: 1, items: 275 }); const p = c.r.pages.get(1);
+  await c.renderPage(1);
+  const text = p.text; const offsets = p.textLayer.textDivs.map(span => ({ ...span.dataset }));
+  assert.ok(c.chunks.length >= 3 && c.chunks.every(size => size <= 100));
+  p.near = false; c.releasePage(p);
+  assert.equal(p.canvas.width, 0); assert.equal(p.canvas.height, 0);
+  assert.equal(p.textLayer, null); assert.equal(p.content, null); assert.equal(p.text, null);
+  assert.equal(p.layer.textContent, ''); assert.equal(p.rendered, false);
+  assert.ok(p.page.cleanups > 0);
+  p.near = true; await c.renderPage(1);
+  assert.equal(p.text, text);
+  assert.deepEqual(p.textLayer.textDivs.map(span => ({ ...span.dataset })), offsets);
+});
+
+test('cleanup protects only pages in the active cross-page selection and releases them after deselection', async () => {
+  const c = renderer({ count: 3 });
+  await Promise.all([c.renderPage(1), c.renderPage(2, true), c.renderPage(3, true)]);
+  const [one, two, three] = [...c.r.pages.values()];
+  c.context.window.getSelection = () => ({ isCollapsed: false, rangeCount: 1, getRangeAt() { return { intersectsNode: layer => layer === one.layer || layer === two.layer }; } });
+  for (const p of c.r.pages.values()) p.near = false;
+  c.releaseDistantPages();
+  assert.ok(one.textLayer); assert.ok(two.textLayer); assert.equal(three.textLayer, null);
+  c.context.window.getSelection = () => ({ isCollapsed: true });
+  c.releaseDistantPages();
+  assert.equal(one.textLayer, null); assert.equal(two.textLayer, null);
+});
+
+test('scrolling cancels an in-flight page and closing resolves queued work without late DOM writes', async () => {
+  const c = renderer({ holdCanvas: true });
+  const first = c.renderPage(1); const next = c.renderPage(2, true);
+  await until(() => c.starts.length === 1);
+  c.context.state.pdf.page = 2;
+  const p = c.r.pages.get(1); p.near = false; c.releasePage(p);
+  await first;
+  assert.ok(p.page.cleanups > 0, 'a cancelled render must release its PDF page resources after settling');
+  await until(() => c.starts.length === 2);
+  const queued = c.renderPage(3, true);
+  c.close();
+  await Promise.all([next, queued]);
+  assert.deepEqual(c.starts, [1, 2]);
+  assert.equal(c.r.pages.size, 0); assert.equal(p.textLayer, null);
+});
+
+test('text chunks yield between batches and stop when the page is no longer wanted', async () => {
+  const c = client(); let current = true;
+  const content = { items: Array.from({ length: 1000 }, (_, i) => ({ str: String(i) })), styles: { font: {} }, lang: 'en' };
+  const reader = c.textChunks(content, () => current).getReader();
+  let inputHandled = false;
+  setTimeout(() => { inputHandled = true; }, 0);
+  const first = await reader.read();
+  assert.equal(inputHandled, true);
+  assert.equal(first.value.items.length, 100); assert.equal(first.value.styles, content.styles);
+  current = false;
+  assert.equal((await reader.read()).done, true);
+});
+
+test('large zoom levels keep the canvas pixel allocation within its budget', async () => {
+  const c = renderer({ count: 1 });
+  c.context.state.pdf.scale = 10; c.context.window.devicePixelRatio = 2;
+  await c.renderPage(1);
+  const canvas = c.r.pages.get(1).canvas;
+  assert.ok(canvas.width * canvas.height <= 8 * 1024 * 1024);
+  assert.equal(canvas.style.width, '6000px');
+});
+
+test('zoom during rendering cancels the old canvas and completes the same request at the new scale', async () => {
+  const c = renderer({ count: 1, holdCanvas: true });
+  c.r.defaultSize = { width: 600, height: 800 };
+  const result = c.renderPage(1);
+  await until(() => c.starts.length === 1);
+  c.pending.shift(); // The first render is cancelled by layout, not completed.
+  c.context.state.pdf.scale = 2; c.layout();
+  await until(() => c.starts.length === 2);
+  c.pending.shift()(); await result;
+  assert.equal(c.r.pages.get(1).canvas.style.width, '1200px');
+  assert.equal(c.r.pages.get(1).rendered, true);
+  assert.equal(c.maxActive(), 1);
+});
+
+test('closing during text construction cancels the stream and leaves no retained text layer', async () => {
+  const c = renderer({ count: 1, items: 3000 }); const p = c.r.pages.get(1);
+  const result = c.renderPage(1);
+  await until(() => p.buildingTextLayer);
+  c.close(); await result;
+  assert.equal(p.textLayer, null); assert.equal(p.buildingTextLayer, null);
+  assert.equal(p.layer.textContent, '');
+  assert.equal(c.r.pages.size, 0);
+});
+
+test('reading a long document keeps retained page content bounded and rebuilds earlier pages on return', async () => {
+  const c = renderer({ count: 40 });
+  for (const p of c.r.pages.values()) p.near = false;
+  for (let number = 1; number <= 40; number += 1) {
+    c.context.state.pdf.page = number;
+    for (const p of c.r.pages.values()) p.near = p.number === number;
+    c.releaseDistantPages();
+    await c.renderPage(number);
+    assert.equal([...c.r.pages.values()].filter(p => p.textLayer).length, 1);
+  }
+  c.context.state.pdf.page = 1;
+  c.r.pages.get(40).near = false; c.r.pages.get(1).near = true;
+  c.releaseDistantPages(); await c.renderPage(1);
+  assert.equal(c.r.pages.get(1).text, 'word-0 word-1 ');
+  assert.equal(c.starts.filter(number => number === 1).length, 2);
 });

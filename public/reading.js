@@ -9,6 +9,47 @@
   r.highlightsEnabled = true;
   const actions = { explain: 'Explain passage', equation: 'Explain equation', methodology: 'Explain methodology', assumptions: 'Examine assumptions', concept: 'Explain concept', question: 'Ask a question', evidence: 'Compare evidence', links: 'Suggest connections' };
   const artifactNames = { summary: 'Paper reading summary', synthesis: 'Collection synthesis', evidence: 'Evidence comparison', concept: 'Concept-page update' };
+  const yieldUI = () => typeof window.scheduler?.yield === 'function' ? window.scheduler.yield() : new Promise(resolve => setTimeout(resolve, 0));
+  const renderQueue = new Map();
+  let rendering = false;
+
+  function pageHasSelection(p) {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) return false;
+    for (let i = 0; i < selection.rangeCount; i += 1) {
+      if (selection.getRangeAt(i).intersectsNode(p.layer)) return true;
+    }
+    return false;
+  }
+  function releasePage(p) {
+    if (!p.rendered && !p.rendering && !p.textLayer && !p.content && !p.needsCleanup && p.canvas.width === 0 && p.canvas.height === 0) return;
+    if (pageHasSelection(p)) return;
+    p.renderVersion = (p.renderVersion || 0) + 1;
+    p.task?.cancel(); p.buildingTextLayer?.cancel();
+    p.textLayer = null; p.content = null; p.text = null;
+    p.layer.textContent = ''; p.overlay.textContent = '';
+    p.canvas.width = 0; p.canvas.height = 0; p.rendered = false;
+    p.needsCleanup = Boolean(p.page);
+    if (!p.rendering && p.page) p.needsCleanup = p.page.cleanup() === false;
+  }
+  function releaseDistantPages() {
+    for (const p of r.pages.values()) if (p.near === false) releasePage(p);
+  }
+  // PDF.js consumes each stream chunk synchronously. Bound the number of spans
+  // built in one turn so dense scientific PDFs leave time for input and paint.
+  function textChunks(content, current) {
+    let offset = 0; let cancelled = false;
+    return new ReadableStream({
+      async pull(controller) {
+        await yieldUI();
+        if (cancelled) return;
+        if (!current() || offset >= content.items.length) { controller.close(); return; }
+        controller.enqueue({ ...content, items: content.items.slice(offset, offset + 100) });
+        offset += 100;
+      },
+      cancel() { cancelled = true; },
+    }, { highWaterMark: 0 });
+  }
 
   async function request(url = '', method = 'GET', body) {
     const response = await fetch(`/api/reading${url}`, { method, headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -93,15 +134,17 @@
   function close() {
     if (r.document && r.positionDirty) void savePosition();
     r.generation += 1; r.observer?.disconnect(); r.thumbnailObserver?.disconnect();
-    for (const p of r.pages.values()) { p.task?.cancel(); p.textLayer?.cancel(); }
+    for (const job of renderQueue.values()) job.resolve();
+    renderQueue.clear();
+    for (const p of r.pages.values()) { p.task?.cancel(); p.buildingTextLayer?.cancel(); p.textLayer?.cancel(); }
     if (r.pdf) { const previous = r.pdf; r.pdf = null; void previous.destroy().catch(() => {}); }
-    r.pages.clear(); r.document = null; r.pending = null; r.historical = null;
+    r.pages.clear(); r.document = null; r.pending = null; r.historical = null; r.findText = null;
     closeHelper(); el('reading-notes').hidden = true; el('reading-thumbnails').hidden = true;
     el('document-stage').classList.remove('reading-region-mode', 'reading-highlights-disabled');
   }
   async function open(pdf, name, session) {
     const generation = ++r.generation;
-    r.pdf = pdf; r.rotation = 0; r.region = false; r.findQuery = ''; r.findResults = []; r.lastScale = null;
+    r.pdf = pdf; r.rotation = 0; r.region = false; r.findQuery = ''; r.findResults = []; r.findText = null; r.lastScale = null;
     setHighlightsEnabled(r.highlightsEnabled);
     el('reading-region').setAttribute('aria-pressed', 'false');
     const result = await request('/documents', 'POST', { name });
@@ -132,10 +175,11 @@
         const p = r.pages.get(Number(entry.target.dataset.readingPage));
         if (!p) continue;
         p.near = entry.isIntersecting;
-        if (p.near) void renderPage(p.number).catch(error => { if (error.name !== 'RenderingCancelledException') notify(error.message); });
-        else if (p.rendered && window.getSelection()?.isCollapsed !== false && !p.rendering) { p.canvas.width = 0; p.canvas.height = 0; p.rendered = false; }
+        p.visible = Boolean(entry.rootBounds && entry.boundingClientRect.bottom > entry.rootBounds.top + 300 && entry.boundingClientRect.top < entry.rootBounds.bottom - 300);
+        if (p.near) void renderPage(p.number, true).catch(error => { if (error.name !== 'RenderingCancelledException') notify(error.message); });
+        else releasePage(p);
       }
-    }, { root: el('document-stage'), rootMargin: '900px 0px' });
+    }, { root: el('document-stage'), rootMargin: '300px 0px' });
     for (const p of r.pages.values()) r.observer.observe(p.wrap);
     await navigate(r.document.position?.page || 1, state.pdf.fitWidth);
     if (result.changedDocuments.length) notify('This filename previously contained a different PDF. Its earlier highlights are preserved in the reading library.', true);
@@ -151,52 +195,101 @@
       const viewport = p.page?.getViewport({ scale: state.pdf.scale, rotation: (p.page.rotate + r.rotation) % 360 });
       const viewportChanged = viewport && (!p.viewport || p.viewport.scale !== viewport.scale || p.viewport.rotation !== viewport.rotation);
       p.viewport = viewport || null;
-      const width = viewport?.width || (r.rotation % 180 ? r.defaultSize.height : r.defaultSize.width) * state.pdf.scale;
-      const height = viewport?.height || (r.rotation % 180 ? r.defaultSize.width : r.defaultSize.height) * state.pdf.scale;
+      const size = p.size || r.defaultSize;
+      const width = viewport?.width || (r.rotation % 180 ? size.height : size.width) * state.pdf.scale;
+      const height = viewport?.height || (r.rotation % 180 ? size.width : size.height) * state.pdf.scale;
       p.wrap.style.width = `${width}px`; p.wrap.style.height = `${height}px`;
       p.wrap.style.setProperty('--scale-factor', state.pdf.scale);
       p.wrap.style.setProperty('--user-unit', p.page?.userUnit || 1);
       p.wrap.style.setProperty('--total-scale-factor', state.pdf.scale * (p.page?.userUnit || 1));
-      if (p.textLayer && viewportChanged) p.textLayer.update({ viewport });
-      if (viewportChanged && (p.rendered || p.rendering)) { p.task?.cancel(); p.rendered = false; p.renderVersion = (p.renderVersion || 0) + 1; }
-      paintHighlights(p);
+      if (viewportChanged && (p.rendered || p.rendering)) {
+        p.task?.cancel(); p.buildingTextLayer?.cancel(); p.rendered = false; p.renderVersion = (p.renderVersion || 0) + 1;
+      }
+      if (p.near !== false) paintHighlights(p);
     }
     updatePageControls();
   }
-  async function renderPage(number) {
-    const p = r.pages.get(number); const generation = r.generation; const pdf = r.pdf;
-    if (!p || !pdf || p.rendered) return;
-    if (p.rendering) { await p.rendering; if (!p.rendered && generation === r.generation) return renderPage(number); return; }
-    p.rendering = (async () => {
-      p.page ||= await pdf.getPage(number);
-      if (generation !== r.generation) return;
+  function renderPage(number, background = false) {
+    const p = r.pages.get(number);
+    if (!p || !r.pdf || p.rendered) return Promise.resolve();
+    if (p.renderJob) { if (!background) p.renderJob.foreground = true; return p.renderJob.promise; }
+    const job = { p, pdf: r.pdf, generation: r.generation, foreground: !background };
+    job.promise = new Promise((resolve, reject) => { job.resolve = resolve; job.reject = reject; });
+    p.renderJob = job; renderQueue.set(p, job);
+    void drainRenderQueue();
+    return job.promise;
+  }
+  function wanted(job) {
+    return job.generation === r.generation && job.pdf === r.pdf && r.pages.get(job.p.number) === job.p &&
+      (job.p.near || job.foreground && job.p.number === state.pdf.page);
+  }
+  async function drainRenderQueue() {
+    if (rendering) return;
+    rendering = true;
+    try {
+      // One canvas/text pipeline at a time, with the visible page ahead of prefetch.
+      while (renderQueue.size) {
+        const jobs = [...renderQueue.values()].sort((a, b) => Number(b.p.number === state.pdf.page) - Number(a.p.number === state.pdf.page) || Number(b.p.visible) - Number(a.p.visible) || Math.abs(a.p.number - state.pdf.page) - Math.abs(b.p.number - state.pdf.page));
+        const job = jobs[0]; const p = job.p;
+        renderQueue.delete(p);
+        try {
+          if (wanted(job)) await drawPage(job);
+          if (wanted(job) && !p.rendered) { renderQueue.set(p, job); continue; }
+          job.resolve();
+        } catch (error) { job.reject(error); }
+        finally { if (!renderQueue.has(p)) p.renderJob = null; }
+        await yieldUI();
+      }
+    } finally { rendering = false; }
+  }
+  async function drawPage(job) {
+    const { p, pdf, generation } = job;
+    const version = p.renderVersion || 0;
+    const current = () => wanted(job) && version === (p.renderVersion || 0);
+    p.rendering = true;
+    try {
+      p.page ||= await pdf.getPage(p.number);
+      p.needsCleanup = true;
+      if (!current()) return;
+      const base = p.page.getViewport({ scale: 1 });
+      p.size = { width: base.width, height: base.height };
       const viewport = p.page.getViewport({ scale: state.pdf.scale, rotation: (p.page.rotate + r.rotation) % 360 });
       p.viewport = viewport;
       p.wrap.style.width = `${viewport.width}px`; p.wrap.style.height = `${viewport.height}px`;
       p.wrap.style.setProperty('--total-scale-factor', state.pdf.scale * (p.page.userUnit || 1));
-      const version = p.renderVersion || 0;
-      const outputScale = Math.min(window.devicePixelRatio || 1, 2);
+      // Bound canvas memory at large zoom levels as well as on high-DPI screens.
+      const outputScale = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(8 * 1024 * 1024 / (viewport.width * viewport.height)));
       p.canvas.width = Math.floor(viewport.width * outputScale); p.canvas.height = Math.floor(viewport.height * outputScale);
       p.canvas.style.width = `${viewport.width}px`; p.canvas.style.height = `${viewport.height}px`;
       p.task = p.page.render({ canvasContext: p.canvas.getContext('2d'), viewport, transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0] });
-      try {
-        await p.task.promise;
-        if (generation !== r.generation || version !== (p.renderVersion || 0)) return;
-        p.content ||= await p.page.getTextContent();
-        if (!p.textLayer) {
-          const lib = await getPdfLibrary();
-          p.textLayer = new lib.TextLayer({ textContentSource: p.content, container: p.layer, viewport });
-          await p.textLayer.render();
-          p.text = p.textLayer.textContentItemsStr.join('');
-          let offset = 0;
-          for (let i = 0; i < p.textLayer.textDivs.length; i += 1) { const span = p.textLayer.textDivs[i]; span.dataset.textStart = offset; span.dataset.textLength = p.textLayer.textContentItemsStr[i].length; offset += p.textLayer.textContentItemsStr[i].length; }
-        } else p.textLayer.update({ viewport });
-        p.rendered = true;
-        paintHighlights(p);
-      } catch (error) { if (error.name !== 'RenderingCancelledException' && generation === r.generation) throw error; }
-      finally { p.task = null; }
-    })();
-    try { await p.rendering; } finally { p.rendering = null; }
+      p.task.onContinue = continuation => { void yieldUI().then(continuation); };
+      await p.task.promise;
+      if (!current()) return;
+      p.content ||= await p.page.getTextContent();
+      if (!current()) return;
+      if (!p.textLayer) {
+        const lib = await getPdfLibrary();
+        if (!current()) return;
+        p.layer.textContent = '';
+        const layer = p.buildingTextLayer = new lib.TextLayer({ textContentSource: textChunks(p.content, current), container: p.layer, viewport });
+        await layer.render();
+        if (!current()) return;
+        p.text = layer.textContentItemsStr.join('');
+        let offset = 0;
+        for (let i = 0; i < layer.textDivs.length; i += 1) {
+          const span = layer.textDivs[i]; span.dataset.textStart = offset; span.dataset.textLength = layer.textContentItemsStr[i].length; offset += layer.textContentItemsStr[i].length;
+          if (i % 100 === 99) { await yieldUI(); if (!current()) return; }
+        }
+        p.textLayer = layer;
+      } else p.textLayer.update({ viewport });
+      p.rendered = true;
+      paintHighlights(p);
+    } catch (error) { if (error.name !== 'RenderingCancelledException' && error.name !== 'AbortException' && current()) throw error; }
+    finally {
+      p.task = null; p.buildingTextLayer = null; p.rendering = false;
+      if (!p.rendered && !p.textLayer) p.layer.textContent = '';
+      if (generation !== r.generation || p.near === false && !wanted(job)) releasePage(p);
+    }
   }
   function joinHighlightRects(rectangles, vertical = false) {
     // Work along the text's baseline, including when the viewer is rotated.
@@ -236,7 +329,7 @@
     for (const p of r.pages.values()) paintHighlights(p);
   }
   function paintHighlights(p) {
-    if (!p?.viewport || !r.document) return;
+    if (!p?.viewport || !r.document || p.near === false && !pageHasSelection(p)) return;
     p.overlay.innerHTML = '';
     if (!r.highlightsEnabled) return;
     const highlights = live('highlights').filter(h => h.documentId === r.document.id && h.id !== r.historical?.highlight.id);
@@ -269,7 +362,7 @@
     const p = r.pages.get(page);
     p.wrap.scrollIntoView({ block: 'start' });
     await renderPage(page);
-    for (const near of r.pages.values()) if (near.near && !near.rendered) void renderPage(near.number).catch(report);
+    for (const near of r.pages.values()) if (near.near && !near.rendered) void renderPage(near.number, true).catch(report);
     updatePageControls(); schedulePosition();
   }
   function schedulePosition() { r.positionDirty = true; clearTimeout(r.saveTimer); r.saveTimer = setTimeout(() => { void savePosition(); }, 900); }
@@ -569,9 +662,21 @@
     if (!r.document) return;
     const query = el('reading-find').value.trim(); if (!query) return;
     const generation = r.generation;
-    if (r.findQuery !== query) { r.findQuery = query; r.findIndex = 0; r.findResults = []; for (let page = 1; page <= r.document.pageCount; page += 1) { const content = await request(`/documents/${r.document.id}/pages/${page}`); if (generation !== r.generation) return; const body = content.text.toLowerCase(); let start = body.indexOf(query.toLowerCase()); while (start !== -1) { r.findResults.push({ page, start, end: start + query.length }); start = body.indexOf(query.toLowerCase(), start + query.length); } } }
+    if (!r.findText) {
+      const content = await request(`/documents/${r.document.id}/text`);
+      if (generation !== r.generation) return;
+      r.findText = content.pages;
+    }
+    if (r.findQuery !== query) {
+      r.findQuery = query; r.findIndex = 0; r.findResults = [];
+      for (const content of r.findText) {
+        const body = content.text.toLowerCase(); let start = body.indexOf(query.toLowerCase());
+        while (start !== -1) { r.findResults.push({ page: content.page, start, end: start + query.length }); start = body.indexOf(query.toLowerCase(), start + query.length); }
+      }
+    }
     if (!r.findResults.length) { notify('No text matches. Scanned pages may need a visual selection.'); return; }
     const found = r.findResults[r.findIndex++ % r.findResults.length]; await navigate(found.page);
+    if (generation !== r.generation || !r.pages.get(found.page)?.textLayer) return;
     const p = r.pages.get(found.page); const range = document.createRange(); let begin = null; let finish = null;
     for (const span of p.textLayer.textDivs) { const start = Number(span.dataset.textStart); const end = start + Number(span.dataset.textLength); if (!begin && found.start >= start && found.start < end) begin = { node: span.firstChild, offset: found.start - start }; if (found.end > start && found.end <= end) finish = { node: span.firstChild, offset: found.end - start }; }
     if (begin && finish) { range.setStart(begin.node, begin.offset); range.setEnd(finish.node, finish.offset); const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range); begin.node.parentElement.scrollIntoView({ block: 'center' }); captureSelection(); }
@@ -832,6 +937,10 @@
       if (current && current.number !== state.pdf.page) { state.pdf.page = current.number; updatePageControls(); schedulePosition(); }
     }, 100);
   }, { passive: true });
+  document.addEventListener('selectionchange', () => {
+    clearTimeout(r.selectionTimer);
+    r.selectionTimer = setTimeout(releaseDistantPages, 100);
+  });
   el('document-stage').addEventListener('click', event => {
     if (!r.highlightsEnabled || r.region || window.getSelection()?.isCollapsed === false) return;
     const wrap = event.target.closest('.reading-page'); if (!wrap) return;

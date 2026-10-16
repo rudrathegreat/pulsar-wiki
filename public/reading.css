@@ -13,7 +13,7 @@
 .reading-tools { flex-wrap:wrap; margin-left:auto; }
 #pdf-toolbar { flex-wrap:wrap; height:auto; min-height:49px; gap:6px; }
 #reading-find { max-width:150px; }
-.reading-page { position:relative; flex:none; margin:0 auto 26px; background:#fff; overflow:hidden; isolation:isolate; cursor:var(--reading-highlighter-cursor); }
+.reading-page { position:relative; flex:none; margin:0 auto 26px; background:#fff; overflow:hidden; contain:layout paint; isolation:isolate; cursor:var(--reading-highlighter-cursor); }
 .reading-page canvas { display:block; background:#fff; }
 .reading-page .reading-page-label { position:absolute; right:8px; bottom:4px; color:#111; background:#fff; font:10px var(--font); pointer-events:none; }
 .reading-page .textLayer { position:absolute; inset:0; overflow:clip; line-height:1; text-align:initial; transform-origin:0 0; -webkit-text-size-adjust:none; text-size-adjust:none; forced-color-adjust:none; z-index:2; --min-font-size:1; --text-scale-factor:calc(var(--total-scale-factor) * var(--min-font-size)); --min-font-size-inv:calc(1 / var(--min-font-size)); }

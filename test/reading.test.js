@@ -261,6 +261,10 @@ test('reading routes require session and origin guards for private reads and mut
   const allowed = await fetch(url + '/documents', { method: 'POST', headers: { 'x-session': 'yes', Origin: 'http://local.test', 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'paper.txt' }) });
   assert.equal(allowed.status, 200); assert.match(allowed.headers.get('cache-control'), /no-store/);
   const h = await highlight(f);
+  assert.equal((await fetch(url + `/documents/${h.documentId}/text`)).status, 403);
+  const fullText = await fetch(url + `/documents/${h.documentId}/text`, { headers: { 'x-session': 'yes' } });
+  assert.equal(fullText.status, 200); assert.match(fullText.headers.get('cache-control'), /no-store/);
+  assert.equal((await fullText.json()).pages[0].text, fs.readFileSync(path.join(f.rawDir, 'paper.txt'), 'utf8'));
   assert.equal((await fetch(url + '/connections', { method: 'POST', headers: { 'x-session': 'yes', 'Content-Type': 'application/json' }, body: JSON.stringify({ highlightId: h.id }) })).status, 403);
   const connected = await fetch(url + '/connections', { method: 'POST', headers: { 'x-session': 'yes', Origin: 'http://local.test', 'Content-Type': 'application/json' }, body: JSON.stringify({ highlightId: h.id, revision: h.revision }) });
   assert.equal(connected.status, 200); assert.equal((await connected.json()).highlightId, h.id);
@@ -301,11 +305,23 @@ test('real PDF extraction preserves page inventory and anchors across zoom and r
   fs.copyFileSync(path.join(__dirname, '..', 'raw', 'psrchive.pdf'), path.join(f.rawDir, 'real.pdf'));
   const opened = await f.service.openDocument('real.pdf');
   assert.ok(opened.document.pageCount > 1); assert.equal(opened.document.labels.length, opened.document.pageCount);
+  const cached = f.service.extractions.get(opened.document.hash);
+  assert.equal(cached.pages.filter(Boolean).length, 0, 'opening must read metadata without extracting page text');
   const pageText = await f.service.pageText(opened.document.id, 1);
   assert.ok(pageText.text.length > 100);
+  assert.equal(cached.pages.filter(Boolean).length, 1, 'only the requested page is extracted');
   const exact = pageText.text.slice(0, 80);
   const h = await f.service.createHighlight({ documentId: opened.document.id, kind: 'text', color: 'green', categories: [], anchors: [{ page: 1, label: '1', exact, start: 0, end: exact.length, rects: [[10, 20, 150, 40]] }] });
   assert.equal(h.text, exact);
+  assert.equal(cached.pages.filter(Boolean).length, 1, 'saving a highlight reuses that page without scanning the paper');
+  const [last, sameLast] = await Promise.all([f.service.pageText(opened.document.id, opened.document.pageCount), f.service.pageText(opened.document.id, opened.document.pageCount)]);
+  assert.equal(last.text, sameLast.text);
+  assert.equal(cached.pages.filter(Boolean).length, 2);
+  const full = await f.service.documentText(opened.document.id);
+  assert.equal(full.pages.length, opened.document.pageCount);
+  assert.ok(full.pages.every(Boolean), 'explicit full-document search fills the remaining pages');
+  assert.equal(full.pages[0].text, pageText.text);
+  await assert.rejects(f.service.pageText(opened.document.id, opened.document.pageCount + 1), e => e.code === 'page-not-found');
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const pdf = await getDocument({ data: new Uint8Array(fs.readFileSync(path.join(f.rawDir, 'real.pdf'))) }).promise;
   try {

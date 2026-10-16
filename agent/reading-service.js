@@ -45,6 +45,7 @@ class ReadingService {
   constructor({ store, wikiTools, authService, discovery, instructions = '', providerFactory = createChatGPTAdapter, now = () => new Date().toISOString() }) {
     Object.assign(this, { store, wikiTools, authService, discovery, instructions, providerFactory, now });
     this.extractions = new Map();
+    this.extractionJobs = new Map();
     this.controllers = new Map();
     this.progress = new Map();
     this.runtimeFailures = new Map();
@@ -63,45 +64,60 @@ class ReadingService {
     throw new ReadingError('The original source is missing or has changed. Existing notes are preserved. Restore the original PDF or explicitly reattach the selection.', 'source-unresolved', 409);
   }
 
-  async extract(name) {
+  async extract(name, selectedPages = null) {
     const file = this.wikiTools.sourcePath(name);
     if (!fs.existsSync(file)) throw new ReadingError('Source file not found.', 'source-not-found', 404);
     const bytes = fs.readFileSync(file);
     const digest = hash(bytes);
-    if (this.extractions.has(digest)) return this.extractions.get(digest);
-    let pages;
-    if (path.extname(name).toLowerCase() === '.pdf') {
-      const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-      let pdf;
-      try {
-        const pdfRoot = path.dirname(require.resolve('pdfjs-dist/package.json'));
-        pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), isEvalSupported: false, standardFontDataUrl: path.join(pdfRoot, 'standard_fonts').replace(/\\/g, '/') + '/', cMapUrl: path.join(pdfRoot, 'cmaps').replace(/\\/g, '/') + '/', cMapPacked: true }).promise;
-        const labels = await pdf.getPageLabels();
-        pages = [];
-        for (let number = 1; number <= pdf.numPages; number += 1) {
-          const page = await pdf.getPage(number);
-          const content = await page.getTextContent();
-          // Match the browser text layer's item offsets exactly.
-          pages.push({ page: number, label: labels?.[number - 1] || String(number), text: content.items.map(i => i.str || '').join('') });
-          page.cleanup();
-        }
-      } catch {
-        throw new ReadingError('The PDF cannot be read. Check whether it is damaged or password protected.', 'pdf-extraction-failed', 422);
-      } finally { if (pdf) await pdf.destroy(); }
-    } else {
-      pages = [{ page: 1, label: '1', text: await this.wikiTools.sourceText(name) }];
+    const cached = this.extractions.get(digest);
+    if (cached && (selectedPages === null ? cached.pages.every(Boolean) : selectedPages.every(number => cached.pages[number - 1]))) return cached;
+    if (this.extractionJobs.has(digest)) {
+      await this.extractionJobs.get(digest);
+      return this.extract(name, selectedPages);
     }
-    const result = { hash: digest, pages, extractionVersion: EXTRACTION_VERSION };
-    this.extractions.set(digest, result);
-    if (this.extractions.size > 25) this.extractions.delete(this.extractions.keys().next().value);
-    return result;
+    // Keep immutable text in the cache, never live PDF workers or page proxies.
+    // An empty page selection reads metadata only; annotations extract their pages.
+    const work = (async () => {
+      let result;
+      if (path.extname(name).toLowerCase() === '.pdf') {
+        const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        let pdf;
+        try {
+          const pdfRoot = path.dirname(require.resolve('pdfjs-dist/package.json'));
+          pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), isEvalSupported: false, standardFontDataUrl: path.join(pdfRoot, 'standard_fonts').replace(/\\/g, '/') + '/', cMapUrl: path.join(pdfRoot, 'cmaps').replace(/\\/g, '/') + '/', cMapPacked: true }).promise;
+          const labels = await pdf.getPageLabels();
+          result = cached || { hash: digest, pages: Array(pdf.numPages).fill(null), labels: labels || Array.from({ length: pdf.numPages }, (_, i) => String(i + 1)), extractionVersion: EXTRACTION_VERSION };
+          const requested = selectedPages === null ? Array.from({ length: pdf.numPages }, (_, i) => i + 1) : [...new Set(selectedPages)];
+          for (const number of requested) {
+            if (!Number.isInteger(number) || number < 1 || number > pdf.numPages) throw new ReadingError('Page not found.', 'page-not-found', 404);
+            if (result.pages[number - 1]) continue;
+            const page = await pdf.getPage(number);
+            const content = await page.getTextContent();
+            // Match the browser text layer's item offsets exactly.
+            result.pages[number - 1] = { page: number, label: labels?.[number - 1] || String(number), text: content.items.map(i => i.str || '').join('') };
+            page.cleanup();
+            await new Promise(resolve => setImmediate(resolve));
+          }
+        } catch (error) {
+          if (error instanceof ReadingError) throw error;
+          throw new ReadingError('The PDF cannot be read. Check whether it is damaged or password protected.', 'pdf-extraction-failed', 422);
+        } finally { if (pdf) await pdf.destroy(); }
+      } else {
+        result = { hash: digest, pages: [{ page: 1, label: '1', text: await this.wikiTools.sourceText(name) }], labels: ['1'], extractionVersion: EXTRACTION_VERSION };
+      }
+      this.extractions.set(digest, result);
+      if (this.extractions.size > 25) this.extractions.delete(this.extractions.keys().next().value);
+      return result;
+    })();
+    this.extractionJobs.set(digest, work);
+    try { return await work; } finally { this.extractionJobs.delete(digest); }
   }
 
   async openDocument(name) {
     text(name, 255);
-    const extracted = await this.extract(name);
+    const extracted = await this.extract(name, []);
     let document = this.store.read().documents.find(d => d.hash === extracted.hash);
-    if (!document) document = this.store.create('documents', { hash: extracted.hash, aliases: [name], pageCount: extracted.pages.length, labels: extracted.pages.map(p => p.label), extractionVersion: EXTRACTION_VERSION, position: { page: 1, scale: 1, fitWidth: true } });
+    if (!document) document = this.store.create('documents', { hash: extracted.hash, aliases: [name], pageCount: extracted.pages.length, labels: extracted.labels, extractionVersion: EXTRACTION_VERSION, position: { page: 1, scale: 1, fitWidth: true } });
     else if (!document.aliases.includes(name)) document = this.store.update('documents', document.id, document.revision, { aliases: [...document.aliases, name] });
     return { document, extractionChanged: document.extractionVersion !== EXTRACTION_VERSION, changedDocuments: this.store.read().documents.filter(d => d.id !== document.id && d.aliases.includes(name)).map(d => d.id) };
   }
@@ -109,17 +125,24 @@ class ReadingService {
   async pageText(documentId, page) {
     const document = this.store.get('documents', documentId);
     const { name } = this.documentFile(document);
-    const extracted = await this.extract(name);
-    const result = extracted.pages.find(p => p.page === Number(page));
+    const extracted = await this.extract(name, [Number(page)]);
+    const result = extracted.pages[Number(page) - 1];
     if (!result) throw new ReadingError('Page not found.', 'page-not-found', 404);
     return result;
+  }
+
+  async documentText(documentId) {
+    const document = this.store.get('documents', documentId);
+    const { name } = this.documentFile(document);
+    const extracted = await this.extract(name);
+    return { pages: extracted.pages };
   }
 
   async highlightValues(input, documentId) {
     const document = this.store.get('documents', documentId);
     const { name } = this.documentFile(document);
-    const extracted = await this.extract(name);
     const selectedAnchors = anchors(input.anchors);
+    const extracted = await this.extract(name, selectedAnchors.map(a => a.page));
     if (!COLORS.has(input.color || 'yellow') || !['text', 'region'].includes(input.kind)) throw new ReadingError('Invalid highlight style.');
     for (const anchor of selectedAnchors) {
       const page = extracted.pages[anchor.page - 1];

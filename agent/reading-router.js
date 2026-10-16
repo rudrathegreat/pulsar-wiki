@@ -23,6 +23,7 @@ function createReadingRouter({ service, requireLocalSession, requireLocalMutatio
     res.json(document);
   }));
   router.get('/documents/:id/pages/:page', route(async (req, res) => res.json(await service.pageText(req.params.id, req.params.page))));
+  router.get('/documents/:id/text', route(async (req, res) => res.json(await service.documentText(req.params.id))));
   router.patch('/documents/:id', route((req, res) => {
     const position = req.body?.position;
     const document = service.store.get('documents', req.params.id);
