@@ -456,17 +456,23 @@
 <script src="/vendor/katex/contrib/auto-render.min.js"></script>
 <script src="/vendor/d3/d3.min.js"></script>
 <dialog id="reading-dialog" aria-labelledby="reading-dialog-title"><header><h2 id="reading-dialog-title"></h2><button type="button" class="btn" id="reading-dialog-close" aria-label="Close dialog">Close</button></header><div id="reading-dialog-body"></div><div id="reading-dialog-error" role="alert"></div></dialog>
-<div id="reading-selection-toolbar" role="toolbar" aria-label="Annotate selection" hidden>
+<div id="reading-selection-toolbar" role="region" aria-label="Highlight helper" hidden>
+  <div class="reading-helper-actions" role="toolbar" aria-label="Annotate selection">
   <div class="reading-palette" role="group" aria-label="Highlight colour">
     <label class="reading-swatch" data-color="yellow"><input type="radio" name="reading-selection-color" data-selection-color="yellow" aria-label="Highlight yellow"/>Yellow</label>
     <label class="reading-swatch" data-color="green"><input type="radio" name="reading-selection-color" data-selection-color="green" aria-label="Highlight green"/>Green</label>
     <label class="reading-swatch" data-color="pink"><input type="radio" name="reading-selection-color" data-selection-color="pink" aria-label="Highlight pink"/>Pink</label>
-    <span class="reading-swatch reading-ai-swatch" data-color="blue" title="Blue is reserved for AI assistance">Blue · AI</span>
   </div>
-  <button type="button" id="reading-selection-wiki">Add to wiki</button>
-  <button type="button" id="reading-selection-ask">Ask AI</button>
-  <button type="button" id="reading-selection-note">Add note</button>
-  <button type="button" id="reading-selection-connect">Connect to related knowledge</button>
+  <button type="button" id="reading-selection-wiki" aria-expanded="false" aria-controls="reading-helper-details">Add to wiki</button>
+  <button type="button" id="reading-selection-ask" aria-expanded="false" aria-controls="reading-helper-details">Ask AI</button>
+  <button type="button" id="reading-selection-note" aria-expanded="false" aria-controls="reading-helper-details">Add note</button>
+  <button type="button" id="reading-selection-connect" aria-expanded="false" aria-controls="reading-helper-details">Connect to related knowledge</button>
+  </div>
+  <section id="reading-helper-details" aria-labelledby="reading-helper-title" hidden>
+    <header><h2 id="reading-helper-title"></h2><button type="button" id="reading-helper-close" aria-label="Close highlight helper">Close</button></header>
+    <div id="reading-helper-body"></div>
+    <div id="reading-helper-error" role="alert"></div>
+  </section>
 </div>
 <div id="reading-toast" role="status" aria-live="polite" hidden></div>
 <script src="/reading.js"></script>

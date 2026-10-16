@@ -12,11 +12,11 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'),
 function client() {
   const nodes = new Map();
   const staticIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]));
-  const element = () => ({ style: {}, dataset: {}, children: [], listeners: {}, attributes: {}, hidden: false, innerHTML: '', offsetWidth: 350, offsetHeight: 45, classList: { add() {}, remove() {}, toggle() {} }, addEventListener(type, listener) { this.listeners[type] = listener; }, querySelectorAll() { return []; }, querySelector() { return null; }, contains() { return false; }, setAttribute(key, value) { this.attributes[key] = value; }, showModal() { this.open = true; }, close() { this.open = false; }, append(child) { this.children.push(child); }, getBoundingClientRect() { return { left: 100, top: 100, right: 500, bottom: 900, width: 400, height: 800 }; } });
+  const element = () => ({ style: {}, dataset: {}, value: '', children: [], listeners: {}, attributes: {}, hidden: false, innerHTML: '', offsetWidth: 350, offsetHeight: 45, classList: { add() {}, remove() {}, toggle() {} }, addEventListener(type, listener) { this.listeners[type] = listener; }, querySelectorAll() { return []; }, querySelector() { return null; }, contains() { return false; }, focus() {}, setAttribute(key, value) { this.attributes[key] = value; }, showModal() { this.open = true; }, close() { this.open = false; }, append(child) { this.children.push(child); }, getBoundingClientRect() { return { left: 100, top: 100, right: 500, bottom: 900, width: 400, height: 800 }; } });
   const document = { activeElement: null, getElementById(id) { if (!staticIds.has(id) && ![...nodes.values()].some(node => node.innerHTML.includes(`id="${id}"`))) return null; if (!nodes.has(id)) nodes.set(id, element()); return nodes.get(id); }, querySelectorAll() { return []; }, addEventListener() {}, createElement(tag) { const node = element(); if (tag === 'template') node.content = { querySelectorAll() { return []; } }; return node; } };
-  const context = { document, window: { addEventListener() {}, getSelection() { return null; }, innerWidth: 1200, innerHeight: 900 }, state: { panel: 'reading' }, setTimeout, clearTimeout, URL, URLSearchParams, Node: { TEXT_NODE: 3 }, renderMd(v) { return v; } };
+  const context = { document, window: { addEventListener() {}, getSelection() { return null; }, innerWidth: 1200, innerHeight: 900 }, state: { panel: 'reading' }, setTimeout, clearTimeout, URL, URLSearchParams, Node: { TEXT_NODE: 3 }, renderMd(v) { return v; }, typesetMath() {} };
   vm.createContext(context);
-  vm.runInContext(source.replace('window.ActiveReading =', 'window.__readingTest = { r, selectedPayload, previewSnapshot, captureSelection, paintHighlights, diffHtml, renderWorkspace, filteredHighlights, library, joinHighlightRects, setHighlightsEnabled, saveSelection, deleteHighlight, undoDeletion, connectKnowledge }; window.ActiveReading ='), context);
+  vm.runInContext(source.replace('window.ActiveReading =', 'window.__readingTest = { r, selectedPayload, previewSnapshot, captureSelection, paintHighlights, diffHtml, renderWorkspace, filteredHighlights, library, joinHighlightRects, setHighlightsEnabled, saveSelection, deleteHighlight, undoDeletion, connectKnowledge, openHighlightHelper, closeHelper, watchTask, paperSummaryPage }; window.ActiveReading ='), context);
   return { ...context.window.__readingTest, context, nodes, document };
 }
 function populate(c) {
@@ -57,7 +57,8 @@ test('reader stores cross-page text selections with page-local coordinates and o
   assert.equal(c.r.pending.anchors[0].exact, 'page selected');
   assert.equal(c.r.pending.anchors[1].exact, 'Second');
   assert.equal(c.r.pending.anchors[0].start, 6); assert.equal(c.r.pending.anchors[1].end, 6);
-  assert.equal(c.r.pending.anchors[1].label, 'ii');
+  assert.equal(c.r.pending.anchors[0].label, '1');
+  assert.equal(c.r.pending.anchors[1].label, '2');
   assert.deepEqual(Array.from(c.r.pending.anchors[0].rects[0]), [10, 20, 60, 30]);
 });
 
@@ -214,18 +215,25 @@ test('sidebar deletion removes the selected highlight and undo restores it', asy
   clearTimeout(c.r.toastTimer);
 });
 
-test('add-to-wiki selection opens a reviewed draft workflow using only that passage', async () => {
+test('add-to-wiki selection expands the helper for a reviewed draft using only that passage', async () => {
   const c = client(); populate(c); c.r.pending = { text: 'A new selection' };
   c.r.selected.add('highlight-two'); c.r.assistanceIds.add('earlier-ai'); c.r.discoveryIds.add('earlier-paper');
   const h = { ...c.r.data.highlights[0], id: 'highlight-new' };
-  c.context.api = { getWikiList: async () => [] };
+  c.context.api = { getWikiList: async () => [{ name: 'paper' }, { name: 'timing' }] };
   c.context.fetch = async (_url, options) => {
     if (options.method === 'POST') { c.r.data.highlights.push(h); return { ok: true, json: async () => h }; }
     return { ok: true, json: async () => c.r.data };
   };
   await c.saveSelection('yellow', 'wiki');
-  assert.equal(c.nodes.get('reading-dialog-title').textContent, 'Add highlighted passage to wiki');
-  assert.match(c.nodes.get('reading-dialog-body').innerHTML, /Review the draft and source citations/);
+  assert.equal(c.nodes.get('reading-helper-title').textContent, 'Add highlighted passage to wiki');
+  const form = c.nodes.get('reading-helper-body').innerHTML;
+  assert.match(form, /value="paper" selected/);
+  assert.match(form, />Add<\/button>/);
+  assert.doesNotMatch(form, /Artifact type|reading-new-artifact-type|reading-new-artifact-title|Existing concept page|Create private draft/);
+  assert.doesNotMatch(c.nodes.get('reading-helper-body').innerHTML, /Prepare this passage|Review the draft and source citations/);
+  assert.equal(c.nodes.get('reading-helper-details').hidden, false);
+  assert.equal(c.nodes.get('reading-selection-toolbar').hidden, false);
+  assert.ok(!c.nodes.get('reading-dialog')?.open);
   assert.deepEqual(Array.from(c.r.selected), ['highlight-new']);
   assert.equal(c.selectedPayload().assistanceIds.length, 0); assert.equal(c.selectedPayload().discoveryIds.length, 0);
 });
@@ -243,4 +251,149 @@ test('connect action requests only the highlighted passage and renders wiki refe
   assert.match(c.nodes.get('reading-connections-results').innerHTML, /href="\/wiki\/timing"/);
   assert.match(c.nodes.get('reading-connections-results').innerHTML, /Connect this page/);
   assert.doesNotMatch(JSON.stringify(submitted), /Do not send unchecked notes/);
+});
+
+test('clicking a saved PDF highlight opens its helper and Ask AI reuses it without creating a duplicate', async () => {
+  const c = client(); populate(c); c.context.state.panel = 'document';
+  const calls = [];
+  c.context.fetch = async (url, options) => { calls.push({ url, method: options.method }); return { ok: true, json: async () => c.r.data }; };
+  const wrap = { dataset: { readingPage: '1' }, getBoundingClientRect() { return { left: 100, top: 100 }; } };
+  c.r.pages.set(1, { overlay: { children: [{ dataset: { highlightId: 'highlight-one' }, style: { left: '10px', top: '20px', width: '30px', height: '10px' } }] } });
+  c.nodes.get('document-stage').listeners.click({ target: { closest() { return wrap; } }, clientX: 125, clientY: 125 });
+  assert.equal(c.r.helper.highlightId, 'highlight-one');
+  assert.equal(c.nodes.get('reading-selection-toolbar').hidden, false);
+  await c.saveSelection('yellow', 'ask');
+  const form = c.nodes.get('reading-helper-body').innerHTML;
+  assert.match(form, /reading-ai-question/);
+  assert.doesNotMatch(form, /reading-ai-action|reading-ai-pages|Additional wiki pages|Nothing is sent until/);
+  assert.ok(!c.nodes.get('reading-dialog')?.open);
+  assert.equal(c.r.data.highlights.length, 2);
+  assert.ok(calls.every(call => call.method === 'GET'));
+});
+
+test('Send submits AI inputs directly and keeps the completed response in the expanded helper', async () => {
+  const c = client(); populate(c); c.context.state.panel = 'document';
+  c.openHighlightHelper('highlight-one', 150, 180);
+  let submitted;
+  const snapshot = { highlights: structuredClone([c.r.data.highlights[0]]), documents: c.r.data.documents, annotations: [], wikiPages: [], discoveries: [], responses: [] };
+  const task = { id: 'task-inline', action: 'question', status: 'completed', response: 'The inline timing explanation.', snapshot };
+  c.context.fetch = async (url, options) => {
+    if (url === '/api/reading/tasks' && options.method === 'POST') { submitted = JSON.parse(options.body); c.r.data.tasks.push(task); }
+    return { ok: true, json: async () => url.includes('/tasks') ? task : c.r.data };
+  };
+  await c.saveSelection('yellow', 'ask');
+  c.document.getElementById('reading-ai-question').value = 'Why are these residuals important?';
+  c.document.getElementById('reading-ai-context').checked = true;
+  assert.match(c.nodes.get('reading-helper-body').innerHTML, />Send<\/button>/);
+  await c.nodes.get('reading-ai-review').listeners.click();
+  assert.equal(submitted.action, 'question');
+  assert.equal(submitted.question, 'Why are these residuals important?');
+  assert.deepEqual(submitted.wikiPages, []); assert.deepEqual(submitted.highlightIds, ['highlight-one']);
+  assert.match(c.nodes.get('reading-task-complete').innerHTML, /inline timing explanation/);
+  assert.equal(c.r.helper.expanded, true); assert.ok(!c.nodes.get('reading-dialog')?.open);
+});
+
+test('notes save from the helper and collapse back to the same highlight menu', async () => {
+  const c = client(); populate(c); c.context.state.panel = 'document'; c.r.data.annotations = [];
+  const h = c.r.data.highlights[0]; h.color = 'green';
+  c.context.fetch = async (url, options) => {
+    if (options.method === 'PATCH') { Object.assign(h, JSON.parse(options.body), { revision: h.revision + 1 }); }
+    if (url === '/api/reading/annotations') c.r.data.annotations.push({ id: 'note-inline', ...JSON.parse(options.body) });
+    return { ok: true, json: async () => options.method === 'GET' ? c.r.data : h };
+  };
+  c.openHighlightHelper(h.id, 160, 180); await c.saveSelection('yellow', 'note');
+  assert.equal(h.color, 'green', 'opening an existing highlight action must preserve its colour');
+  const form = c.nodes.get('reading-helper-body').innerHTML;
+  assert.equal(c.nodes.get('reading-helper-title').textContent, 'Add note');
+  assert.doesNotMatch(form, /reading-edit-color|Highlight colour|paper\.pdf|p\. 1/);
+  c.document.getElementById('reading-edit-categories').value = 'result';
+  c.nodes.get('reading-new-comment').value = 'My inline note.';
+  await c.nodes.get('reading-save-highlight').listeners.click();
+  assert.equal(h.color, 'green', 'saving a note must preserve its highlight colour');
+  assert.equal(c.r.data.annotations[0].text, 'My inline note.');
+  assert.equal(c.r.data.annotations[0].highlightId, h.id);
+  assert.equal(c.r.helper.highlightId, h.id); assert.equal(c.r.helper.expanded, false);
+  assert.equal(c.nodes.get('reading-selection-toolbar').hidden, false); assert.ok(!c.nodes.get('reading-dialog')?.open);
+  clearTimeout(c.r.toastTimer);
+});
+
+test('related knowledge results expand within an existing highlight helper', async () => {
+  const c = client(); populate(c); c.context.state.panel = 'document';
+  c.context.fetch = async url => ({ ok: true, json: async () => url.endsWith('/connections') ? { wiki: [{ name: 'timing', title: 'Timing', url: '/wiki/timing', text: 'Timing context.', matchedTerms: ['timing'] }], papers: [], warnings: [] } : c.r.data });
+  c.openHighlightHelper('highlight-one', 160, 180); await c.saveSelection('yellow', 'connect');
+  assert.equal(c.nodes.get('reading-helper-title').textContent, 'Connect to related knowledge');
+  assert.match(c.nodes.get('reading-connections-results').innerHTML, /Connect this page/);
+  assert.equal(c.r.helper.expanded, true); assert.ok(!c.nodes.get('reading-dialog')?.open);
+});
+
+test('Add targets the selected existing wiki page and continues to its editor inside the helper', async () => {
+  const c = client(); populate(c); c.context.state.panel = 'document';
+  const artifact = { id: 'draft-inline', type: 'summary', title: 'Timing draft', content: '# Timing draft', targetPage: '', snapshot: { highlights: [c.r.data.highlights[0]], documents: c.r.data.documents, annotations: [], wikiPages: [], discoveries: [], responses: [] }, publications: [] };
+  c.context.api = { getWikiList: async () => [{ name: 'paper' }, { name: 'timing' }] };
+  let submitted;
+  c.context.fetch = async (url, options) => {
+    if (url.endsWith('/artifacts') && options.method === 'POST') { submitted = JSON.parse(options.body); c.r.data.artifacts.push(artifact); return { ok: true, json: async () => artifact }; }
+    return { ok: true, json: async () => c.r.data };
+  };
+  c.openHighlightHelper('highlight-one', 160, 180); await c.saveSelection('yellow', 'wiki');
+  c.document.getElementById('reading-new-artifact-target').value = 'timing';
+  await c.nodes.get('reading-new-artifact-create').listeners.click();
+  assert.equal(submitted.type, 'concept');
+  assert.equal(submitted.targetPage, 'timing');
+  assert.equal(submitted.title, 'timing');
+  assert.deepEqual(submitted.highlightIds, ['highlight-one']);
+  assert.equal(c.nodes.get('reading-helper-title').textContent, 'Timing draft');
+  assert.match(c.nodes.get('reading-helper-body').innerHTML, /reading-artifact-editor|reading-artifact-reviewed/);
+  assert.equal(c.r.helper.expanded, true); assert.ok(!c.nodes.get('reading-dialog')?.open);
+});
+
+test('a late AI response cannot reopen or replace another highlight helper', async () => {
+  const c = client(); populate(c); c.context.state.panel = 'document';
+  c.openHighlightHelper('highlight-one', 160, 180); c.r.helper.expanded = true;
+  const task = { id: 'task-late', action: 'question', status: 'completed', response: 'Late response.', snapshot: { highlights: [c.r.data.highlights[0]], documents: c.r.data.documents, annotations: [], wikiPages: [], discoveries: [], responses: [] } };
+  let finish;
+  c.context.fetch = async url => url.includes('/tasks/') ? new Promise(resolve => { finish = () => resolve({ ok: true, json: async () => task }); }) : { ok: true, json: async () => c.r.data };
+  const watching = c.watchTask(task);
+  c.closeHelper(); c.openHighlightHelper('highlight-two', 200, 240);
+  finish(); await watching;
+  assert.equal(c.r.helper.highlightId, 'highlight-two'); assert.equal(c.r.helper.expanded, false);
+  assert.equal(c.nodes.get('reading-helper-body').innerHTML, '');
+  assert.ok(!c.nodes.get('reading-dialog')?.open);
+});
+
+
+test('journal page labels display as one-based page numbers without changing saved evidence', () => {
+  const c = client(); populate(c); c.context.state.panel = 'document';
+  c.r.data.highlights[0].anchors[0].label = '1789';
+  c.renderWorkspace();
+  assert.match(c.nodes.get('reading-notes').innerHTML, /p\. 1/);
+  assert.doesNotMatch(c.nodes.get('reading-notes').innerHTML, /1789/);
+  assert.equal(c.r.data.highlights[0].anchors[0].label, '1789');
+  assert.doesNotMatch(html, /reading-ai-swatch/);
+});
+
+
+test('paper destination prefers its published summary and supports filename-based summaries', () => {
+  const c = client(); populate(c); c.r.selected.add('highlight-one');
+  const pages = [{ name: 'paper-summary' }, { name: 'timing-results' }];
+  assert.equal(c.paperSummaryPage(pages), 'paper-summary');
+  c.r.data.artifacts.push({ type: 'summary', updatedAt: '2026-10-16', snapshot: { documents: [c.r.data.documents[0]] }, publications: [{ page: 'timing-results' }] });
+  assert.equal(c.paperSummaryPage(pages), 'timing-results');
+  assert.equal(c.paperSummaryPage([{ name: 'unrelated' }]), '');
+});
+
+test('researcher comments toggle preserves the filters and narrows the matching passages', async () => {
+  const c = client(); populate(c); c.context.state.panel = 'document';
+  c.r.data.annotations = [c.r.data.annotations[0]];
+  c.renderWorkspace();
+  const filters = () => c.nodes.get('reading-notes').innerHTML.split('<div class="reading-filters">')[1].split('<label class="reading-check">')[0];
+  const before = filters();
+  await c.nodes.get('reading-notes').listeners.change({ target: { id: 'reading-filter-annotated', checked: true, dataset: {} } });
+  assert.equal(filters(), before);
+  assert.equal(c.r.filter.annotated, true);
+  assert.match(c.nodes.get('reading-notes').innerHTML, /data-reading-card="highlight-one"/);
+  assert.doesNotMatch(c.nodes.get('reading-notes').innerHTML, /data-reading-card="highlight-two"/);
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'reading.css'), 'utf8');
+  assert.match(css, /#reading-notes\s*\{[^}]*scrollbar-gutter:stable/);
+  assert.match(css, /#panel-reading\s*\{[^}]*scrollbar-gutter:stable/);
 });
