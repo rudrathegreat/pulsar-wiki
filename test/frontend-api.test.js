@@ -207,7 +207,7 @@ test('UI source uses only approved palettes and contains no built-in emojis', ()
   assert.doesNotMatch(`${indexSource}\n${appSource}\n${readingSource}\n${serverSource}`, /\p{Extended_Pictographic}/u);
   const annotationColors = new Set([...allowed, '#f4d35e', '#8dd3a8', '#8ec5ff', '#efa8ca']);
   for (const color of readingStyle.match(/#[0-9a-f]{3,8}\b/gi) || []) assert.ok(annotationColors.has(color.toLowerCase()), `Unexpected annotation color: ${color}`);
-  for (const token of ['yellow', 'green', 'blue', 'pink']) assert.match(readingStyle, new RegExp(`--highlight-${token}:`));
+  for (const token of ['yellow', 'green', 'blue', 'pink', 'ai']) assert.match(readingStyle, new RegExp(`--highlight-${token}:`));
   assert.match(indexSource, /href="\/style\.css"/);
   assert.match(indexSource, /src="\/app\.js"/);
 });

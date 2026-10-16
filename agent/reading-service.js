@@ -12,6 +12,21 @@ const quoteText = value => String(value).normalize('NFKC').replace(/\s+/g, ' ').
 const passageUrl = (documentId, highlightId, page, revision) => `/#reading/${documentId}/${highlightId || ''}${revision ? `?revision=${revision}` : page ? `?page=${page}` : ''}`;
 const plain = value => String(value).replace(/[\r\n]+/g, ' ').replace(/[<>]/g, '');
 const literal = value => String(value).replace(/([\\`*_{}\[\]<>#|])/g, '\\$1');
+const CONNECTION_STOP_WORDS = new Set(('a an and are as at be been being by can could did do does for from had has have how i if in into is it its may might not of on or our paper papers research result results show shows shown study studies such that the their these they this those through to use used using was we were what when where which while who why will with would you your also find found suggest suggests measure measured observe observed reveal reveals method methods data source sources selected passage figure equation important however therefore').split(' '));
+function connectionTerms(value) {
+  return (String(value).toLowerCase().match(/[a-z][a-z0-9]*(?:[+-][a-z0-9]+)*/g) || [])
+    .filter(word => word.length > 2 && !CONNECTION_STOP_WORDS.has(word))
+    .map(word => word.length > 4 && word.endsWith('s') && !/(ss|is|us)$/.test(word) ? word.slice(0, -1) : word);
+}
+function connectionMatch(terms, body, title = '') {
+  const words = new Set(connectionTerms(`${title} ${body}`));
+  const matchedTerms = terms.filter(term => words.has(term));
+  const titleTerms = [...new Set(connectionTerms(title))];
+  const coverage = matchedTerms.length / terms.length;
+  const titleMatches = terms.filter(term => titleTerms.includes(term)).length;
+  const namedConcept = titleTerms.length && (titleTerms.length > 1 || terms.length <= 3) && terms.join(' ').includes(titleTerms.join(' '));
+  return { matchedTerms, relevant: Boolean(namedConcept || matchedTerms.length >= Math.min(2, terms.length) && coverage >= .4), score: coverage * (matchedTerms.length + titleMatches * 2) + (namedConcept ? 3 : 0) };
+}
 
 function sourceCitations(content) {
   const result = [];
@@ -484,6 +499,34 @@ class ReadingService {
       return existing || this.store.create('discoveries', { source, evidenceLevel: 'abstract-only', savedAt: this.now() });
     });
     return { ...result, records };
+  }
+
+  async relatedKnowledge(highlightId, revision) {
+    const highlight = this.store.get('highlights', highlightId);
+    if (revision !== undefined && revision !== highlight.revision) throw new ReadingError('The highlight changed. Refresh and connect its current selection.', 'reading-conflict', 409);
+    const terms = [...new Set(connectionTerms(highlight.text))].slice(0, 32);
+    if (!terms.length) throw new ReadingError('Add a transcription to this visual selection, or select meaningful text before connecting related knowledge.');
+    const query = terms.slice(0, 6).join(' ');
+    const wiki = [];
+    const warnings = [];
+    for (const name of this.wikiTools.listWikiPages().filter(name => !['index', 'log', 'active-reading', 'project-handover'].includes(name))) {
+      const page = this.wikiTools.readWikiPage({ name, maxChars: 1000000 });
+      if (!page.exists) continue;
+      const title = /^#\s+(.+)$/m.exec(page.content)?.[1] || name.replace(/-/g, ' ');
+      // Scientific prose only: bibliography, metadata and related-page lists must not create spurious matches.
+      const content = page.content.split(/^##\s+(?:Related pages|References|Sources)\b/im)[0].replace(/^\*\*(?:Sources|Last updated)\*\*:.*$/gm, '').replace(/\(source:[^\n]*?\)/g, '').replace(/\[\[([^\]]+)\]\]/g, '$1');
+      const excerpts = content.split(/\n\s*\n/).flatMap(paragraph => {
+        const chunks = []; for (let offset = 0; offset < paragraph.length; offset += 650) chunks.push(paragraph.slice(offset, offset + 900));
+        return chunks;
+      });
+      const best = excerpts.map(excerpt => ({ text: excerpt, ...connectionMatch(terms, excerpt, title) })).filter(match => match.relevant).sort((a, b) => b.score - a.score)[0];
+      if (best) wiki.push({ name, title, url: `/wiki/${encodeURIComponent(name)}`, ...best });
+    }
+    wiki.sort((a, b) => b.score - a.score);
+    if (wiki.length) return { highlightId, revision: highlight.revision, query, wiki: wiki.slice(0, 3), papers: [], warnings };
+    const found = await this.discover(query);
+    const papers = found.records.map(record => ({ ...record, ...connectionMatch(terms, record.source.abstract || '', record.source.title) })).filter(match => match.relevant).sort((a, b) => b.score - a.score).slice(0, 6);
+    return { highlightId, revision: highlight.revision, query, wiki: [], papers, warnings: [...warnings, ...(found.warnings || [])] };
   }
 
   restoreDiscoveries(discoveryIds) {

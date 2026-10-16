@@ -187,6 +187,58 @@ test('discovery metadata survives expired previews and stays labelled abstract-o
   assert.equal(f.calls[0].discovery[0].title, 'Candidate');
 });
 
+test('related knowledge prefers relevant wiki prose and never calls external discovery for a wiki match', async t => {
+  let searches = 0;
+  const f = fixture(t, { discovery: { async search() { searches += 1; throw new Error('Wiki match must remain local'); } } });
+  const h = await highlight(f);
+  const file = path.join(f.wikiDir, 'timing.md');
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('Existing content.', 'Pulsar timing residuals help characterise noise in rotation.'));
+  const result = await f.service.relatedKnowledge(h.id, h.revision);
+  assert.equal(result.wiki[0].name, 'timing'); assert.equal(result.wiki[0].url, '/wiki/timing');
+  assert.match(result.wiki[0].text, /timing residuals/); assert.equal(result.papers.length, 0);
+  assert.equal(searches, 0); assert.equal(f.calls.length, 0);
+});
+
+test('related knowledge falls back to relevant papers and excludes generic matches and private comments', async t => {
+  const queries = [];
+  const f = fixture(t, { discovery: { async search(query) {
+    queries.push(query);
+    return { results: [
+      { id: 'arxiv-relevant', title: 'Pulsar timing residuals and noise', abstract: 'Timing noise in pulsar residuals.', recordUrl: 'https://arxiv.org/abs/2401.01234' },
+      { id: 'arxiv-unrelated', title: 'A pulsar survey', abstract: 'Radio instrumentation and telescope construction.', recordUrl: 'https://arxiv.org/abs/2401.01235' }
+    ], warnings: ['NASA ADS is unavailable; arXiv results are shown.'] };
+  } } });
+  const h = await highlight(f); f.service.saveAnnotation({ highlightId: h.id, text: 'secret personal interpretation never send' });
+  const result = await f.service.relatedKnowledge(h.id, h.revision);
+  assert.equal(result.wiki.length, 0); assert.equal(result.papers.length, 1);
+  assert.equal(result.papers[0].source.id, 'arxiv-relevant'); assert.equal(result.papers[0].evidenceLevel, 'abstract-only');
+  assert.equal(queries.length, 1); assert.match(queries[0], /pulsar timing residual noise/);
+  assert.doesNotMatch(queries[0], /secret|personal|interpretation/); assert.equal(result.warnings.length, 1);
+  assert.equal(f.calls.length, 0, 'connecting references must not invoke an AI request');
+});
+
+test('wiki bibliography and related-page lists cannot suppress the external fallback', async t => {
+  let searches = 0;
+  const f = fixture(t, { discovery: { async search() { searches += 1; return { results: [], warnings: [] }; } } });
+  const h = await highlight(f);
+  fs.writeFileSync(path.join(f.wikiDir, 'unrelated.md'), '# Unrelated\n\n**Sources**: pulsar-timing-residual-noise.pdf\n\nUnrelated information.\n\n## Related pages\n\nPulsar timing residuals reveal noise.\n');
+  const result = await f.service.relatedKnowledge(h.id);
+  assert.equal(result.wiki.length, 0); assert.equal(result.papers.length, 0); assert.equal(searches, 1);
+});
+
+test('related knowledge rejects stale, deleted and untranscribed selections before searching', async t => {
+  let searches = 0;
+  const f = fixture(t, { discovery: { async search() { searches += 1; return { results: [], warnings: [] }; } } });
+  const h = await highlight(f);
+  await f.service.updateHighlight(h.id, { revision: h.revision, color: 'green' });
+  await assert.rejects(f.service.relatedKnowledge(h.id, h.revision), e => e.code === 'reading-conflict');
+  const visual = await f.service.createHighlight({ documentId: h.documentId, kind: 'region', text: '', color: 'yellow', anchors: [{ page: 1, rects: [[10, 20, 40, 30]] }] });
+  await assert.rejects(f.service.relatedKnowledge(visual.id), /transcription/);
+  f.service.deleteRecord('highlights', h.id, h.revision + 1);
+  await assert.rejects(f.service.relatedKnowledge(h.id), e => e.code === 'reading-not-found');
+  assert.equal(searches, 0);
+});
+
 test('backup merge never overwrites records or discards conflicting snapshots', async t => {
   const f = fixture(t); const h = await highlight(f); const backup = f.store.read();
   assert.equal(f.store.importBackup(backup, backup.revision).added, 0);
@@ -208,6 +260,10 @@ test('reading routes require session and origin guards for private reads and mut
   assert.equal((await fetch(url + '/documents', { method: 'POST', headers: { 'x-session': 'yes', 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'paper.txt' }) })).status, 403);
   const allowed = await fetch(url + '/documents', { method: 'POST', headers: { 'x-session': 'yes', Origin: 'http://local.test', 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'paper.txt' }) });
   assert.equal(allowed.status, 200); assert.match(allowed.headers.get('cache-control'), /no-store/);
+  const h = await highlight(f);
+  assert.equal((await fetch(url + '/connections', { method: 'POST', headers: { 'x-session': 'yes', 'Content-Type': 'application/json' }, body: JSON.stringify({ highlightId: h.id }) })).status, 403);
+  const connected = await fetch(url + '/connections', { method: 'POST', headers: { 'x-session': 'yes', Origin: 'http://local.test', 'Content-Type': 'application/json' }, body: JSON.stringify({ highlightId: h.id, revision: h.revision }) });
+  assert.equal(connected.status, 200); assert.equal((await connected.json()).highlightId, h.id);
 });
 
 test('provider forwards selected visual content while preserving plain text conversations', async () => {

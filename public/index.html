@@ -368,6 +368,7 @@
             </button>
             <button class="document-icon-btn toolbar-text-btn" id="pdf-fit" type="button">Fit width</button>
             <button class="document-icon-btn toolbar-text-btn" id="reading-rotate" type="button" title="Rotate clockwise">Rotate</button>
+            <button class="document-icon-btn toolbar-text-btn" id="reading-highlights-toggle" type="button" aria-pressed="true" title="Disable highlighting and hide highlights">Highlights on</button>
           </div>
           <div class="toolbar-group reading-tools">
             <input type="search" id="reading-find" placeholder="Find in paper" aria-label="Find in paper"/>
@@ -456,13 +457,16 @@
 <script src="/vendor/d3/d3.min.js"></script>
 <dialog id="reading-dialog" aria-labelledby="reading-dialog-title"><header><h2 id="reading-dialog-title"></h2><button type="button" class="btn" id="reading-dialog-close" aria-label="Close dialog">Close</button></header><div id="reading-dialog-body"></div><div id="reading-dialog-error" role="alert"></div></dialog>
 <div id="reading-selection-toolbar" role="toolbar" aria-label="Annotate selection" hidden>
-  <button type="button" data-selection-color="yellow" class="reading-swatch" aria-label="Highlight yellow">Yellow</button>
-  <button type="button" data-selection-color="green" class="reading-swatch" aria-label="Highlight green">Green</button>
-  <button type="button" data-selection-color="blue" class="reading-swatch" aria-label="Highlight blue">Blue</button>
-  <button type="button" data-selection-color="pink" class="reading-swatch" aria-label="Highlight pink">Pink</button>
-  <button type="button" id="reading-selection-note">Add note</button>
+  <div class="reading-palette" role="group" aria-label="Highlight colour">
+    <label class="reading-swatch" data-color="yellow"><input type="radio" name="reading-selection-color" data-selection-color="yellow" aria-label="Highlight yellow"/>Yellow</label>
+    <label class="reading-swatch" data-color="green"><input type="radio" name="reading-selection-color" data-selection-color="green" aria-label="Highlight green"/>Green</label>
+    <label class="reading-swatch" data-color="pink"><input type="radio" name="reading-selection-color" data-selection-color="pink" aria-label="Highlight pink"/>Pink</label>
+    <span class="reading-swatch reading-ai-swatch" data-color="blue" title="Blue is reserved for AI assistance">Blue · AI</span>
+  </div>
+  <button type="button" id="reading-selection-wiki">Add to wiki</button>
   <button type="button" id="reading-selection-ask">Ask AI</button>
-  <button type="button" id="reading-selection-reattach">Reattach old highlight</button>
+  <button type="button" id="reading-selection-note">Add note</button>
+  <button type="button" id="reading-selection-connect">Connect to related knowledge</button>
 </div>
 <div id="reading-toast" role="status" aria-live="polite" hidden></div>
 <script src="/reading.js"></script>

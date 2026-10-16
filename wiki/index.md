@@ -42,7 +42,7 @@ Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pul
 
 ## Project Continuity
 - [[project-handover]]: A researcher-reviewed guide to project context, evidence, methods, decisions, open questions, and next steps.
-- [[active-reading]]: Private paper annotations, connected evidence, and reviewed wiki artifacts from researcher-selected passages.
+- [[active-reading]]: Paper highlights, passage-linked AI comments, wiki-first reference discovery, and reviewed wiki artifacts.
 
 ---
-*Last updated: 2026-10-15*
+*Last updated: 2026-10-16*

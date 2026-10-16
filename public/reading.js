@@ -4,7 +4,9 @@
   const el = id => document.getElementById(id);
   const e = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const r = { data: null, document: null, pdf: null, generation: 0, pages: new Map(), selected: new Set(), annotationIds: new Set(), discoveryIds: new Set(), assistanceIds: new Set(), active: null, tab: 'highlights', filter: { document: '', color: '', category: '', query: '', annotated: false }, region: false, rotation: 0, pending: null, undo: null, collection: '', observer: null, polling: null, artifact: null, task: null, saveTimer: null, positionDirty: false, findIndex: 0, searchResults: null };
-  const colors = ['yellow', 'green', 'blue', 'pink'];
+  const colors = ['yellow', 'green', 'pink'];
+  const colorName = color => color === 'blue' ? 'Blue · AI assistance' : color;
+  r.highlightsEnabled = true;
   const actions = { explain: 'Explain passage', equation: 'Explain equation', methodology: 'Explain methodology', assumptions: 'Examine assumptions', concept: 'Explain concept', question: 'Ask a question', evidence: 'Compare evidence', links: 'Suggest connections' };
   const artifactNames = { summary: 'Paper reading summary', synthesis: 'Collection synthesis', evidence: 'Evidence comparison', concept: 'Concept-page update' };
 
@@ -63,18 +65,20 @@
     if (r.pdf) { const previous = r.pdf; r.pdf = null; void previous.destroy().catch(() => {}); }
     r.pages.clear(); r.document = null; r.pending = null; r.historical = null;
     el('reading-selection-toolbar').hidden = true; el('reading-notes').hidden = true; el('reading-thumbnails').hidden = true;
-    el('document-stage').classList.remove('reading-region-mode');
+    el('document-stage').classList.remove('reading-region-mode', 'reading-highlights-disabled');
   }
   async function open(pdf, name, session) {
     const generation = ++r.generation;
     r.pdf = pdf; r.rotation = 0; r.region = false; r.findQuery = ''; r.findResults = []; r.lastScale = null;
+    setHighlightsEnabled(r.highlightsEnabled);
     el('reading-region').setAttribute('aria-pressed', 'false');
     const result = await request('/documents', 'POST', { name });
     if (session !== state.documentSession || generation !== r.generation) return;
     r.document = result.document;
     await refresh();
     if (session !== state.documentSession || generation !== r.generation) return;
-    r.filter.document = r.document.id;
+    r.filter = { document: r.document.id, color: '', category: '', query: '', annotated: false };
+    r.tab = 'highlights';
     const first = await pdf.getPage(1);
     const firstViewport = first.getViewport({ scale: 1 });
     r.defaultSize = { width: firstViewport.width, height: firstViewport.height };
@@ -162,15 +166,54 @@
     })();
     try { await p.rendering; } finally { p.rendering = null; }
   }
+  function joinHighlightRects(rectangles, vertical = false) {
+    // Work along the text's baseline, including when the viewer is rotated.
+    const boxes = rectangles.map(rect => {
+      const [x1, y1, x2, y2] = vertical ? [rect[1], rect[0], rect[3], rect[2]] : rect;
+      return { left: Math.min(x1, x2), right: Math.max(x1, x2), top: Math.min(y1, y2), bottom: Math.max(y1, y2) };
+    }).sort((a, b) => a.top - b.top || a.left - b.left);
+    const lines = [];
+    for (const box of boxes) {
+      let index;
+      while ((index = lines.findIndex(line => {
+        const height = box.bottom - box.top;
+        const lineHeight = line.bottom - line.top;
+        const overlap = Math.min(box.bottom, line.bottom) - Math.max(box.top, line.top);
+        const gap = Math.max(box.left - line.right, line.left - box.right, 0);
+        return overlap >= Math.min(height, lineHeight) * .65 && Math.abs((box.top + box.bottom) - (line.top + line.bottom)) <= Math.max(height, lineHeight) * .6 && gap <= Math.min(height, lineHeight) * .9;
+      })) !== -1) {
+        const [line] = lines.splice(index, 1);
+        box.left = Math.min(line.left, box.left); box.right = Math.max(line.right, box.right); box.top = Math.min(line.top, box.top); box.bottom = Math.max(line.bottom, box.bottom);
+      }
+      lines.push(box);
+    }
+    return lines.map(box => vertical ? [box.top, box.left, box.bottom, box.right] : [box.left, box.top, box.right, box.bottom]);
+  }
+  function setHighlightsEnabled(enabled) {
+    r.highlightsEnabled = enabled;
+    el('document-stage').classList.toggle('reading-highlights-disabled', !enabled);
+    const toggle = el('reading-highlights-toggle');
+    toggle.setAttribute('aria-pressed', String(enabled)); toggle.textContent = enabled ? 'Highlights on' : 'Highlights off';
+    toggle.title = enabled ? 'Disable highlighting and hide highlights' : 'Enable highlighting and show highlights';
+    el('reading-region').disabled = !enabled;
+    if (!enabled) {
+      r.pending = null; r.region = false;
+      el('reading-selection-toolbar').hidden = true;
+      el('document-stage').classList.remove('reading-region-mode');
+      el('reading-region').setAttribute('aria-pressed', 'false');
+    }
+    for (const p of r.pages.values()) paintHighlights(p);
+  }
   function paintHighlights(p) {
     if (!p?.viewport || !r.document) return;
     p.overlay.innerHTML = '';
+    if (!r.highlightsEnabled) return;
     const highlights = live('highlights').filter(h => h.documentId === r.document.id && h.id !== r.historical?.highlight.id);
     if (r.historical?.highlight.documentId === r.document.id) highlights.push(r.historical.highlight);
     for (const h of highlights) {
-      for (const a of h.anchors.filter(a => a.page === p.number)) for (const rectangle of a.rects) {
-        const coords = p.viewport.convertToViewportRectangle(rectangle);
-        const mark = document.createElement('div'); mark.className = `reading-mark${r.active === h.id ? ' active' : ''}${h.kind === 'region' ? ' region' : ''}`; mark.dataset.color = h.color; mark.dataset.highlightId = h.id;
+      const rectangles = h.anchors.filter(a => a.page === p.number).flatMap(a => a.rects.map(rect => p.viewport.convertToViewportRectangle(rect)));
+      for (const coords of h.kind === 'region' ? rectangles : joinHighlightRects(rectangles, r.rotation % 180 !== 0)) {
+        const mark = document.createElement('div'); mark.className = `reading-mark${r.active === h.id ? ' active' : ''}${h.kind === 'region' ? ' region' : ''}`; mark.dataset.color = highlightColor(h); mark.dataset.highlightId = h.id;
         Object.assign(mark.style, { left: `${Math.min(coords[0], coords[2])}px`, top: `${Math.min(coords[1], coords[3])}px`, width: `${Math.abs(coords[2] - coords[0])}px`, height: `${Math.abs(coords[3] - coords[1])}px` });
         p.overlay.append(mark);
       }
@@ -214,7 +257,7 @@
     return Number(span.dataset.textStart) + prefix.toString().length;
   }
   function captureSelection() {
-    if (!r.document || r.region || state.panel !== 'document') return;
+    if (!r.document || !r.highlightsEnabled || r.region || state.panel !== 'document') return;
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || !selection.rangeCount) return;
     const range = selection.getRangeAt(0);
@@ -243,18 +286,25 @@
     const bounds = range.getBoundingClientRect(); showSelectionToolbar(bounds.left, bounds.bottom);
   }
   function showSelectionToolbar(left, top) {
+    if (!r.highlightsEnabled) return;
+    document.querySelectorAll('[data-selection-color]').forEach(input => { input.checked = false; });
     const toolbar = el('reading-selection-toolbar'); toolbar.hidden = false;
     toolbar.style.left = `${Math.max(8, Math.min(left, window.innerWidth - toolbar.offsetWidth - 8))}px`;
-    toolbar.style.top = `${Math.min(window.innerHeight - toolbar.offsetHeight - 12, top + 8)}px`;
+    toolbar.style.top = `${Math.max(8, Math.min(window.innerHeight - toolbar.offsetHeight - 12, top + 8))}px`;
   }
   async function saveSelection(color = 'yellow', next = '') {
-    if (!r.pending) return;
+    if (!r.pending || !r.highlightsEnabled) return;
+    if (!colors.includes(color)) throw new Error('Blue is reserved for AI assistance.');
     const highlight = await request('/highlights', 'POST', { ...r.pending, color });
     r.active = highlight.id; r.selected.add(highlight.id); r.pending = null;
     window.getSelection()?.removeAllRanges(); el('reading-selection-toolbar').hidden = true;
     await refresh(); renderWorkspace(); for (const p of r.pages.values()) paintHighlights(p);
     if (next === 'note') editHighlight(highlight.id, true);
-    if (next === 'ask') assistanceDialog();
+    if (next === 'ask' || next === 'wiki') {
+      r.selected = new Set([highlight.id]); r.annotationIds.clear(); r.assistanceIds.clear(); r.discoveryIds.clear();
+      if (next === 'ask') await assistanceDialog(); else await newArtifactDialog(true);
+    }
+    if (next === 'connect') await connectKnowledge(highlight.id);
     return highlight;
   }
   async function openHighlight(id, options = {}) {
@@ -298,12 +348,16 @@
   }
 
   async function library() {
-    await refresh(); r.filter.document = ''; renderWorkspace();
+    await refresh(); r.filter = { document: '', color: '', category: '', query: '', annotated: false }; r.tab = 'highlights'; renderWorkspace();
     if (state.panel === 'reading') history.replaceState(null, '', '/#reading');
   }
   function host() { return state.panel === 'reading' ? el('reading-library-content') : el('reading-notes'); }
+  function assistanceFor(h) {
+    return live('tasks').filter(t => t.status === 'completed' && t.response && !t.artifactId && !['summary', 'synthesis', 'artifact'].includes(t.action) && t.snapshot.highlights.some(source => source.id === h.id && source.documentId === h.documentId && source.text === h.text && JSON.stringify(source.anchors) === JSON.stringify(h.anchors)));
+  }
+  function highlightColor(h) { return assistanceFor(h).length ? 'blue' : h.color === 'blue' ? 'yellow' : h.color; }
   function filteredHighlights() {
-    return live('highlights').filter(h => (!r.filter.document || h.documentId === r.filter.document) && (!r.filter.color || h.color === r.filter.color) && (!r.filter.category || h.categories.includes(r.filter.category)) && (!r.filter.annotated || live('annotations').some(a => a.highlightId === h.id)) && (!r.filter.query || `${h.text} ${h.categories.join(' ')} ${live('annotations').filter(a => a.highlightId === h.id).map(a => a.text).join(' ')}`.toLowerCase().includes(r.filter.query.toLowerCase())));
+    return live('highlights').filter(h => (!r.filter.document || h.documentId === r.filter.document) && (!r.filter.color || highlightColor(h) === r.filter.color) && (!r.filter.category || h.categories.includes(r.filter.category)) && (!r.filter.annotated || live('annotations').some(a => a.highlightId === h.id)) && (!r.filter.query || `${h.text} ${h.categories.join(' ')} ${live('annotations').filter(a => a.highlightId === h.id).map(a => a.text).join(' ')} ${assistanceFor(h).map(t => `${t.question} ${t.response}`).join(' ')}`.toLowerCase().includes(r.filter.query.toLowerCase())));
   }
   function renderWorkspace() {
     if (!r.data) return;
@@ -312,35 +366,38 @@
     const focusId = focused?.id; const caret = focused?.selectionStart;
     const categories = [...new Set(live('highlights').flatMap(h => h.categories))].sort();
     const highlights = filteredHighlights();
-    const header = `<div class="reading-section-title"><h3>${state.panel === 'reading' ? 'Your reading workspace' : 'Active reading'}</h3><span class="reading-muted">Local &amp; private</span></div>
-      <nav class="reading-nav" aria-label="Reading workspace views">${['highlights', 'assistance', 'collections', 'artifacts'].map(tab => `<button type="button" data-reading-tab="${tab}" aria-selected="${r.tab === tab}">${tab[0].toUpperCase() + tab.slice(1)}</button>`).join('')}</nav>
-      <div class="reading-filters"><select id="reading-filter-document" aria-label="Filter by paper"><option value="">All papers</option>${r.data.documents.map(d => `<option value="${d.id}" ${d.id === r.filter.document ? 'selected' : ''}>${e(d.currentName || d.aliases[0])}${d.available ? '' : ' (source unavailable)'}</option>`).join('')}</select><select id="reading-filter-color" aria-label="Filter by colour"><option value="">All colours</option>${colors.map(c => `<option ${r.filter.color === c ? 'selected' : ''}>${c}</option>`).join('')}</select><select id="reading-filter-category" aria-label="Filter by category"><option value="">All categories</option>${categories.map(c => `<option ${r.filter.category === c ? 'selected' : ''}>${e(c)}</option>`).join('')}</select></div>
+    const inLibrary = state.panel === 'reading';
+    const header = `<div class="reading-section-title"><h3>${state.panel === 'reading' ? 'Your reading workspace' : 'Active reading'}</h3></div>
+      ${inLibrary ? `<nav class="reading-nav" aria-label="Reading workspace views">${['highlights', 'assistance', 'collections', 'artifacts'].map(tab => `<button type="button" data-reading-tab="${tab}" aria-selected="${r.tab === tab}">${tab[0].toUpperCase() + tab.slice(1)}</button>`).join('')}</nav>` : ''}
+      <div class="reading-filters"><select id="reading-filter-document" aria-label="Filter by paper"><option value="">All papers</option>${r.data.documents.map(d => `<option value="${d.id}" ${d.id === r.filter.document ? 'selected' : ''}>${e(d.currentName || d.aliases[0])}${d.available ? '' : ' (source unavailable)'}</option>`).join('')}</select><select id="reading-filter-color" aria-label="Filter by colour"><option value="">All colours</option>${['yellow', 'green', 'blue', 'pink'].map(c => `<option value="${c}" ${r.filter.color === c ? 'selected' : ''}>${colorName(c)}</option>`).join('')}</select><select id="reading-filter-category" aria-label="Filter by category"><option value="">All categories</option>${categories.map(c => `<option ${r.filter.category === c ? 'selected' : ''}>${e(c)}</option>`).join('')}</select></div>
       <div class="reading-filters"><input id="reading-filter-query" type="search" value="${e(r.filter.query)}" placeholder="Filter passages and notes" aria-label="Filter passages and notes"/></div>
       <label class="reading-check"><input type="checkbox" id="reading-filter-annotated" ${r.filter.annotated ? 'checked' : ''}/>With researcher comments</label>
-      <div class="reading-actions"><button type="button" data-reading-action="select-visible">Select shown (${highlights.length})</button><button type="button" data-reading-action="clear-selection">Clear selection</button>${r.undo ? '<button type="button" data-reading-action="undo">Undo deletion</button>' : ''}</div>
+      ${inLibrary ? `<div class="reading-actions"><button type="button" data-reading-action="select-visible">Select shown (${highlights.length})</button><button type="button" data-reading-action="clear-selection">Clear selection</button>${r.undo ? '<button type="button" data-reading-action="undo">Undo deletion</button>' : ''}</div>
       <p class="reading-muted">${selectedHighlights().length} passages selected across ${new Set(selectedHighlights().map(h => h.documentId)).size} papers. Comments and earlier AI responses are included only when checked.</p>
-      <div class="reading-actions"><button type="button" data-reading-action="assist">Ask AI</button><button type="button" data-reading-action="search">Search &amp; discover</button><button type="button" data-reading-action="new-artifact">Create artifact</button><button type="button" data-reading-action="add-collection">Add to collection</button></div>`;
+      <div class="reading-actions"><button type="button" data-reading-action="assist">Ask AI</button><button type="button" data-reading-action="search">Search &amp; discover</button><button type="button" data-reading-action="new-artifact">Create artifact</button><button type="button" data-reading-action="add-collection">Add to collection</button></div>` : ''}`;
     let body = '';
-    if (r.tab === 'highlights') body = highlights.length ? highlights.map(highlightCard).join('') : '<div class="reading-empty">Select text in a PDF, then choose a highlight colour or add a note. Use Select region for equations and scanned passages.</div>';
-    if (r.tab === 'assistance') body = live('tasks').filter(t => !r.filter.document || t.snapshot.highlights.some(h => h.documentId === r.filter.document)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(taskCard).join('') || '<div class="reading-empty">AI assistance appears here when you request it. Select passages and choose Ask AI.</div>';
-    if (r.tab === 'collections') body = `<div class="reading-actions"><button type="button" data-reading-action="new-collection">New collection</button></div>${live('collections').map(c => `<article class="reading-card"><h3>${e(c.name)}</h3><p class="reading-muted">${c.highlightIds.filter(id => live('highlights').some(h => h.id === id)).length} passages</p><p>${e(c.notes)}</p><div class="reading-actions"><button type="button" data-reading-collection="${c.id}">Organise &amp; compare</button><button type="button" data-reading-collection-select="${c.id}">Select members</button></div></article>`).join('') || '<div class="reading-empty">Organise passages from different papers to compare methods, assumptions, and evidence.</div>'}`;
-    if (r.tab === 'artifacts') body = live('artifacts').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(a => `<article class="reading-card"><h3>${e(a.title)}</h3><p class="reading-muted">${e(artifactNames[a.type])} · ${a.snapshot.highlights.length} selected passages${a.outdated ? ' · Notes have changed since capture' : ''}</p><div class="reading-actions"><button type="button" data-reading-artifact="${a.id}">Review draft</button>${a.publications.map(p => `<a href="/wiki/${e(p.page)}">Published page</a>`).join('')}</div></article>`).join('') || '<div class="reading-empty">Create an artifact from selected highlights. You can write it yourself or request an AI draft, then review it before publishing.</div>';
+    if (!inLibrary || r.tab === 'highlights') body = highlights.length ? highlights.map(h => highlightCard(h, inLibrary)).join('') : '<div class="reading-empty">No highlights match. Select text in a PDF to highlight it, add a note, or ask AI.</div>';
+    if (inLibrary && r.tab === 'assistance') body = live('tasks').filter(t => !r.filter.document || t.snapshot.highlights.some(h => h.documentId === r.filter.document)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(taskCard).join('') || '<div class="reading-empty">AI assistance appears here when you request it. Select passages and choose Ask AI.</div>';
+    if (inLibrary && r.tab === 'collections') body = `<div class="reading-actions"><button type="button" data-reading-action="new-collection">New collection</button></div>${live('collections').map(c => `<article class="reading-card"><h3>${e(c.name)}</h3><p class="reading-muted">${c.highlightIds.filter(id => live('highlights').some(h => h.id === id)).length} passages</p><p>${e(c.notes)}</p><div class="reading-actions"><button type="button" data-reading-collection="${c.id}">Organise &amp; compare</button><button type="button" data-reading-collection-select="${c.id}">Select members</button></div></article>`).join('') || '<div class="reading-empty">Organise passages from different papers to compare methods, assumptions, and evidence.</div>'}`;
+    if (inLibrary && r.tab === 'artifacts') body = live('artifacts').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(a => `<article class="reading-card"><h3>${e(a.title)}</h3><p class="reading-muted">${e(artifactNames[a.type])} · ${a.snapshot.highlights.length} selected passages${a.outdated ? ' · Notes have changed since capture' : ''}</p><div class="reading-actions"><button type="button" data-reading-artifact="${a.id}">Review draft</button>${a.publications.map(p => `<a href="/wiki/${e(p.page)}">Published page</a>`).join('')}</div></article>`).join('') || '<div class="reading-empty">Create an artifact from selected highlights. You can write it yourself or request an AI draft, then review it before publishing.</div>';
     const historical = r.historical ? `<article class="reading-card"><strong>Preserved selection · revision ${r.historical.highlight.revision}</strong><p class="reading-muted">This is the original source selection. Its current highlight has changed or was deleted.</p><blockquote>${e(r.historical.highlight.text || 'Visual selection')}</blockquote>${r.historical.annotations.map(a => `<p class="reading-comment">${e(a.text)}</p>`).join('')}</article>` : '';
-    target.innerHTML = historical + header + body + `<div class="reading-actions"><a class="btn" href="/api/reading/export" download>Export private backup</a><button type="button" data-reading-action="import">Import backup</button><input type="file" id="reading-backup-input" accept="application/json,.json" hidden/></div>`;
+    target.innerHTML = historical + header + body + (inLibrary ? `<div class="reading-actions"><a class="btn" href="/api/reading/export" download>Export private backup</a><button type="button" data-reading-action="import">Import backup</button><input type="file" id="reading-backup-input" accept="application/json,.json" hidden/></div>` : r.undo ? '<div class="reading-actions"><button type="button" data-reading-action="undo">Undo deletion</button></div>' : '');
     if (focusId && el(focusId)) { el(focusId).focus(); if (typeof caret === 'number' && el(focusId).setSelectionRange) { try { el(focusId).setSelectionRange(caret, caret); } catch { /* select elements do not expose text selection */ } } }
     for (const node of target.querySelectorAll('.reading-task-response')) typesetMath(node);
     if (r.active) target.querySelector(`[data-reading-card="${r.active}"]`)?.classList.add('active');
   }
-  function highlightCard(h) {
+  function highlightCard(h, controls = true) {
     const comments = live('annotations').filter(a => a.highlightId === h.id);
     const relationships = live('relationships').filter(link => link.from === h.id || link.targetType === 'highlight' && link.target === h.id);
+    const color = highlightColor(h);
     return `<article class="reading-card ${h.id === r.active ? 'active' : ''}" data-reading-card="${h.id}">
-      <div class="reading-card-head"><input type="checkbox" data-reading-select="${h.id}" ${r.selected.has(h.id) ? 'checked' : ''} aria-label="Select passage from ${e(docName(h.documentId))}"/><span class="reading-color-dot" data-color="${h.color}" title="${h.color}"></span><button type="button" data-reading-open="${h.id}">${e(docName(h.documentId))} · p. ${h.anchors.map(a => e(a.label)).join(', ')}</button></div>
+      <div class="reading-card-head">${controls ? `<input type="checkbox" data-reading-select="${h.id}" ${r.selected.has(h.id) ? 'checked' : ''} aria-label="Select passage from ${e(docName(h.documentId))}"/>` : ''}<span class="reading-color-dot" data-color="${color}" title="${colorName(color)}"></span><a href="/#reading/${h.documentId}/${h.id}">${e(docName(h.documentId))} · p. ${h.anchors.map(a => e(a.label)).join(', ')}</a></div>
       ${h.image ? `<img src="${h.image}" alt="Selected source region"/>` : ''}<blockquote>${e(h.text || 'Visual region - add a transcription or comment.')}</blockquote>
       ${h.categories.map(c => `<span class="reading-tag">${e(c)}</span>`).join('')}
-      ${comments.map(a => `<div class="reading-comment"><small>Researcher comment</small>${e(a.text)}<label class="reading-check"><input type="checkbox" data-reading-annotation="${a.id}" ${r.annotationIds.has(a.id) ? 'checked' : ''}/>Include this comment in selected inputs</label></div>`).join('')}
-      ${relationships.map(link => `<div class="reading-muted">${e(link.relation)}: ${link.targetType === 'wiki' ? `<a href="/wiki/${e(link.target)}">${e(link.target)}</a>` : `<button type="button" class="btn" data-reading-open="${link.from === h.id ? link.target : link.from}">Related passage</button>`}</div>`).join('')}
-      <div class="reading-actions"><button type="button" data-reading-edit="${h.id}">Edit / comment</button><button type="button" data-reading-link="${h.id}">Link</button><button type="button" data-reading-copy="${h.id}">Copy link</button><button type="button" data-reading-delete="${h.id}">Delete</button>${r.pending ? `<button type="button" data-reading-reattach="${h.id}">Reattach to selection</button>` : ''}</div></article>`;
+      ${comments.map(a => `<div class="reading-comment"><small>Researcher comment</small>${e(a.text)}${controls ? `<label class="reading-check"><input type="checkbox" data-reading-annotation="${a.id}" ${r.annotationIds.has(a.id) ? 'checked' : ''}/>Include this comment in selected inputs</label>` : ''}</div>`).join('')}
+      ${assistanceFor(h).map(t => `<div class="reading-comment reading-ai-comment"><small>AI-generated comment · ${e(actions[t.action] || 'Reading assistance')}${t.snapshot.highlights.length > 1 ? ' · Shared response for selected passages' : ''}</small>${t.question ? `<p class="reading-ai-question">${e(t.question)}</p>` : ''}<div class="reading-task-response md-body">${safeMarkdown(t.response, t.snapshot)}</div>${controls ? `<label class="reading-check"><input type="checkbox" data-reading-assistance="${t.id}" ${r.assistanceIds.has(t.id) ? 'checked' : ''}/>Include this AI explanation as interpretation</label>` : ''}</div>`).join('')}
+      ${relationships.map(link => `<div class="reading-muted">${e(link.relation)}: ${link.targetType === 'wiki' ? `<a href="/wiki/${e(link.target)}">${e(link.target)}</a>` : `<a href="/#reading/${record('highlights', link.from === h.id ? link.target : link.from)?.documentId}/${link.from === h.id ? link.target : link.from}">Related passage</a>`}</div>`).join('')}
+      <div class="reading-actions">${controls ? `<button type="button" data-reading-edit="${h.id}">Edit / comment</button><button type="button" data-reading-link="${h.id}">Link</button><button type="button" data-reading-connect="${h.id}">Connect to related knowledge</button><button type="button" data-reading-copy="${h.id}">Copy link</button>${r.pending ? `<button type="button" data-reading-reattach="${h.id}">Reattach to selection</button>` : ''}` : ''}<button type="button" data-reading-delete="${h.id}" aria-label="Delete highlight from ${e(docName(h.documentId))}">Delete</button></div></article>`;
   }
   function taskCard(t) {
     return `<article class="reading-card"><div class="reading-section-title"><strong>${e(actions[t.action] || artifactNames[t.action] || 'Artifact draft')}</strong><span class="reading-muted">${e(t.status)}</span></div><p class="reading-muted">${e(t.question || 'Selected-passage assistance')} · ${e(t.model || '')}</p>${t.error ? `<p>${e(t.error)}</p>` : ''}${t.response ? `<div class="reading-task-response md-body">${safeMarkdown(t.response, t.snapshot)}</div><label class="reading-check"><input type="checkbox" data-reading-assistance="${t.id}" ${r.assistanceIds.has(t.id) ? 'checked' : ''}/>Include this AI explanation as interpretation</label>` : ''}<div class="reading-actions"><button type="button" data-reading-task-inputs="${t.id}">Inspect preserved inputs</button>${['queued', 'running'].includes(t.status) ? `<button type="button" data-reading-task-stop="${t.id}">Stop</button><button type="button" data-reading-task-watch="${t.id}">View progress</button>` : ''}${['failed', 'cancelled', 'interrupted'].includes(t.status) ? `<button type="button" data-reading-task-retry="${t.id}">Retry original inputs</button>` : ''}</div></article>`;
@@ -376,6 +433,29 @@
       await refresh(); renderWorkspace(); el('reading-dialog').close();
     }));
     for (const button of document.querySelectorAll('[data-unlink]')) button.addEventListener('click', guard(async () => { const link = record('relationships', button.dataset.unlink); await request(`/relationships/${link.id}`, 'DELETE', { revision: link.revision }); await refresh(); await linkDialog(id); renderWorkspace(); }));
+  }
+  async function connectKnowledge(id) {
+    const h = record('highlights', id);
+    const token = r.connectionRequest = (r.connectionRequest || 0) + 1;
+    dialog('Connect to related knowledge', `<blockquote>${e(h.text || 'Visual selection')}</blockquote><p id="reading-connections-status" role="status">Looking for a related wiki page, then arXiv and NASA ADS if needed…</p><div id="reading-connections-results"></div>`);
+    const result = await request('/connections', 'POST', { highlightId: id, revision: h.revision });
+    if (token !== r.connectionRequest || !el('reading-connections-results')) return;
+    el('reading-connections-status').textContent = result.wiki.length ? 'Related wiki knowledge found.' : result.papers.length ? 'No close wiki match. Related papers from arXiv / NASA ADS:' : 'No close wiki match or directly related paper found. Try a more specific passage or add a transcription.';
+    const container = el('reading-connections-results');
+    container.innerHTML = result.wiki.map(page => `<article class="reading-card"><h3><a class="wiki-link" data-page="${e(page.name)}" href="${e(page.url)}">${e(page.title)}</a></h3><p>${e(page.text)}</p><p class="reading-muted">Matching concepts: ${e(page.matchedTerms.join(', '))}</p><div class="reading-actions"><button type="button" data-connect-wiki="${e(page.name)}">Connect this page</button></div></article>`).join('') + result.papers.map(paper => `<article class="reading-card"><h3><a href="${e(paper.source.recordUrl)}" target="_blank" rel="noopener noreferrer">${e(paper.source.title)}</a></h3><p class="reading-muted">${e(paper.source.provider || 'arXiv / NASA ADS')}${paper.source.year ? ` · ${e(paper.source.year)}` : ''} · Abstract only; full text not verified</p><p>${e(paper.source.abstract)}</p><p class="reading-muted">Matching concepts: ${e(paper.matchedTerms.join(', '))}</p><div class="reading-actions"><button type="button" data-connect-paper="${paper.id}">Save paper reference</button></div></article>`).join('') + result.warnings.map(warning => `<p class="reading-muted">${e(warning)}</p>`).join('');
+    container.addEventListener('click', guard(async event => {
+      const button = event.target.closest('button'); if (!button || button.disabled) return;
+      button.disabled = true;
+      try {
+        if (button.dataset.connectWiki) {
+          await request('/relationships', 'POST', { from: id, targetType: 'wiki', target: button.dataset.connectWiki, relation: 'related', note: 'Connected from the highlighted passage.' });
+        } else if (button.dataset.connectPaper) {
+          const paper = result.papers.find(p => p.id === button.dataset.connectPaper);
+          await request('/annotations', 'POST', { highlightId: id, text: `Related paper: ${paper.source.title}\n${paper.source.recordUrl}\nAbstract-only reference; full text not verified.` });
+        } else return;
+        await refresh(); renderWorkspace(); button.textContent = 'Connected';
+      } catch (error) { button.disabled = false; throw error; }
+    }));
   }
   function collectionDialog(id = null, add = false) {
     const c = id ? record('collections', id) : { name: '', notes: '', highlightIds: [], groups: {} };
@@ -445,7 +525,7 @@
         if (el('reading-task-status')) el('reading-task-status').textContent = `${current.status}${current.model ? ` · ${current.model}` : ''}${current.error ? `: ${current.error}` : ''}`;
         if (el('reading-task-live')) el('reading-task-live').textContent = current.progress || '';
         if (['queued', 'running'].includes(current.status)) { r.polling = setTimeout(poll, 900); return; }
-        await refresh(); renderWorkspace();
+        await refresh(); renderWorkspace(); for (const p of r.pages.values()) paintHighlights(p);
         if (el('reading-task-cancel')) el('reading-task-cancel').hidden = true;
         if (el('reading-task-live')) el('reading-task-live').textContent = '';
         if (el('reading-task-complete')) { el('reading-task-complete').innerHTML = current.response ? safeMarkdown(current.response, current.snapshot) : `<p>${e(current.error || 'The request did not complete.')}</p>`; typesetMath(el('reading-task-complete')); }
@@ -479,10 +559,10 @@
     el('reading-search-results').addEventListener('change', event => { const id = event.target.dataset.discoverySelect; if (id) { if (event.target.checked) r.discoveryIds.add(id); else r.discoveryIds.delete(id); } });
     el('reading-search-results').addEventListener('click', guard(async event => { const button = event.target.closest('[data-discovery-import]'); if (!button) return; button.disabled = true; const result = await request('/discover/import', 'POST', { ids: [button.dataset.discoveryImport] }); button.textContent = result.imported.length ? 'Imported; ingestion started' : 'Import unavailable'; notify(result.imported.length ? 'PDF imported. The existing automatic ingestion workflow has started.' : 'The paper could not be imported.'); }));
   }
-  async function newArtifactDialog() {
+  async function newArtifactDialog(addToWiki = false) {
     if (!selectedHighlights().length) throw new Error('Select one or more highlights to create an artifact.');
     const pages = await api.getWikiList();
-    dialog('Create a reading artifact', `<p class="reading-muted">Create a private draft from selected material. AI generation and wiki publication are separate actions.</p><label class="reading-field">Artifact type<select id="reading-new-artifact-type">${Object.entries(artifactNames).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select></label><label class="reading-field">Title<input id="reading-new-artifact-title" maxlength="200" placeholder="e.g. Timing-noise assumptions across selected papers"/></label><label class="reading-field">Existing concept page (only for concept updates)<select id="reading-new-artifact-target"><option value="">Choose a page</option>${pages.filter(p => !['index', 'log'].includes(p.name)).map(p => `<option>${e(p.name)}</option>`).join('')}</select></label><label class="reading-check"><input type="checkbox" id="reading-new-artifact-images" ${selectedHighlights().some(h => h.image) ? 'checked' : ''}/>Include selected visual regions if AI is requested</label><details><summary>Review selected private inputs</summary>${snapshotView(previewSnapshot({ ...selectedPayload(), includeContext: false, includeImages: true }))}</details><div class="reading-actions"><button type="button" id="reading-new-artifact-create">Create private draft</button></div>`);
+    dialog(addToWiki ? 'Add highlighted passage to wiki' : 'Create a reading artifact', `<p class="reading-muted">${addToWiki ? 'Prepare this passage for a new wiki page or an existing concept-page update. Review the draft and source citations before publishing.' : 'Create a private draft from selected material. AI generation and wiki publication are separate actions.'}</p><label class="reading-field">Artifact type<select id="reading-new-artifact-type">${Object.entries(artifactNames).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select></label><label class="reading-field">Title<input id="reading-new-artifact-title" maxlength="200" placeholder="e.g. Timing-noise assumptions across selected papers"/></label><label class="reading-field">Existing concept page (only for concept updates)<select id="reading-new-artifact-target"><option value="">Choose a page</option>${pages.filter(p => !['index', 'log'].includes(p.name)).map(p => `<option>${e(p.name)}</option>`).join('')}</select></label><label class="reading-check"><input type="checkbox" id="reading-new-artifact-images" ${selectedHighlights().some(h => h.image) ? 'checked' : ''}/>Include selected visual regions if AI is requested</label><details><summary>Review selected private inputs</summary>${snapshotView(previewSnapshot({ ...selectedPayload(), includeContext: false, includeImages: true }))}</details><div class="reading-actions"><button type="button" id="reading-new-artifact-create">Create private draft</button></div>`);
     el('reading-new-artifact-create').addEventListener('click', guard(async () => {
       const artifact = await request('/artifacts', 'POST', { ...selectedPayload(), type: el('reading-new-artifact-type').value, title: el('reading-new-artifact-title').value, targetPage: el('reading-new-artifact-target').value, includeContext: false, includeImages: el('reading-new-artifact-images').checked });
       await refresh(); r.tab = 'artifacts'; renderWorkspace(); await artifactDialog(artifact.id);
@@ -547,8 +627,9 @@
       if (d.readingOpen) await openHighlight(d.readingOpen);
       if (d.readingEdit) editHighlight(d.readingEdit);
       if (d.readingLink) await linkDialog(d.readingLink);
+      if (d.readingConnect) await connectKnowledge(d.readingConnect);
       if (d.readingCopy) { const h = record('highlights', d.readingCopy); await navigator.clipboard.writeText(`${location.origin}/#reading/${h.documentId}/${h.id}?revision=${h.revision}`); notify('Passage link copied.'); }
-      if (d.readingDelete) { const h = record('highlights', d.readingDelete); r.undo = await request(`/highlights/${h.id}`, 'DELETE', { revision: h.revision }); r.selected.delete(h.id); await refresh(); renderWorkspace(); for (const p of r.pages.values()) paintHighlights(p); notify('Highlight deleted. Choose Undo deletion to restore it; historical evidence remains available.'); }
+      if (d.readingDelete) await deleteHighlight(d.readingDelete);
       if (d.readingReattach) { if (!r.pending) throw new Error('Select a passage in the replacement PDF first.'); const h = record('highlights', d.readingReattach); await request(`/highlights/${h.id}`, 'PATCH', { ...r.pending, revision: h.revision }); r.pending = null; el('reading-selection-toolbar').hidden = true; await refresh(); renderWorkspace(); for (const p of r.pages.values()) paintHighlights(p); }
       if (d.readingCollection) collectionDialog(d.readingCollection);
       if (d.readingCollectionSelect) { const c = record('collections', d.readingCollectionSelect); r.selected = new Set(c.highlightIds); r.filter.document = ''; r.tab = 'highlights'; renderWorkspace(); }
@@ -559,7 +640,7 @@
       if (d.readingTaskWatch) await watchTask(await request(`/tasks/${d.readingTaskWatch}`));
       if (d.readingAction === 'select-visible') { filteredHighlights().forEach(h => r.selected.add(h.id)); renderWorkspace(); }
       if (d.readingAction === 'clear-selection') { r.selected.clear(); r.annotationIds.clear(); r.assistanceIds.clear(); r.discoveryIds.clear(); renderWorkspace(); }
-      if (d.readingAction === 'undo' && r.undo) { await request(`/highlights/${r.undo.id}`, 'PATCH', { revision: r.undo.revision, deletedAt: null }); r.undo = null; await refresh(); renderWorkspace(); for (const p of r.pages.values()) paintHighlights(p); }
+      if (d.readingAction === 'undo') await undoDeletion();
       if (d.readingAction === 'assist') assistanceDialog();
       if (d.readingAction === 'search') searchDialog();
       if (d.readingAction === 'new-artifact') await newArtifactDialog();
@@ -569,28 +650,34 @@
     }));
   }
 
-  el('reading-selection-toolbar').addEventListener('pointerdown', event => event.preventDefault());
-  document.querySelectorAll('[data-selection-color]').forEach(button => button.addEventListener('click', guard(() => saveSelection(button.dataset.selectionColor))));
+  async function deleteHighlight(id) {
+    const h = record('highlights', id);
+    r.undo = await request(`/highlights/${h.id}`, 'DELETE', { revision: h.revision });
+    r.selected.delete(h.id); if (r.active === h.id) r.active = null;
+    if (r.historical?.highlight.id === h.id) r.historical = null;
+    await refresh(); renderWorkspace(); for (const p of r.pages.values()) paintHighlights(p);
+    notify('Highlight deleted. Choose Undo deletion to restore it.');
+  }
+  async function undoDeletion() {
+    if (!r.undo) return;
+    await request(`/highlights/${r.undo.id}`, 'PATCH', { revision: r.undo.revision, deletedAt: null });
+    r.undo = null; await refresh(); renderWorkspace(); for (const p of r.pages.values()) paintHighlights(p);
+  }
+  el('reading-selection-toolbar').addEventListener('pointerdown', event => { if (event.target.closest('button')) event.preventDefault(); });
+  document.querySelectorAll('[data-selection-color]').forEach(input => input.addEventListener('change', guard(() => saveSelection(input.dataset.selectionColor))));
+  el('reading-selection-wiki').addEventListener('click', guard(() => saveSelection('yellow', 'wiki')));
   el('reading-selection-note').addEventListener('click', guard(() => saveSelection('yellow', 'note')));
   el('reading-selection-ask').addEventListener('click', guard(() => saveSelection('yellow', 'ask')));
-  el('reading-selection-reattach').addEventListener('click', guard(async () => {
-    if (!r.pending) return;
-    const pending = r.pending;
-    dialog('Reattach an existing highlight', `<p class="reading-muted">This explicitly moves a live highlight to your new selection. Earlier AI and publication snapshots retain the original passage.</p><label class="reading-field">Existing highlight<select id="reading-reattach-id">${live('highlights').map(h => `<option value="${h.id}">${e(docName(h.documentId))}: ${e(h.text.slice(0, 110) || 'Visual selection')}</option>`).join('')}</select></label><blockquote>${e(pending.text || 'New visual region')}</blockquote><div class="reading-actions"><button type="button" id="reading-reattach-save">Reattach to this selection</button></div>`);
-    el('reading-reattach-save').addEventListener('click', guard(async () => {
-      const h = record('highlights', el('reading-reattach-id').value); if (!h) throw new Error('Choose an existing highlight.');
-      await request(`/highlights/${h.id}`, 'PATCH', { ...pending, revision: h.revision, color: h.color, categories: h.categories });
-      r.pending = null; el('reading-selection-toolbar').hidden = true; await refresh(); renderWorkspace(); for (const p of r.pages.values()) paintHighlights(p); el('reading-dialog').close();
-    }));
-  }));
+  el('reading-selection-connect').addEventListener('click', guard(() => saveSelection('yellow', 'connect')));
   el('reading-dialog-close').addEventListener('click', () => {
     if (r.artifact && el('reading-artifact-editor')?.value !== r.artifact.content) { notify('Save your draft before closing, or press Escape to discard unsaved edits.'); return; }
     el('reading-dialog').close(); r.artifact = null;
   });
   el('reading-dialog').addEventListener('close', () => { r.artifact = null; });
   el('reading-open-files').addEventListener('click', () => showPanel('files'));
-  el('reading-region').addEventListener('click', () => { r.region = !r.region; el('document-stage').classList.toggle('reading-region-mode', r.region); el('reading-region').setAttribute('aria-pressed', String(r.region)); if (r.region) notify('Drag a rectangle around an equation, figure, or scanned passage.'); });
+  el('reading-region').addEventListener('click', () => { if (!r.highlightsEnabled) return; r.region = !r.region; el('document-stage').classList.toggle('reading-region-mode', r.region); el('reading-region').setAttribute('aria-pressed', String(r.region)); if (r.region) notify('Drag a rectangle around an equation, figure, or scanned passage.'); });
   el('reading-rotate').addEventListener('click', guard(async () => { r.rotation = (r.rotation + 90) % 360; await navigate(state.pdf.page); }));
+  el('reading-highlights-toggle').addEventListener('click', () => setHighlightsEnabled(!r.highlightsEnabled));
   el('reading-notes-toggle').addEventListener('click', guard(async () => { el('reading-notes').hidden = !el('reading-notes').hidden; el('reading-notes-toggle').setAttribute('aria-expanded', String(!el('reading-notes').hidden)); await navigate(state.pdf.page); }));
   el('reading-thumbnails-toggle').addEventListener('click', guard(async () => {
     const nav = el('reading-thumbnails'); nav.hidden = !nav.hidden; el('reading-thumbnails-toggle').setAttribute('aria-pressed', String(!nav.hidden));
@@ -620,7 +707,7 @@
     }, 100);
   }, { passive: true });
   el('document-stage').addEventListener('click', event => {
-    if (r.region || window.getSelection()?.isCollapsed === false) return;
+    if (!r.highlightsEnabled || r.region || window.getSelection()?.isCollapsed === false) return;
     const wrap = event.target.closest('.reading-page'); if (!wrap) return;
     const p = r.pages.get(Number(wrap.dataset.readingPage)); const box = wrap.getBoundingClientRect();
     const x = event.clientX - box.left; const y = event.clientY - box.top;

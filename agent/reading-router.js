@@ -44,6 +44,7 @@ function createReadingRouter({ service, requireLocalSession, requireLocalMutatio
     res.json(relationships.map(r => ({ ...r, highlight: data.highlights.find(h => h.id === r.from && !h.deletedAt) })).filter(r => r.highlight));
   }));
   router.post('/search', route(async (req, res) => res.json(await service.search(req.body?.query))));
+  router.post('/connections', route(async (req, res) => res.json(await service.relatedKnowledge(req.body?.highlightId, req.body?.revision))));
   router.post('/discover', route(async (req, res) => res.json(await service.discover(req.body?.query))));
   router.post('/discover/import', route(async (req, res) => {
     const ids = service.restoreDiscoveries(req.body?.ids);
