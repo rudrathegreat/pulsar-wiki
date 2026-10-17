@@ -1,6 +1,6 @@
 # PulsarWiki
 
-PulsarWiki is a local, browser-only interface for a source-backed pulsar astronomy wiki. Its chat uses an eligible ChatGPT subscription, while wiki files and saved conversations remain on the local machine.
+PulsarWiki is a local browser interface for source-backed research workspaces. Open any local folder for a separate project, or continue using the included pulsar astronomy wiki. Its chat uses an eligible ChatGPT subscription, while wiki files and saved conversations remain on the local machine.
 
 ## Requirements
 
@@ -21,6 +21,16 @@ In PowerShell environments where `npm.ps1` is disabled, use:
     npm.cmd start
 
 Open the displayed loopback address, normally <http://127.0.0.1:3000>. PulsarWiki is intentionally local-only and browser-based; do not expose it through a reverse proxy, LAN address, or the public internet.
+
+## Research workspaces
+
+On a new server session, the welcome screen shows a plain **Workspace folder** path field. Use **Browse** to select a folder in the system folder dialog, or enter its full path, then select **Open**. Recent folders can also be reopened directly. The native dialog supports creating a new folder; on Linux it requires Zenity, with manual path entry available if the dialog cannot open.
+
+Each selected folder holds its own `wiki/`, immutable `raw/` sources, `.pulsarwiki/chat/` conversations, and `.pulsarwiki/reading/` annotations and drafts. Missing folders, `GEMINI.md`, and starter index/log pages are created without replacing existing content. A new workspace starts with general research instructions; existing projects retain their own instructions and sources. Existing source files should be placed in that project's `raw/` folder to appear in Files.
+
+The selected folder is remembered throughout the running browser/server session, including refreshes, direct page links, and the ChatGPT sign-in round trip. Each tab pins its own workspace, so different projects can be open in separate tabs. Recent paths remain in this browser for reopening after a server restart. ChatGPT account settings are shared across projects.
+
+Use **Change folder** in the title bar or the folder icon in the activity bar to switch projects with the system dialog. The title bar always shows the full active folder path, including on small screens; **Close folder** returns to the welcome screen. Switching reloads the interface to clear the previous project's document and search state. Save any draft edits before switching or closing; saved files and notes remain in their project folders.
 
 The sidebar's **Search wiki** field filters pages by matching text in their names or contents, keeping the existing page groups. When the all-pages graph is open, it shows the same matching pages and only links between them. The filter stays active while browsing; clear the field or press Escape to restore all pages and graph nodes.
 
@@ -51,9 +61,9 @@ The file is written atomically and uses owner-only permissions where the operati
 
 ## Saved chats and agent context
 
-Chats are stored in ignored local application data at `.pulsarwiki/chat/`. Each Responses API request uses `store: false`, streams its result, and resends the complete local conversation transcript. Saved chats remain available across ChatGPT disconnects and account changes.
+Chats are stored in local application data at `.pulsarwiki/chat/` inside the selected workspace (ignored by Git in the included project). Each Responses API request uses `store: false`, streams its result, and resends the complete local conversation transcript. Saved chats remain available across ChatGPT disconnects and account changes.
 
-`GEMINI.md` is loaded when the local server starts and becomes the canonical instruction snapshot for new chats. Restart the server after editing it to create chats using the new instruction version.
+The selected folder's `GEMINI.md` is loaded when that workspace first opens in a server session and becomes the canonical instruction snapshot for new chats. Restart the server after editing it to create chats using the new instruction version.
 
 ## Local tool boundaries
 

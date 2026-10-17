@@ -1,5 +1,45 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
+/* Folder-based startup, with the quiet layout of an editor welcome tab. */
+body:not(.workspace-ready) #app { display: none; }
+body.workspace-ready #workspace-welcome { display: none; }
+#workspace-welcome { height: 100%; overflow: auto; background: var(--bg); }
+.welcome-titlebar { height: 44px; padding: 10px 24px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.welcome-titlebar span { opacity: .45; margin-left: 20px; }
+.welcome-content { max-width: 940px; margin: 9vh auto 0; padding: 24px 50px 60px; }
+.welcome-brand { width: 58px; height: 58px; margin-bottom: 24px; opacity: .75; }
+.welcome-brand svg { width: 100%; height: 100%; }
+.welcome-content h1 { font-size: 44px; font-weight: 400; letter-spacing: -1.8px; line-height: 1.2; }
+.welcome-tagline { font-size: 20px; opacity: .5; margin-top: 8px; }
+.welcome-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 70px; margin-top: 48px; }
+.welcome-columns h2 { font-size: 16px; font-weight: 500; margin-bottom: 18px; }
+.workspace-recent:hover strong { text-decoration: underline; text-underline-offset: 4px; }
+.welcome-help { font-size: 12px; opacity: .5; margin-top: 16px; line-height: 1.8; }
+.welcome-footnote { font-size: 11px; opacity: .4; margin-top: 65px; }
+.workspace-recent { display: block; width: 100%; text-align: left; font: inherit; color: var(--text-1); border: 0; background: none; padding: 7px 0; cursor: pointer; }
+.workspace-recent strong { font-weight: 400; font-size: 13px; }
+.workspace-recent span { display: block; font: 11px var(--mono); opacity: .45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#workspace-error { color: var(--text-1); font-size: 12px; min-height: 20px; margin-top: 12px; }
+.workspace-titlebar { flex-shrink: 0; display: flex; align-items: center; gap: 16px; min-height: 44px; padding: 8px 20px; flex-wrap: wrap; border-bottom: 1px solid var(--border); font-size: 12px; }
+#workspace-current-name { white-space: nowrap; }
+#workspace-current-path { flex: 1 1 200px; font: 12px var(--mono); overflow-wrap: anywhere; user-select: all; }
+#workspace-close { margin-left: auto; flex-shrink: 0; background: none; color: inherit; opacity: .6; border: 0; font: inherit; cursor: pointer; }
+#workspace-close:hover { opacity: 1; }
+#workspace-path-form label { display: block; font-size: 12px; margin-bottom: 8px; }
+.workspace-path-row { display: flex; flex-wrap: wrap; gap: 8px; }
+#workspace-path { flex: 1 1 100%; min-width: 0; padding: 10px; font: 12px var(--mono); color: var(--text-1); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; }
+#workspace-status:not([hidden]) { position: fixed; top: 44px; right: 20px; max-width: min(480px, 90vw); padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); z-index: 100; font-size: 13px; }
+#workspace-change { flex-shrink: 0; padding: 3px 8px; font: inherit; cursor: pointer; color: var(--text-1) !important; }
+.workspace-loading .welcome-columns { opacity: .4; pointer-events: none; }
+#workspace-welcome button, #workspace-close { color: var(--text-1) !important; }
+#workspace-welcome .workspace-recent { border-color: transparent !important; }
+@media (max-width: 650px) {
+  .welcome-content { margin-top: 4vh; padding: 20px 28px 40px; }
+  .welcome-columns { grid-template-columns: 1fr; gap: 32px; margin-top: 30px; }
+  .welcome-content h1 { font-size: 36px; }
+  .welcome-footnote { margin-top: 32px; }
+}
+
 /* ── Tokens ─────────────────────────────────────────────────────── */
 :root {
   --bg: #111;

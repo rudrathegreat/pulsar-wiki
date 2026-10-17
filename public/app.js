@@ -98,89 +98,100 @@ async function readJsonResponse(response, apiName) {
   return data;
 }
 
+// A tab pins its workspace so another tab can open a different project safely.
+let workspaceId = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('pw-workspace') : null;
+function workspaceFetch(url, options = {}) {
+  return fetch(url, { ...options, headers: { ...options.headers, ...(workspaceId ? { 'X-PulsarWiki-Workspace': workspaceId } : {}) } });
+}
+function workspaceUrl(url) {
+  return workspaceId ? `${url}${url.includes('?') ? '&' : '?'}workspace=${encodeURIComponent(workspaceId)}` : url;
+}
+if (typeof window !== 'undefined') window.WorkspaceSession = { fetch: workspaceFetch, url: workspaceUrl };
+
 // Local browser API. ChatGPT credentials never enter this client.
 const api = {
   async getChatGPTStatus() {
-    return readJsonResponse(await fetch('/api/chatgpt/status'), 'ChatGPT status');
+    return readJsonResponse(await workspaceFetch('/api/chatgpt/status'), 'ChatGPT status');
   },
   async saveChatGPTModel(model) {
-    return readJsonResponse(await fetch('/api/chatgpt/model', {
+    return readJsonResponse(await workspaceFetch('/api/chatgpt/model', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model }),
     }), 'ChatGPT model');
   },
   async disconnectChatGPT() {
-    return readJsonResponse(await fetch('/api/chatgpt/session', { method: 'DELETE' }), 'ChatGPT disconnect');
+    return readJsonResponse(await workspaceFetch('/api/chatgpt/session', { method: 'DELETE' }), 'ChatGPT disconnect');
   },
   async forgetChatGPTAccount() {
-    return readJsonResponse(await fetch('/api/chatgpt/account', { method: 'DELETE' }), 'ChatGPT account');
+    return readJsonResponse(await workspaceFetch('/api/chatgpt/account', { method: 'DELETE' }), 'ChatGPT account');
   },
   async listThreads() {
-    return readJsonResponse(await fetch('/api/chat/threads'), 'Saved chats');
+    return readJsonResponse(await workspaceFetch('/api/chat/threads'), 'Saved chats');
   },
   async createThread(title) {
-    return readJsonResponse(await fetch('/api/chat/threads', {
+    return readJsonResponse(await workspaceFetch('/api/chat/threads', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }),
     }), 'Saved chat');
   },
   async getThread(id) {
-    return readJsonResponse(await fetch(`/api/chat/threads/${encodeURIComponent(id)}`), 'Saved chat');
+    return readJsonResponse(await workspaceFetch(`/api/chat/threads/${encodeURIComponent(id)}`), 'Saved chat');
   },
   async renameThread(id, title) {
-    return readJsonResponse(await fetch(`/api/chat/threads/${encodeURIComponent(id)}`, {
+    return readJsonResponse(await workspaceFetch(`/api/chat/threads/${encodeURIComponent(id)}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }),
     }), 'Saved chat');
   },
   async deleteThread(id) {
-    const response = await fetch(`/api/chat/threads/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const response = await workspaceFetch(`/api/chat/threads/${encodeURIComponent(id)}`, { method: 'DELETE' });
     if (!response.ok) await readJsonResponse(response, 'Saved chat');
   },
-  async getWikiList() { return readJsonResponse(await fetch('/api/wiki'), 'Wiki'); },
-  async getWikiPage(name) { return readJsonResponse(await fetch(`/api/wiki/${encodeURIComponent(name)}`), 'Wiki page'); },
+  async getWikiList() { return readJsonResponse(await workspaceFetch('/api/wiki'), 'Wiki'); },
+  async getWikiPage(name) { return readJsonResponse(await workspaceFetch(`/api/wiki/${encodeURIComponent(name)}`), 'Wiki page'); },
   async saveWikiPage(name, content) {
-    return readJsonResponse(await fetch(`/api/wiki/${encodeURIComponent(name)}`, {
+    return readJsonResponse(await workspaceFetch(`/api/wiki/${encodeURIComponent(name)}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }),
     }), 'Wiki page');
   },
   async createWikiPage(name, content) {
-    return readJsonResponse(await fetch('/api/wiki', {
+    return readJsonResponse(await workspaceFetch('/api/wiki', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, content }),
     }), 'Wiki page');
   },
-  async getRawList() { return readJsonResponse(await fetch('/api/raw'), 'Source files'); },
+  async getRawList() { return readJsonResponse(await workspaceFetch('/api/raw'), 'Source files'); },
   async searchSources(query, limit = 20) {
-    return readJsonResponse(await fetch('/api/sources/search', {
+    return readJsonResponse(await workspaceFetch('/api/sources/search', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, limit }),
     }), 'Paper search');
   },
   async getRelatedSources(id) {
-    return readJsonResponse(await fetch(`/api/sources/${encodeURIComponent(id)}/related`), 'Related papers');
+    return readJsonResponse(await workspaceFetch(`/api/sources/${encodeURIComponent(id)}/related`), 'Related papers');
   },
   async importSources(ids) {
-    return readJsonResponse(await fetch('/api/sources/import', {
+    return readJsonResponse(await workspaceFetch('/api/sources/import', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
     }), 'Paper import');
   },
   async getSourceJob(id) {
-    return readJsonResponse(await fetch(`/api/sources/jobs/${encodeURIComponent(id)}`), 'Wiki update');
+    return readJsonResponse(await workspaceFetch(`/api/sources/jobs/${encodeURIComponent(id)}`), 'Wiki update');
   },
   async generateHandover(payload) {
-    return readJsonResponse(await fetch('/api/handover/generate', {
+    return readJsonResponse(await workspaceFetch('/api/handover/generate', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
     }), 'Project handover');
   },
   async publishHandover(content) {
-    return readJsonResponse(await fetch('/api/handover/publish', {
+    return readJsonResponse(await workspaceFetch('/api/handover/publish', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, reviewed: true }),
     }), 'Project handover');
   },
-  async getGraph() { return readJsonResponse(await fetch('/api/graph'), 'Wiki graph'); },
-  async search(query) { return readJsonResponse(await fetch(`/api/search?q=${encodeURIComponent(query)}`), 'Search'); },
+  async getGraph() { return readJsonResponse(await workspaceFetch('/api/graph'), 'Wiki graph'); },
+  async search(query) { return readJsonResponse(await workspaceFetch(`/api/search?q=${encodeURIComponent(query)}`), 'Search'); },
   async uploadFile(file, onProgress) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/api/upload');
+      if (workspaceId) xhr.setRequestHeader('X-PulsarWiki-Workspace', workspaceId);
       xhr.setRequestHeader('X-Filename', encodeURIComponent(file.name));
       xhr.setRequestHeader('Content-Type', 'application/octet-stream');
       xhr.upload.onprogress = event => {
@@ -1230,7 +1241,7 @@ function setDocumentStatus(message, detail = '', isError = false) {
 async function openRawFile(name, ext, file = {}, updateHash = true) {
   window.ActiveReading?.close();
   const normalizedExt = String(ext || '').toLowerCase();
-  const url = `/api/raw/${encodeURIComponent(name)}`;
+  const url = workspaceUrl(`/api/raw/${encodeURIComponent(name)}`);
   const session = ++state.documentSession;
   state.currentDocument = { name, ext: normalizedExt, url };
   state.pdf.doc = null;
@@ -1841,7 +1852,7 @@ async function useAnotherChatGPTAccount() {
 
 function connectDirectAgentWS() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(proto + '://' + location.host);
+  const ws = new WebSocket(workspaceUrl(proto + '://' + location.host + '/'));
   state.ws = ws;
   ws.onopen = () => {
     state.wsReady = true;
@@ -1992,6 +2003,7 @@ dom.chatAbort.addEventListener('click', () => {
 
 // ── Bootstrap ──────────────────────────────────────────────────────
 (async function init() {
+  if (!await initializeWorkspaceUi()) return;
   connectDirectAgentWS();
 
   const callbackCode = new URLSearchParams(location.search).get('chatgpt');

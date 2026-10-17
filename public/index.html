@@ -9,11 +9,41 @@
   <link rel="stylesheet" href="/reading.css"/>
   <link rel="stylesheet" href="/vendor/katex/katex.min.css"/>
 </head>
-<body>
+<body class="workspace-loading">
+<section id="workspace-welcome" aria-labelledby="workspace-welcome-title">
+  <div class="welcome-titlebar">PulsarWiki <span>Research workspaces</span></div>
+  <main class="welcome-content">
+    <div class="welcome-brand" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M24 5 4 15l20 10 20-10L24 5ZM4 24l20 10 20-10M4 33l20 10 20-10"/></svg></div>
+    <h1 id="workspace-welcome-title">PulsarWiki</h1>
+    <p class="welcome-tagline">A place for every research project.</p>
+    <div class="welcome-columns">
+      <section aria-labelledby="welcome-start-title">
+        <h2 id="welcome-start-title">Start</h2>
+        <form id="workspace-path-form">
+          <label for="workspace-path">Workspace folder</label>
+          <div class="workspace-path-row">
+            <input id="workspace-path" type="text" autocomplete="off" spellcheck="false" required placeholder="Select a folder or enter its full path"/>
+            <button id="workspace-open" type="button" class="btn">Browse</button>
+            <button id="workspace-submit" type="submit" class="btn">Open</button>
+          </div>
+        </form>
+        <p class="welcome-help">Open an existing workspace or choose a folder for a new project. Your sources, wiki, chats and reading notes stay together in that folder.</p>
+      </section>
+      <section aria-labelledby="welcome-recent-title">
+        <h2 id="welcome-recent-title">Recent</h2>
+        <div id="workspace-recents"><p class="welcome-help">Your opened folders will appear here.</p></div>
+      </section>
+    </div>
+    <p id="workspace-error" role="alert"></p>
+    <p class="welcome-footnote">Your folder stays open throughout this session, including after a refresh or sign-in.</p>
+  </main>
+</section>
+<p id="workspace-status" role="status" hidden></p>
 <div id="app">
 
   <!-- Icon bar -->
   <nav id="iconbar">
+    <button class="icon-btn" id="workspace-switch" title="Open another workspace folder" aria-label="Open another workspace folder" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg></button>
     <button class="icon-btn active" id="ib-wiki" title="Wiki" data-panel="wiki">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
     </button>
@@ -86,6 +116,7 @@
 
   <!-- Main -->
   <div id="main">
+    <header class="workspace-titlebar"><span id="workspace-current-name"></span><span id="workspace-current-path"></span><button id="workspace-change" type="button">Change folder</button><button id="workspace-close" type="button" title="Return to welcome screen">Close folder</button></header>
     <!-- Content area -->
     <div id="content">
 
@@ -112,13 +143,13 @@
             <div class="chat-avatar">AI</div>
             <div class="chat-bubble">
               <strong>Connect your ChatGPT subscription to get started.</strong><br>
-              Ask me anything about pulsars — I have full context of this wiki and can use its bounded wiki tools.
+              Ask about your research or build on the sources and notes in this workspace.
             </div>
           </div>
         </div>
         <div id="chat-bar">
           <div class="chat-bar-inner">
-            <textarea id="chat-input" rows="1" placeholder="Ask about pulsars, timing, MeerKAT…"></textarea>
+            <textarea id="chat-input" rows="1" placeholder="Ask about your research…"></textarea>
             <button id="chat-abort" title="Stop">
               <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
             </button>
@@ -476,6 +507,7 @@
 <div id="reading-toast" role="status" aria-live="polite" hidden></div>
 <script src="/reading-performance.js"></script>
 <script src="/reading.js"></script>
+<script src="/workspaces.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

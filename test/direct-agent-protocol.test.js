@@ -3,6 +3,8 @@
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
 const { spawn } = require('node:child_process');
 const test = require('node:test');
 const WebSocket = require('ws');
@@ -53,8 +55,14 @@ test('direct-agent WebSocket requires protocol 4 and thread-scoped chat payloads
 
   await started;
   const page = await request(serverUrl);
-  const cookie = page.headers['set-cookie']?.[0]?.split(';')[0];
+  let cookie = page.headers['set-cookie']?.[0]?.split(';')[0];
   assert.match(cookie || '', /^pulsarwiki_session=/);
+
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'pulsarwiki-protocol-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const opened = await request(serverUrl + '/api/workspaces/open', { method: 'POST', headers: { Cookie: cookie, Origin: serverUrl, 'Content-Type': 'application/json' }, body: JSON.stringify({ path: folder }) });
+  assert.equal(opened.statusCode, 200);
+  cookie += '; ' + opened.headers['set-cookie'].find(value => value.startsWith('pulsarwiki_workspace=')).split(';')[0];
 
   const privateReading = await request(serverUrl + '/api/reading', { headers: { Cookie: cookie } });
   assert.equal(privateReading.statusCode, 200);

@@ -8,6 +8,9 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { pipeline } = require('node:stream/promises');
 const chokidar = require('chokidar');
+const { AsyncLocalStorage } = require('node:async_hooks');
+const { initializeWorkspace, describe } = require('./agent/workspaces');
+const { pickFolder } = require('./agent/folder-picker');
 const { AgentService, AgentServiceError } = require('./agent/agent-service');
 const { ChatGPTAuthError, ChatGPTAuthService } = require('./agent/chatgpt-auth');
 const { ThreadStore, ThreadStoreError } = require('./agent/thread-store');
@@ -23,11 +26,11 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
 
 const ROOT_DIR = __dirname;
-const WIKI_DIR = path.join(ROOT_DIR, 'wiki');
-const RAW_DIR = path.join(ROOT_DIR, 'raw');
 const PUB_DIR = path.join(ROOT_DIR, 'public');
-const DATA_DIR = path.join(ROOT_DIR, '.pulsarwiki');
-const INSTRUCTIONS_PATH = path.join(ROOT_DIR, 'GEMINI.md');
+const workspaceScope = new AsyncLocalStorage();
+const workspaces = new Map();
+const WORKSPACE_COOKIE = 'pulsarwiki_workspace';
+const currentWorkspace = () => workspaceScope.getStore();
 const CHAT_PROTOCOL_VERSION = 4;
 const SESSION_COOKIE_NAME = 'pulsarwiki_session';
 const SESSION_TOKEN = crypto.randomBytes(32).toString('hex');
@@ -35,29 +38,35 @@ const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
 const CHAT_TIMEOUT_MS = 120000;
 let boundPort = null;
 
-function loadInstructions() {
-  try {
-    return fs.readFileSync(INSTRUCTIONS_PATH, 'utf8');
-  } catch {
-    throw new Error('GEMINI.md is required to start the PulsarWiki agent.');
-  }
+const chatgptAuth = new ChatGPTAuthService();
+
+function openWorkspace(folder) {
+  if (typeof folder !== 'string' || !folder.trim() || !path.isAbsolute(folder.trim())) throw new Error('Enter an absolute folder path.');
+  folder = folder.trim();
+  const root = fs.realpathSync(folder);
+  const cached = [...workspaces.values()].find(workspace => workspace.rootDir === root);
+  if (cached) return cached;
+  const workspace = initializeWorkspace(folder);
+  const { rootDir, wikiDir, rawDir, dataDir, instructions } = workspace;
+  workspace.wikiTools = new WikiTools({ rootDir, wikiDir, rawDir, dataDir });
+  workspace.agentService = new AgentService({ threadStore: new ThreadStore({ dataDir: path.join(dataDir, 'chat') }), authService: chatgptAuth, wikiTools: workspace.wikiTools, instructions });
+  workspace.sourceDiscovery = new SourceDiscoveryService({ rawDir });
+  workspace.readingService = new ReadingService({ store: new ReadingStore({ dataDir: path.join(dataDir, 'reading') }), wikiTools: workspace.wikiTools, authService: chatgptAuth, discovery: workspace.sourceDiscovery, instructions });
+  workspace.ingestJobs = new Map();
+  workspace.readingRouter = createReadingRouter({ service: workspace.readingService, requireLocalSession, requireLocalMutation, onImport: queueSourceIngest });
+  workspace.watcher = chokidar.watch([wikiDir, rawDir], { ignoreInitial: true }).on('all', (event, filePath) => {
+    const payload = JSON.stringify({ type: 'filechange', event, path: filePath });
+    wss.clients.forEach(client => { if (client.workspace === workspace && client.readyState === WebSocket.OPEN) client.send(payload); });
+  });
+  workspaces.set(workspace.id, workspace);
+  return workspace;
 }
 
-const threadStore = new ThreadStore({ dataDir: path.join(DATA_DIR, 'chat') });
-const chatgptAuth = new ChatGPTAuthService();
-const wikiTools = new WikiTools({ rootDir: ROOT_DIR, wikiDir: WIKI_DIR, rawDir: RAW_DIR, dataDir: DATA_DIR });
-const agentService = new AgentService({
-  threadStore,
-  authService: chatgptAuth,
-  wikiTools,
-  instructions: loadInstructions(),
-});
-const sourceDiscovery = new SourceDiscoveryService({ rawDir: RAW_DIR });
-const readingService = new ReadingService({
-  store: new ReadingStore({ dataDir: path.join(DATA_DIR, 'reading') }),
-  wikiTools, authService: chatgptAuth, discovery: sourceDiscovery, instructions: loadInstructions(),
-});
-const ingestJobs = new Map();
+function requestWorkspace(request) {
+  const url = new URL(request.url, 'http://localhost');
+  const id = request.headers['x-pulsarwiki-workspace'] || url.searchParams.get('workspace') || parseCookies(request.headers.cookie)[WORKSPACE_COOKIE];
+  return workspaces.get(id) || null;
+}
 
 function publicIngestJob(job) {
   return {
@@ -84,7 +93,7 @@ async function runIngestJob(job) {
   job.updatedAt = new Date().toISOString();
   try {
     const names = job.files.map(file => file.name);
-    const thread = agentService.createThread(`Ingest ${names.length === 1 ? names[0] : `${names.length} sources`}`);
+    const thread = currentWorkspace().agentService.createThread(`Ingest ${names.length === 1 ? names[0] : `${names.length} sources`}`);
     job.threadId = thread.id;
     const descriptions = job.files.map(file => {
       const details = [file.name];
@@ -93,7 +102,7 @@ async function runIngestJob(job) {
       if (file.arxivId) details.push(`arXiv: ${file.arxivId}`);
       return `- ${details.join('; ')}`;
     }).join('\n');
-    await agentService.runTurn({
+    await currentWorkspace().agentService.runTurn({
       threadId: thread.id,
       text: `New research sources were imported into raw/:\n${descriptions}\n\nBegin the canonical ingest workflow for these sources and update the research workspace as allowed by GEMINI.md. Read every source in full and preserve source citations. If the workflow requires user review before edits, present the key takeaways in this saved chat and clearly state what confirmation is needed.`,
       onDelta() {}, onTool() {}, signal: AbortSignal.timeout(CHAT_TIMEOUT_MS),
@@ -116,15 +125,17 @@ function queueSourceIngest(files) {
   if (!normalized.length) return null;
   const timestamp = new Date().toISOString();
   const job = { id: crypto.randomUUID(), status: 'queued', files: normalized, threadId: null, error: null, createdAt: timestamp, updatedAt: timestamp };
-  ingestJobs.set(job.id, job);
+  currentWorkspace().ingestJobs.set(job.id, job);
   setImmediate(() => { void runIngestJob(job); });
   return publicIngestJob(job);
 }
 
 function resumePendingIngestJobs() {
-  for (const job of ingestJobs.values()) {
-    if (['queued', 'awaiting-connection'].includes(job.status)) setImmediate(() => { void runIngestJob(job); });
-  }
+  for (const workspace of workspaces.values()) workspaceScope.run(workspace, () => {
+    for (const job of workspace.ingestJobs.values()) {
+      if (['queued', 'awaiting-connection'].includes(job.status)) setImmediate(() => { void runIngestJob(job); });
+    }
+  });
 }
 
 app.use('/api/reading/import', express.json({ limit: '110mb' }));
@@ -231,6 +242,45 @@ function asPublicError(error) {
   return { code: 'chat-error', text: 'PulsarWiki could not complete this chat request.' };
 }
 
+// Workspace selection is a local, explicit action. Choices live for this server session.
+app.get('/api/workspaces', requireLocalSession, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ active: describe(requestWorkspace(req)), recent: [...workspaces.values()].map(describe).reverse(), defaultPath: ROOT_DIR });
+});
+let folderPickerPending = false;
+app.post('/api/workspaces/pick', requireLocalMutation, async (req, res) => {
+  if (folderPickerPending) return res.status(409).json({ error: 'The folder picker is already open. Select a folder or cancel it.' });
+  folderPickerPending = true;
+  try {
+    const initialPath = typeof req.body?.path === 'string' ? req.body.path : requestWorkspace(req)?.rootDir || ROOT_DIR;
+    res.json({ path: await pickFolder({ initialPath }) });
+  } catch (error) { res.status(503).json({ error: error.message }); }
+  finally { folderPickerPending = false; }
+});
+app.post('/api/workspaces/open', requireLocalMutation, (req, res) => {
+  try {
+    const workspace = openWorkspace(req.body?.path);
+    res.append('Set-Cookie', `${WORKSPACE_COOKIE}=${workspace.id}; Path=/; HttpOnly; SameSite=Strict`);
+    res.json({ active: describe(workspace) });
+  } catch (error) {
+    res.status(400).json({ error: error.code ? 'This folder could not be opened. Check that it exists and is writable.' : error.message });
+  }
+});
+app.post('/api/workspaces/close', requireLocalMutation, (_req, res) => {
+  res.append('Set-Cookie', `${WORKSPACE_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`);
+  res.json({ ok: true });
+});
+
+app.use('/api', (req, res, next) => {
+  if (req.path.startsWith('/chatgpt/')) return next();
+  return requireLocalSession(req, res, () => {
+    const workspace = requestWorkspace(req);
+    if (!workspace) return res.status(409).json({ error: 'Open a research workspace folder to continue.', code: 'workspace-required' });
+    res.setHeader('Cache-Control', 'no-store');
+    return workspaceScope.run(workspace, next);
+  });
+});
+
 // --- ChatGPT subscription connection and saved chats ---
 app.get('/api/chatgpt/status', requireLocalSession, async (_req, res) => {
   try {
@@ -287,42 +337,42 @@ app.delete('/api/chatgpt/account', requireLocalMutation, async (_req, res) => {
 });
 
 app.get('/api/chat/threads', (_req, res) => {
-  try { res.json(agentService.listThreads()); } catch (error) { res.status(500).json({ error: asPublicError(error).text }); }
+  try { res.json(currentWorkspace().agentService.listThreads()); } catch (error) { res.status(500).json({ error: asPublicError(error).text }); }
 });
 
 app.post('/api/chat/threads', (req, res) => {
-  try { res.status(201).json(agentService.createThread(req.body?.title)); } catch (error) { res.status(400).json({ error: asPublicError(error).text }); }
+  try { res.status(201).json(currentWorkspace().agentService.createThread(req.body?.title)); } catch (error) { res.status(400).json({ error: asPublicError(error).text }); }
 });
 
 app.get('/api/chat/threads/:id', (req, res) => {
-  try { res.json(agentService.getThread(req.params.id)); } catch (error) { res.status(404).json({ error: asPublicError(error).text }); }
+  try { res.json(currentWorkspace().agentService.getThread(req.params.id)); } catch (error) { res.status(404).json({ error: asPublicError(error).text }); }
 });
 
 app.patch('/api/chat/threads/:id', (req, res) => {
-  try { res.json(agentService.renameThread(req.params.id, req.body?.title)); } catch (error) { res.status(400).json({ error: asPublicError(error).text }); }
+  try { res.json(currentWorkspace().agentService.renameThread(req.params.id, req.body?.title)); } catch (error) { res.status(400).json({ error: asPublicError(error).text }); }
 });
 
 app.delete('/api/chat/threads/:id', (req, res) => {
-  try { agentService.deleteThread(req.params.id); res.status(204).end(); } catch (error) { res.status(404).json({ error: asPublicError(error).text }); }
+  try { currentWorkspace().agentService.deleteThread(req.params.id); res.status(204).end(); } catch (error) { res.status(404).json({ error: asPublicError(error).text }); }
 });
 
 // --- Wiki API ---
 app.get('/api/wiki', (_req, res) => {
-  const files = fs.readdirSync(WIKI_DIR).filter(file => file.endsWith('.md'));
+  const files = fs.readdirSync(currentWorkspace().wikiDir).filter(file => file.endsWith('.md'));
   res.json(files.map(file => {
-    const stat = fs.statSync(path.join(WIKI_DIR, file));
+    const stat = fs.statSync(path.join(currentWorkspace().wikiDir, file));
     return { name: file.replace('.md', ''), size: stat.size, modified: stat.mtime };
   }));
 });
 
 app.get('/api/wiki/:page', (req, res) => {
-  const filePath = path.join(WIKI_DIR, `${safeBase(req.params.page)}.md`);
+  const filePath = path.join(currentWorkspace().wikiDir, `${safeBase(req.params.page)}.md`);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
   return res.json({ content: fs.readFileSync(filePath, 'utf8') });
 });
 
 app.put('/api/wiki/:page', (req, res) => {
-  const filePath = path.join(WIKI_DIR, `${safeBase(req.params.page)}.md`);
+  const filePath = path.join(currentWorkspace().wikiDir, `${safeBase(req.params.page)}.md`);
   fs.writeFileSync(filePath, req.body.content || '', 'utf8');
   res.json({ ok: true });
 });
@@ -330,14 +380,14 @@ app.put('/api/wiki/:page', (req, res) => {
 app.post('/api/wiki', (req, res) => {
   const { name, content } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name required' });
-  const filePath = path.join(WIKI_DIR, `${safeBase(name)}.md`);
+  const filePath = path.join(currentWorkspace().wikiDir, `${safeBase(name)}.md`);
   if (fs.existsSync(filePath)) return res.status(409).json({ error: 'Already exists' });
   fs.writeFileSync(filePath, content || `# ${name}\n\n**Summary**: \n\n**Sources**: \n\n**Last updated**: ${new Date().toISOString().slice(0, 10)}\n\n---\n\n`, 'utf8');
   return res.json({ ok: true });
 });
 
 app.delete('/api/wiki/:page', (req, res) => {
-  const filePath = path.join(WIKI_DIR, `${safeBase(req.params.page)}.md`);
+  const filePath = path.join(currentWorkspace().wikiDir, `${safeBase(req.params.page)}.md`);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
   fs.unlinkSync(filePath);
   return res.json({ ok: true });
@@ -345,15 +395,15 @@ app.delete('/api/wiki/:page', (req, res) => {
 
 // --- Raw file API ---
 app.get('/api/raw', (_req, res) => {
-  const files = fs.readdirSync(RAW_DIR);
+  const files = fs.readdirSync(currentWorkspace().rawDir);
   res.json(files.map(file => {
-    const stat = fs.statSync(path.join(RAW_DIR, file));
+    const stat = fs.statSync(path.join(currentWorkspace().rawDir, file));
     return { name: file, size: stat.size, modified: stat.mtime, ext: path.extname(file).slice(1).toLowerCase() };
   }));
 });
 
 app.get('/api/raw/:file', (req, res) => {
-  const filePath = path.join(RAW_DIR, safeBase(req.params.file));
+  const filePath = path.join(currentWorkspace().rawDir, safeBase(req.params.file));
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
   return res.sendFile(filePath);
 });
@@ -362,9 +412,9 @@ app.post('/api/upload', requireLocalMutation, async (req, res) => {
   let name;
   try { name = safeBase(decodeURIComponent(req.headers['x-filename'] || 'upload.bin')); }
   catch { return res.status(400).json({ error: 'Invalid filename.' }); }
-  const filePath = path.join(RAW_DIR, name);
+  const filePath = path.join(currentWorkspace().rawDir, name);
   if (fs.existsSync(filePath)) return res.status(409).json({ error: 'A source with this filename already exists. Rename the new file; original sources cannot be overwritten.' });
-  const uploadDir = path.join(DATA_DIR, 'uploads');
+  const uploadDir = path.join(currentWorkspace().dataDir, 'uploads');
   fs.mkdirSync(uploadDir, { recursive: true });
   const temporary = path.join(uploadDir, `${crypto.randomUUID()}.upload`);
   try {
@@ -379,7 +429,7 @@ app.post('/api/upload', requireLocalMutation, async (req, res) => {
   }
 });
 
-app.use('/api/reading', createReadingRouter({ service: readingService, requireLocalSession, requireLocalMutation, onImport: queueSourceIngest }));
+app.use('/api/reading', (req, res, next) => currentWorkspace().readingRouter(req, res, next));
 
 // --- Research source discovery and import ---
 app.get('/api/sources/filters', requireLocalSession, (_req, res) => {
@@ -390,20 +440,20 @@ app.post('/api/sources/search', requireLocalSession, async (req, res) => {
   const query = String(req.body?.query || '').trim();
   if (!query) return res.status(400).json({ error: 'Enter a research question, keywords, title, DOI, or paper link.' });
   try {
-    return res.json(await sourceDiscovery.search(query, { limit: req.body?.limit }));
+    return res.json(await currentWorkspace().sourceDiscovery.search(query, { limit: req.body?.limit }));
   } catch (error) {
     return res.status(502).json({ error: error.message || 'The paper search could not be completed.' });
   }
 });
 
 app.get('/api/sources/:id/related', requireLocalSession, async (req, res) => {
-  try { return res.json(await sourceDiscovery.related(req.params.id)); }
+  try { return res.json(await currentWorkspace().sourceDiscovery.related(req.params.id)); }
   catch (error) { return res.status(400).json({ error: error.message || 'Related papers could not be loaded.' }); }
 });
 
 app.post('/api/sources/import', requireLocalMutation, async (req, res) => {
   try {
-    const result = await sourceDiscovery.import(req.body?.ids);
+    const result = await currentWorkspace().sourceDiscovery.import(req.body?.ids);
     const files = result.imported.map(item => ({
       name: item.name,
       title: item.source.title,
@@ -418,7 +468,7 @@ app.post('/api/sources/import', requireLocalMutation, async (req, res) => {
 });
 
 app.get('/api/sources/jobs/:id', requireLocalSession, (req, res) => {
-  const job = ingestJobs.get(req.params.id);
+  const job = currentWorkspace().ingestJobs.get(req.params.id);
   if (!job) return res.status(404).json({ error: 'Ingest job not found.' });
   return res.json(publicIngestJob(job));
 });
@@ -426,15 +476,15 @@ app.get('/api/sources/jobs/:id', requireLocalSession, (req, res) => {
 // --- Project handover ---
 app.post('/api/handover/generate', requireLocalMutation, async (req, res) => {
   try {
-    const availablePages = new Set(wikiTools.listWikiPages().filter(name => !['log', 'project-handover'].includes(name)));
-    const availableSources = new Set(wikiTools.listSources().map(source => source.name));
+    const availablePages = new Set(currentWorkspace().wikiTools.listWikiPages().filter(name => !['log', 'project-handover'].includes(name)));
+    const availableSources = new Set(currentWorkspace().wikiTools.listSources().map(source => source.name));
     const pages = selectedWorkspaceItems(req.body?.pages, availablePages, 30, 'wiki pages');
     const sources = selectedWorkspaceItems(req.body?.sources, availableSources, 20, 'research materials');
     if (!pages.length && !sources.length) return res.status(400).json({ error: 'Select at least one wiki page or research material.' });
 
     const projectName = String(req.body?.projectName || 'Research project').replace(/[\r\n]+/g, ' ').trim().slice(0, 120) || 'Research project';
     const context = String(req.body?.context || '').trim().slice(0, 2000);
-    const thread = agentService.createThread(`Handover draft: ${projectName}`);
+    const thread = currentWorkspace().agentService.createThread(`Handover draft: ${projectName}`);
     const prompt = `Prepare a comprehensive project handover document for "${projectName}" from the explicitly selected workspace material below.
 
 Selected wiki pages (read each with read_wiki_page):
@@ -459,13 +509,13 @@ Return only a polished Markdown draft. Do not call apply_wiki_changes and do not
 
 Then organise the evidence into clear sections covering: project overview and current state; people/ownership details if evidenced; selected material inventory with original wiki links and raw filenames; important methodologies and computational analyses (including reproducibility instructions when recorded); assumptions and limitations; important decisions with rationale; results and interpretation; outstanding research questions; unresolved issues and risks; and prioritised next steps for a new student or collaborator. Preserve wiki references as [[page-name]] and raw references as literal filenames with (source: filename) citations. Distinguish documented facts from researcher context. Mark unsupported, missing, or uncertain claims as "Needs verification". Do not infer decisions, results, owners, commands, paths, or scientific conclusions that are not recorded. End with "## Review record", an unchecked reviewer line, and "## Related pages" linking the selected wiki pages. Make the document useful for continuation, not merely a list of files.`;
 
-    await agentService.runTurn({
+    await currentWorkspace().agentService.runTurn({
       threadId: thread.id,
       text: prompt,
       onDelta() {}, onTool() {}, signal: AbortSignal.timeout(CHAT_TIMEOUT_MS),
       allowedTools: ['read_wiki_page', 'read_source'],
     });
-    const completed = agentService.getThread(thread.id);
+    const completed = currentWorkspace().agentService.getThread(thread.id);
     const draft = cleanGeneratedMarkdown(completed.messages?.at(-1)?.text);
     if (!draft) throw new AgentServiceError('ChatGPT completed without a usable handover draft.', 'empty-response');
     return res.json({ draft, threadId: thread.id, requiresReview: true, selected: { pages, sources } });
@@ -486,9 +536,9 @@ app.post('/api/handover/publish', requireLocalMutation, (req, res) => {
     if (missing.length) return res.status(400).json({ error: `The reviewed draft is missing required page structure: ${missing.join(', ')}` });
 
     const date = new Date().toISOString().slice(0, 10);
-    const indexPath = path.join(WIKI_DIR, 'index.md');
+    const indexPath = path.join(currentWorkspace().wikiDir, 'index.md');
     const index = indexWithProjectHandover(fs.existsSync(indexPath) ? fs.readFileSync(indexPath, 'utf8') : '# LLM Wiki Index\n', date);
-    const result = wikiTools.applyWikiChanges({
+    const result = currentWorkspace().wikiTools.applyWikiChanges({
       changes: [{ name: 'project-handover', content: `${content}\n` }, { name: 'index', content: index }],
       logSummary: 'Published the researcher-reviewed Project Handover guide and updated the wiki index.',
     });
@@ -501,9 +551,9 @@ app.post('/api/handover/publish', requireLocalMutation, (req, res) => {
 
 // --- Graph and search API ---
 app.get('/api/graph', (_req, res) => {
-  const files = fs.readdirSync(WIKI_DIR).filter(file => file.endsWith('.md'));
+  const files = fs.readdirSync(currentWorkspace().wikiDir).filter(file => file.endsWith('.md'));
   const pageSet = new Set(files.map(file => file.replace('.md', '')));
-  const indexPath = path.join(WIKI_DIR, 'index.md');
+  const indexPath = path.join(currentWorkspace().wikiDir, 'index.md');
   const categories = {};
   if (fs.existsSync(indexPath)) {
     let currentGroup = 0;
@@ -518,7 +568,7 @@ app.get('/api/graph', (_req, res) => {
   const linkCounts = {};
   files.forEach(file => {
     const name = file.replace('.md', '');
-    const links = parseWikiLinks(fs.readFileSync(path.join(WIKI_DIR, file), 'utf8'));
+    const links = parseWikiLinks(fs.readFileSync(path.join(currentWorkspace().wikiDir, file), 'utf8'));
     linkCounts[name] = linkCounts[name] || 0;
     links.forEach(link => {
       if (pageSet.has(link) && link !== name) {
@@ -538,10 +588,10 @@ app.get('/api/search', (req, res) => {
   const query = String(req.query.q || '').toLowerCase().trim();
   if (!query) return res.json([]);
   const results = [];
-  fs.readdirSync(WIKI_DIR).filter(file => file.endsWith('.md')).forEach(file => {
+  fs.readdirSync(currentWorkspace().wikiDir).filter(file => file.endsWith('.md')).forEach(file => {
     const name = file.replace('.md', '');
     const matches = [];
-    fs.readFileSync(path.join(WIKI_DIR, file), 'utf8').split('\n').forEach((line, index) => {
+    fs.readFileSync(path.join(currentWorkspace().wikiDir, file), 'utf8').split('\n').forEach((line, index) => {
       if (line.toLowerCase().includes(query)) matches.push({ line: index + 1, text: line.trim().slice(0, 120) });
     });
     if (matches.length || name.includes(query)) results.push({ page: name, matches: matches.slice(0, 3) });
@@ -550,7 +600,9 @@ app.get('/api/search', (req, res) => {
 });
 
 // --- WebSocket: ChatGPT subscription threaded chat ---
-wss.on('connection', ws => {
+wss.on('connection', (ws, request) => {
+  const workspace = requestWorkspace(request);
+  ws.workspace = workspace;
   let activeTurn = null;
   let requestId = 0;
   const send = object => {
@@ -593,6 +645,10 @@ wss.on('connection', ws => {
       send({ type: 'done', code: -1, threadId: message.threadId || null });
       return;
     }
+    if (!workspace) {
+      send({ type: 'error', code: 'workspace-required', text: 'Open a research workspace folder to continue.' });
+      return;
+    }
     if (message.type !== 'chat') {
       send({ type: 'error', code: 'unsupported-message', text: 'Unsupported WebSocket message.' });
       return;
@@ -608,7 +664,7 @@ wss.on('connection', ws => {
     const timeout = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
     activeTurn = { id, controller, timeout, threadId: message.threadId };
     try {
-      const thread = await agentService.runTurn({
+      const thread = await currentWorkspace().agentService.runTurn({
         threadId: message.threadId,
         text: message.text,
         signal: controller.signal,
@@ -632,7 +688,7 @@ wss.on('connection', ws => {
     }
   };
 
-  ws.on('message', raw => { void handleMessage(raw); });
+  ws.on('message', raw => { void workspaceScope.run(workspace, () => handleMessage(raw)); });
   ws.on('close', () => stopActiveTurn());
 });
 
@@ -641,15 +697,10 @@ server.on('upgrade', (request, socket, head) => {
     try { socket.write(`HTTP/1.1 ${status}\r\nConnection: close\r\n\r\n`); } catch { /* ignored */ }
     socket.destroy();
   };
-  if (request.url !== '/') return reject('404 Not Found');
+  if (new URL(request.url, 'http://localhost').pathname !== '/') return reject('404 Not Found');
   if (!sessionMatches(parseCookies(request.headers.cookie)[SESSION_COOKIE_NAME])) return reject('401 Unauthorized');
   if (!isAllowedLoopbackOrigin(request.headers.origin)) return reject('403 Forbidden');
   return wss.handleUpgrade(request, socket, head, ws => wss.emit('connection', ws, request));
-});
-
-const watcher = chokidar.watch([WIKI_DIR, RAW_DIR], { ignoreInitial: true }).on('all', (event, filePath) => {
-  const payload = JSON.stringify({ type: 'filechange', event, path: filePath });
-  wss.clients.forEach(client => { if (client.readyState === WebSocket.OPEN) client.send(payload); });
 });
 
 const PORT = Number(process.env.PORT || 3000);
@@ -661,8 +712,8 @@ server.listen(PORT, HOST, () => {
 });
 
 async function shutdown() {
-  readingService.close();
-  await watcher.close();
+  for (const workspace of workspaces.values()) workspace.readingService.close();
+  await Promise.all([...workspaces.values()].map(workspace => workspace.watcher.close()));
   for (const client of wss.clients) client.close();
   await new Promise(resolve => server.close(resolve));
 }
