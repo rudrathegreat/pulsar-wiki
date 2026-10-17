@@ -11,8 +11,27 @@
   const artifactNames = { summary: 'Paper reading summary', synthesis: 'Collection synthesis', evidence: 'Evidence comparison', concept: 'Concept-page update' };
   const yieldUI = () => typeof window.scheduler?.yield === 'function' ? window.scheduler.yield() : new Promise(resolve => setTimeout(resolve, 0));
   const renderQueue = new Map();
+  const thumbnailQueue = new Map();
+  const SCROLL_SETTLE_MS = 120;
+  const CACHE_PAGES = 5;
+  const CACHE_PIXELS = 24 * 1024 * 1024;
   let rendering = false;
+  const diagnostics = window.ReadingPerformance?.create({ sample: () => ({
+    page: state.pdf.page, scrolling: Boolean(r.scrolling), queuedPages: renderQueue.size, queuedThumbnails: thumbnailQueue.size,
+    canvases: [...r.pages.values()].filter(p => (p.canvasReady || p.rendering) && p.canvas.width && p.canvas.height).map(p => ({
+      page: p.number, width: p.canvas.width, height: p.canvas.height, visible: Boolean(p.visible), ready: Boolean(p.canvasReady),
+      textSpans: p.textLayer?.textDivs.length || 0,
+      context: p.contextAttributes || null,
+    })),
+  }) });
+  function renderPhase(phase, page) { diagnostics?.mark(phase, { page }); }
 
+  function interruptPage(p) {
+    if (!p?.rendering) return;
+    p.renderVersion = (p.renderVersion || 0) + 1;
+    p.task?.cancel(); p.buildingTextLayer?.cancel();
+    void p.textReader?.cancel().catch(() => {});
+  }
   function pageHasSelection(p) {
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) return false;
@@ -26,14 +45,134 @@
     if (pageHasSelection(p)) return;
     p.renderVersion = (p.renderVersion || 0) + 1;
     p.task?.cancel(); p.buildingTextLayer?.cancel();
+    void p.textReader?.cancel().catch(() => {});
     p.textLayer = null; p.content = null; p.text = null;
     p.layer.textContent = ''; p.overlay.textContent = '';
-    p.canvas.width = 0; p.canvas.height = 0; p.rendered = false;
+    p.canvas.width = 0; p.canvas.height = 0; p.rendered = false; p.canvasReady = false;
     p.needsCleanup = Boolean(p.page);
     if (!p.rendering && p.page) p.needsCleanup = p.page.cleanup() === false;
   }
   function releaseDistantPages() {
-    for (const p of r.pages.values()) if (p.near === false) releasePage(p);
+    // Keep recently viewed pages for direction changes, within both a page and
+    // pixel budget. Visible/near pages and active selections take precedence.
+    let count = 0; let pixels = 0; const cached = [];
+    for (const p of r.pages.values()) {
+      if (p.near === false && !p.rendered && !p.canvasReady) { releasePage(p); continue; }
+      if (!p.rendered && !p.canvasReady) continue;
+      count += 1; pixels += p.canvas.width * p.canvas.height;
+      if (p.near === false && !pageHasSelection(p)) cached.push(p);
+    }
+    cached.sort((a, b) => Math.abs(b.number - state.pdf.page) - Math.abs(a.number - state.pdf.page));
+    for (const p of cached) {
+      if (count <= CACHE_PAGES && pixels <= CACHE_PIXELS) break;
+      count -= 1; pixels -= p.canvas.width * p.canvas.height; releasePage(p);
+    }
+  }
+  function firstPageAfter(y) {
+    let low = 1; let high = r.pages.size;
+    while (low < high) {
+      const middle = (low + high) >> 1; const wrap = r.pages.get(middle).wrap;
+      if (wrap.offsetTop + wrap.offsetHeight <= y) low = middle + 1;
+      else high = middle;
+    }
+    return low;
+  }
+  function updateViewport() {
+    if (!r.pdf || !r.pages.size) return;
+    const stage = el('document-stage'); const top = stage.scrollTop; const bottom = top + stage.clientHeight;
+    const previous = r.nearPages || new Set(); const near = new Set();
+    if (!stage.clientHeight) {
+      for (const number of previous) {
+        const p = r.pages.get(number); if (!p) continue;
+        p.near = false; p.visible = false; interruptPage(p);
+      }
+      r.nearPages = near; return;
+    }
+    for (let number = firstPageAfter(top - 300); number <= r.pages.size; number += 1) {
+      const p = r.pages.get(number); const start = p.wrap.offsetTop; const end = start + p.wrap.offsetHeight;
+      if (start >= bottom + 300) break;
+      p.near = true; p.visible = end > top && start < bottom; near.add(number);
+      if (!previous.has(number) && p.rendered) paintHighlights(p);
+    }
+    for (const number of previous) if (!near.has(number)) {
+      const p = r.pages.get(number); if (!p) continue;
+      p.near = false; p.visible = false; interruptPage(p);
+    }
+    r.nearPages = near;
+    const number = firstPageAfter(top + 30);
+    if (number !== state.pdf.page) { state.pdf.page = number; updatePageControls(); schedulePosition(); }
+  }
+  function queueNearbyPages() {
+    if (r.scrolling) return;
+    const pages = [...(r.nearPages || [])].map(number => r.pages.get(number));
+    pages.sort((a, b) => Number(b.visible) - Number(a.visible) || Math.abs(a.number - state.pdf.page) - Math.abs(b.number - state.pdf.page));
+    for (const p of pages) void renderPage(p.number, true).catch(report);
+  }
+  function scheduleViewport() {
+    if (r.viewportFrame != null) return;
+    r.viewportFrame = window.requestAnimationFrame(() => {
+      r.viewportFrame = null; updateViewport(); queueNearbyPages();
+    });
+  }
+  function pauseForScroll() {
+    if (!r.pdf || !r.pages.size) return;
+    r.scrolling = true; interruptPage(r.renderingPage); r.thumbnailTask?.task.cancel();
+    scheduleViewport();
+    clearTimeout(r.scrollTimer);
+    r.scrollTimer = setTimeout(() => {
+      r.scrolling = false; updateViewport(); releaseDistantPages(); queueNearbyPages(); void drainRenderQueue();
+    }, SCROLL_SETTLE_MS);
+  }
+  async function readPageText(p, current) {
+    const reader = p.textReader = p.page.streamTextContent().getReader();
+    const content = { items: [], styles: Object.create(null), lang: null };
+    try {
+      while (current()) {
+        const { value, done } = await reader.read();
+        if (done || !current()) break;
+        content.items.push(...value.items); Object.assign(content.styles, value.styles); content.lang ??= value.lang;
+        await yieldUI();
+      }
+      return content;
+    } finally {
+      if (!current()) await reader.cancel().catch(() => {});
+      if (p.textReader === reader) p.textReader = null;
+      reader.releaseLock();
+    }
+  }
+  function thumbnailWanted(job) {
+    return job.pdf === r.pdf && job.generation === r.generation && !el('reading-thumbnails').hidden &&
+      el('reading-thumbnails').contains(job.button) && job.button.dataset.near === 'true';
+  }
+  function queueThumbnail(button) {
+    if (button.dataset.done) return;
+    thumbnailQueue.set(button, { button, pdf: r.pdf, generation: r.generation });
+    void drainRenderQueue();
+  }
+  async function drawNextThumbnail() {
+    const job = thumbnailQueue.values().next().value; thumbnailQueue.delete(job.button);
+    if (!thumbnailWanted(job) || job.button.dataset.done) return;
+    let page;
+    try {
+      page = await job.pdf.getPage(Number(job.button.dataset.readingJump));
+      if (!thumbnailWanted(job) || r.scrolling || renderQueue.size) return;
+      const viewport = page.getViewport({ scale: .1 }); const canvas = job.button.querySelector('canvas');
+      canvas.width = viewport.width; canvas.height = viewport.height;
+      renderPhase('thumbnail', Number(job.button.dataset.readingJump));
+      const task = page.render({ canvasContext: canvas.getContext('2d', { alpha: false, willReadFrequently: true }), viewport });
+      r.thumbnailTask = { button: job.button, task };
+      task.onContinue = continuation => { void yieldUI().then(() => {
+        if (thumbnailWanted(job) && !r.scrolling) continuation(); else if (r.thumbnailTask?.task === task) task.cancel();
+      }); };
+      await task.promise;
+      if (thumbnailWanted(job)) { job.button.dataset.done = 'true'; thumbnailQueue.delete(job.button); }
+    } catch (error) { if (error.name !== 'RenderingCancelledException' && error.name !== 'AbortException') job.button.dataset.done = 'error'; }
+    finally {
+      renderPhase('idle');
+      r.thumbnailTask = null;
+      if (!job.button.dataset.done && thumbnailWanted(job)) thumbnailQueue.set(job.button, job);
+      if (page && !r.pages.get(Number(job.button.dataset.readingJump))?.canvasReady) page.cleanup();
+    }
   }
   // PDF.js consumes each stream chunk synchronously. Bound the number of spans
   // built in one turn so dense scientific PDFs leave time for input and paint.
@@ -132,11 +271,16 @@
   function selectedHighlights() { return live('highlights').filter(h => r.selected.has(h.id)); }
 
   function close() {
+    renderPhase('close');
     if (r.document && r.positionDirty) void savePosition();
     r.generation += 1; r.observer?.disconnect(); r.thumbnailObserver?.disconnect();
+    thumbnailQueue.clear(); r.thumbnailTask?.task.cancel();
+    clearTimeout(r.scrollTimer); clearTimeout(r.selectionTimer);
+    if (r.viewportFrame != null) window.cancelAnimationFrame(r.viewportFrame);
+    r.viewportFrame = null; r.scrolling = false; r.nearPages = new Set();
     for (const job of renderQueue.values()) job.resolve();
     renderQueue.clear();
-    for (const p of r.pages.values()) { p.task?.cancel(); p.buildingTextLayer?.cancel(); p.textLayer?.cancel(); }
+    for (const p of r.pages.values()) { p.task?.cancel(); p.buildingTextLayer?.cancel(); p.textLayer?.cancel(); void p.textReader?.cancel().catch(() => {}); }
     if (r.pdf) { const previous = r.pdf; r.pdf = null; void previous.destroy().catch(() => {}); }
     r.pages.clear(); r.document = null; r.pending = null; r.historical = null; r.findText = null;
     closeHelper(); el('reading-notes').hidden = true; el('reading-thumbnails').hidden = true;
@@ -167,19 +311,10 @@
       wrap.setAttribute('aria-label', `Page ${number} of ${pdf.numPages}`);
       wrap.innerHTML = `<canvas aria-hidden="true"></canvas><div class="reading-overlays"></div><div class="textLayer"></div><span class="reading-page-label">${number}</span>`;
       el('document-stage').append(wrap);
-      r.pages.set(number, { number, wrap, canvas: wrap.querySelector('canvas'), layer: wrap.querySelector('.textLayer'), overlay: wrap.querySelector('.reading-overlays'), rendered: false });
+      r.pages.set(number, { number, wrap, canvas: wrap.querySelector('canvas'), layer: wrap.querySelector('.textLayer'), overlay: wrap.querySelector('.reading-overlays'), rendered: false, near: false });
     }
     layout(); renderWorkspace();
-    r.observer = new IntersectionObserver(entries => {
-      for (const entry of entries) {
-        const p = r.pages.get(Number(entry.target.dataset.readingPage));
-        if (!p) continue;
-        p.near = entry.isIntersecting;
-        p.visible = Boolean(entry.rootBounds && entry.boundingClientRect.bottom > entry.rootBounds.top + 300 && entry.boundingClientRect.top < entry.rootBounds.bottom - 300);
-        if (p.near) void renderPage(p.number, true).catch(error => { if (error.name !== 'RenderingCancelledException') notify(error.message); });
-        else releasePage(p);
-      }
-    }, { root: el('document-stage'), rootMargin: '300px 0px' });
+    r.observer = new IntersectionObserver(scheduleViewport, { root: el('document-stage'), rootMargin: '300px 0px' });
     for (const p of r.pages.values()) r.observer.observe(p.wrap);
     await navigate(r.document.position?.page || 1, state.pdf.fitWidth);
     if (result.changedDocuments.length) notify('This filename previously contained a different PDF. Its earlier highlights are preserved in the reading library.', true);
@@ -202,8 +337,9 @@
       p.wrap.style.setProperty('--scale-factor', state.pdf.scale);
       p.wrap.style.setProperty('--user-unit', p.page?.userUnit || 1);
       p.wrap.style.setProperty('--total-scale-factor', state.pdf.scale * (p.page?.userUnit || 1));
-      if (viewportChanged && (p.rendered || p.rendering)) {
-        p.task?.cancel(); p.buildingTextLayer?.cancel(); p.rendered = false; p.renderVersion = (p.renderVersion || 0) + 1;
+      if (viewportChanged && (p.rendered || p.rendering || p.canvasReady)) {
+        p.task?.cancel(); p.buildingTextLayer?.cancel(); void p.textReader?.cancel().catch(() => {});
+        p.rendered = false; p.canvasReady = false; p.renderVersion = (p.renderVersion || 0) + 1;
       }
       if (p.near !== false) paintHighlights(p);
     }
@@ -216,20 +352,23 @@
     const job = { p, pdf: r.pdf, generation: r.generation, foreground: !background };
     job.promise = new Promise((resolve, reject) => { job.resolve = resolve; job.reject = reject; });
     p.renderJob = job; renderQueue.set(p, job);
+    r.thumbnailTask?.task.cancel();
     void drainRenderQueue();
     return job.promise;
   }
   function wanted(job) {
     return job.generation === r.generation && job.pdf === r.pdf && r.pages.get(job.p.number) === job.p &&
-      (job.p.near || job.foreground && job.p.number === state.pdf.page);
+      job.p.near !== false && (job.p.near || job.foreground && job.p.number === state.pdf.page);
   }
   async function drainRenderQueue() {
     if (rendering) return;
     rendering = true;
     try {
       // One canvas/text pipeline at a time, with the visible page ahead of prefetch.
-      while (renderQueue.size) {
-        const jobs = [...renderQueue.values()].sort((a, b) => Number(b.p.number === state.pdf.page) - Number(a.p.number === state.pdf.page) || Number(b.p.visible) - Number(a.p.visible) || Math.abs(a.p.number - state.pdf.page) - Math.abs(b.p.number - state.pdf.page));
+      while ((renderQueue.size || thumbnailQueue.size) && !r.scrolling) {
+        // Thumbnails share the same slot, behind full-size pages.
+        if (!renderQueue.size) { await drawNextThumbnail(); await yieldUI(); continue; }
+        const jobs = [...renderQueue.values()].sort((a, b) => Number(Boolean(b.p.visible)) - Number(Boolean(a.p.visible)) || Number(b.p.number === state.pdf.page) - Number(a.p.number === state.pdf.page) || Math.abs(a.p.number - state.pdf.page) - Math.abs(b.p.number - state.pdf.page));
         const job = jobs[0]; const p = job.p;
         renderQueue.delete(p);
         try {
@@ -245,8 +384,9 @@
   async function drawPage(job) {
     const { p, pdf, generation } = job;
     const version = p.renderVersion || 0;
-    const current = () => wanted(job) && version === (p.renderVersion || 0);
-    p.rendering = true;
+    const current = () => wanted(job) && !r.scrolling && version === (p.renderVersion || 0);
+    p.rendering = true; r.renderingPage = p;
+    renderPhase('page-request', p.number);
     try {
       p.page ||= await pdf.getPage(p.number);
       p.needsCleanup = true;
@@ -259,15 +399,27 @@
       p.wrap.style.setProperty('--total-scale-factor', state.pdf.scale * (p.page.userUnit || 1));
       // Bound canvas memory at large zoom levels as well as on high-DPI screens.
       const outputScale = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(8 * 1024 * 1024 / (viewport.width * viewport.height)));
-      p.canvas.width = Math.floor(viewport.width * outputScale); p.canvas.height = Math.floor(viewport.height * outputScale);
-      p.canvas.style.width = `${viewport.width}px`; p.canvas.style.height = `${viewport.height}px`;
-      p.task = p.page.render({ canvasContext: p.canvas.getContext('2d'), viewport, transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0] });
-      p.task.onContinue = continuation => { void yieldUI().then(continuation); };
-      await p.task.promise;
+      if (!p.canvasReady) {
+        renderPhase('canvas', p.number);
+        p.canvas.width = Math.floor(viewport.width * outputScale); p.canvas.height = Math.floor(viewport.height * outputScale);
+        p.canvas.style.width = `${viewport.width}px`; p.canvas.style.height = `${viewport.height}px`;
+        // The first getContext call determines the backing store. Match PDF.js's
+        // software-canvas default before it obtains this context again internally.
+        const context = p.canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+        p.contextAttributes = context.getContextAttributes?.() || null;
+        const task = p.task = p.page.render({ canvasContext: context, viewport, transform: outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0] });
+        task.onContinue = continuation => { void yieldUI().then(() => { if (current()) continuation(); else if (p.task === task) task.cancel(); }); };
+        await task.promise;
+        if (!current()) return;
+        p.task = null; p.canvasReady = true;
+      }
       if (!current()) return;
-      p.content ||= await p.page.getTextContent();
+      renderPhase('text-extraction', p.number);
+      const content = p.content || await readPageText(p, current);
       if (!current()) return;
+      p.content = content;
       if (!p.textLayer) {
+        renderPhase('text-layer', p.number);
         const lib = await getPdfLibrary();
         if (!current()) return;
         p.layer.textContent = '';
@@ -281,14 +433,18 @@
           if (i % 100 === 99) { await yieldUI(); if (!current()) return; }
         }
         p.textLayer = layer;
-      } else p.textLayer.update({ viewport });
+      } else { renderPhase('text-update', p.number); p.textLayer.update({ viewport }); }
       p.rendered = true;
+      renderPhase('highlights', p.number);
       paintHighlights(p);
     } catch (error) { if (error.name !== 'RenderingCancelledException' && error.name !== 'AbortException' && current()) throw error; }
     finally {
+      renderPhase('idle');
       p.task = null; p.buildingTextLayer = null; p.rendering = false;
+      if (r.renderingPage === p) r.renderingPage = null;
       if (!p.rendered && !p.textLayer) p.layer.textContent = '';
-      if (generation !== r.generation || p.near === false && !wanted(job)) releasePage(p);
+      if (generation !== r.generation) releasePage(p);
+      else if (!r.scrolling) releaseDistantPages();
     }
   }
   function joinHighlightRects(rectangles, vertical = false) {
@@ -330,7 +486,7 @@
   }
   function paintHighlights(p) {
     if (!p?.viewport || !r.document || p.near === false && !pageHasSelection(p)) return;
-    p.overlay.innerHTML = '';
+    p.overlay.innerHTML = ''; p.overlay.hidden = true;
     if (!r.highlightsEnabled) return;
     const highlights = live('highlights').filter(h => h.documentId === r.document.id && h.id !== r.historical?.highlight.id);
     if (r.historical?.highlight.documentId === r.document.id) highlights.push(r.historical.highlight);
@@ -340,6 +496,7 @@
         const mark = document.createElement('div'); mark.className = `reading-mark${r.active === h.id ? ' active' : ''}${h.kind === 'region' ? ' region' : ''}`; mark.dataset.color = highlightColor(h); mark.dataset.highlightId = h.id;
         Object.assign(mark.style, { left: `${Math.min(coords[0], coords[2])}px`, top: `${Math.min(coords[1], coords[3])}px`, width: `${Math.abs(coords[2] - coords[0])}px`, height: `${Math.abs(coords[3] - coords[1])}px` });
         p.overlay.append(mark);
+        p.overlay.hidden = false;
       }
     }
   }
@@ -361,8 +518,9 @@
     state.pdf.page = page;
     const p = r.pages.get(page);
     p.wrap.scrollIntoView({ block: 'start' });
+    updateViewport();
     await renderPage(page);
-    for (const near of r.pages.values()) if (near.near && !near.rendered) void renderPage(near.number, true).catch(report);
+    queueNearbyPages();
     updatePageControls(); schedulePosition();
   }
   function schedulePosition() { r.positionDirty = true; clearTimeout(r.saveTimer); r.saveTimer = setTimeout(() => { void savePosition(); }, 900); }
@@ -934,6 +1092,24 @@
   el('reading-region').addEventListener('click', () => { if (!r.highlightsEnabled) return; r.region = !r.region; el('document-stage').classList.toggle('reading-region-mode', r.region); el('reading-region').setAttribute('aria-pressed', String(r.region)); if (r.region) notify('Drag a rectangle around an equation, figure, or scanned passage.'); });
   el('reading-rotate').addEventListener('click', guard(async () => { r.rotation = (r.rotation + 90) % 360; await navigate(state.pdf.page); }));
   el('reading-highlights-toggle').addEventListener('click', () => setHighlightsEnabled(!r.highlightsEnabled));
+  function saveLagRecording() {
+    clearTimeout(r.diagnosticTimer);
+    const report = diagnostics?.stop();
+    const button = el('reading-record-lag'); button.textContent = 'Record lag'; button.setAttribute('aria-pressed', 'false');
+    if (!report) return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'pulsarwiki-lag.json'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    notify('Local lag report saved. It contains timing and rendering metadata, without paper text or annotations.');
+  }
+  el('reading-record-lag').addEventListener('click', () => {
+    if (!diagnostics) return;
+    if (diagnostics.recording) { saveLagRecording(); return; }
+    diagnostics.start();
+    const button = el('reading-record-lag'); button.textContent = 'Stop & save lag report'; button.setAttribute('aria-pressed', 'true');
+    notify('Recording timing for 30 seconds. Reproduce the scrolling lag; the report saves locally.');
+    r.diagnosticTimer = setTimeout(saveLagRecording, 30000);
+  });
   el('reading-notes-toggle').addEventListener('click', guard(async () => { el('reading-notes').hidden = !el('reading-notes').hidden; el('reading-notes-toggle').setAttribute('aria-expanded', String(!el('reading-notes').hidden)); await navigate(state.pdf.page); }));
   el('reading-thumbnails-toggle').addEventListener('click', guard(async () => {
     const nav = el('reading-thumbnails'); nav.hidden = !nav.hidden; el('reading-thumbnails-toggle').setAttribute('aria-pressed', String(!nav.hidden));
@@ -943,25 +1119,20 @@
       // Render small thumbnails only as their buttons enter the page list viewport.
       r.thumbnailObserver?.disconnect();
       r.thumbnailObserver = new IntersectionObserver(entries => entries.forEach(entry => {
-        if (!entry.isIntersecting || entry.target.dataset.done) return;
-        entry.target.dataset.done = 'true';
-        void (async () => { const page = await r.pdf.getPage(Number(entry.target.dataset.readingJump)); if (generation !== r.generation) return; const viewport = page.getViewport({ scale: .1 }); const canvas = entry.target.querySelector('canvas'); canvas.width = viewport.width; canvas.height = viewport.height; await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise; })().catch(() => {});
+        if (generation !== r.generation) return;
+        entry.target.dataset.near = String(entry.isIntersecting);
+        if (entry.isIntersecting) queueThumbnail(entry.target);
+        else { thumbnailQueue.delete(entry.target); if (r.thumbnailTask?.button === entry.target) r.thumbnailTask.task.cancel(); }
       }), { root: nav, rootMargin: '100px' });
       for (const button of nav.querySelectorAll('button')) r.thumbnailObserver.observe(button);
-    }
+    } else { r.thumbnailObserver?.disconnect(); thumbnailQueue.clear(); r.thumbnailTask?.task.cancel(); }
     await navigate(state.pdf.page);
   }));
   el('reading-thumbnails').addEventListener('click', guard(event => { const button = event.target.closest('[data-reading-jump]'); if (button) return navigate(Number(button.dataset.readingJump)); }));
   el('document-stage').addEventListener('pointerup', () => { if (!r.region) setTimeout(captureSelection, 0); });
   el('document-stage').addEventListener('keyup', () => { if (!r.region) captureSelection(); });
-  el('document-stage').addEventListener('scroll', () => {
-    if (!r.pdf || !r.pages.size) return;
-    clearTimeout(r.scrollTimer); r.scrollTimer = setTimeout(() => {
-      const top = el('document-stage').getBoundingClientRect().top;
-      const current = [...r.pages.values()].find(p => p.wrap.getBoundingClientRect().bottom > top + 30);
-      if (current && current.number !== state.pdf.page) { state.pdf.page = current.number; updatePageControls(); schedulePosition(); }
-    }, 100);
-  }, { passive: true });
+  el('document-stage').addEventListener('scroll', pauseForScroll, { passive: true });
+  el('document-stage').addEventListener('wheel', pauseForScroll, { passive: true });
   document.addEventListener('selectionchange', () => {
     clearTimeout(r.selectionTimer);
     r.selectionTimer = setTimeout(releaseDistantPages, 100);

@@ -4,7 +4,7 @@
 
 **Sources**: README.md (application documentation; no scientific source ingestion).
 
-**Last updated**: 2026-10-16
+**Last updated**: 2026-10-17
 
 ---
 
@@ -12,9 +12,11 @@
 
 Open a PDF from Files, select text, and choose a highlight colour. Add optional categories and personal comments. Use Select region for equations, figures, or scanned passages; an entered transcription can support models without image input. Reading notes are local and private. (source: README.md)
 
-The reader opens PDFs from page metadata and extracts passage text on demand. Page rendering prioritises the current page and yields between small text batches. Distant pages release their rendering resources and rebuild when revisited; pages containing the active text selection remain available until it is cleared. Paper search loads the complete text when requested. (source: README.md)
+The reader opens PDFs from page metadata and extracts passage text on demand. Scrolling interrupts drawing and text work, then rendering resumes after a 120 ms pause with the current viewport prioritised. Completed nearby pages stay cached for direction changes; eviction targets five pages and 24 megapixels of canvas pixels, while near pages and active text selections remain protected. Older pages release their resources and rebuild when revisited. Interrupted text work can reuse its completed canvas, text batches yield to input and painting, and thumbnails share a rendering slot behind full-size pages. Paper search loads the complete text when requested. (source: README.md)
 
 A highlighter pointer follows the mouse over PDF pages. Yellow, green, and pink are manual colours; blue is reserved for AI assistance. The selection helper offers Add to wiki, Ask AI, Add note, and Connect to related knowledge. The helper follows the app theme and has no blue swatch. Each action expands the helper with its fields and results. Add note omits the colour selector and PDF details. Reader pages, thumbnails, and displayed passage locations count from 1 instead of journal page labels. Click a saved PDF highlight or its sidebar card to reopen its menu. Highlights use full opacity with multiply blending and join nearby word blocks into continuous lines. The Highlights on/off toggle beside Rotate controls their visibility and pauses new highlighting without deleting saved passages. (source: README.md)
+
+Drawing contexts request the bundled PDF.js software-canvas settings on their first creation. Offscreen page contents can skip layout and painting, and empty highlight overlays remain hidden. For remaining stalls, Record lag saves a local 30-second report of frame gaps, long tasks, rendering phases, and canvas metadata, without paper text, annotations, filenames, URLs, or screenshots. Recording is opt-in and sends nothing to the server. These timings narrow the diagnosis but do not prove that a desktop-wide stall is resolved or identify its driver-level cause. (source: README.md)
 
 Filter widths remain stable when the researcher-comments toggle changes the results. The right reading panel contains filters and passage comments, with Delete on each highlight and Undo deletion after a deletion. All highlights in the opened paper show by default. Editing, collection, artifact, and backup controls are available in the Reading library. (source: README.md)
 

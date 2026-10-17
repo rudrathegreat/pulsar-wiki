@@ -1346,7 +1346,7 @@ async function renderPdfPage(pageNumber, fitWidth = state.pdf.fitWidth) {
       <canvas id="pdf-canvas"></canvas>
     </div>`;
   const canvas = $('pdf-canvas');
-  const context = canvas.getContext('2d');
+  const context = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
   canvas.width = Math.floor(viewport.width * outputScale);
   canvas.height = Math.floor(viewport.height * outputScale);
   canvas.style.width = `${Math.floor(viewport.width)}px`;
