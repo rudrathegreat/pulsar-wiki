@@ -51,7 +51,7 @@
       <div class="sidebar-title">PulsarWiki</div>
       <div class="search-wrap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="search-input" type="text" placeholder="Search wiki…" autocomplete="off"/>
+        <input id="search-input" type="text" placeholder="Search wiki…" autocomplete="off" aria-label="Search wiki" aria-controls="sidebar-body" aria-describedby="wiki-search-status"/>
       </div>
       <div class="sidebar-actions" aria-label="Wiki actions">
         <button class="sidebar-action" id="btn-new-page" type="button">
@@ -64,6 +64,7 @@
         </button>
       </div>
       </div>
+      <div id="wiki-search-status" class="wiki-search-status" role="status" aria-live="polite"></div>
       <div class="sidebar-body" id="sidebar-body">
         <!-- Populated by JS -->
       </div>
@@ -85,9 +86,6 @@
 
   <!-- Main -->
   <div id="main">
-    <!-- Search results overlay -->
-    <div id="search-results"></div>
-
     <!-- Content area -->
     <div id="content">
 

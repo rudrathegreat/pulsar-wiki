@@ -22,6 +22,8 @@ In PowerShell environments where `npm.ps1` is disabled, use:
 
 Open the displayed loopback address, normally <http://127.0.0.1:3000>. PulsarWiki is intentionally local-only and browser-based; do not expose it through a reverse proxy, LAN address, or the public internet.
 
+The sidebar's **Search wiki** field filters pages by matching text in their names or contents, keeping the existing page groups. When the all-pages graph is open, it shows the same matching pages and only links between them. The filter stays active while browsing; clear the field or press Escape to restore all pages and graph nodes.
+
 ## Connect ChatGPT
 
 1. Select **Connect ChatGPT** in the top-right corner.

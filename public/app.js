@@ -222,6 +222,7 @@ const state = {
   threads: [],
   activeThreadId: null,
   searchTimer: null,
+  wikiSearch: { query: '', pages: null, pending: false, error: '', revision: 0 },
   documentSession: 0,
   currentDocument: null,
   pdf: { lib: null, doc: null, page: 1, scale: 1, fitWidth: true, renderTask: null, renderId: 0, resizeTimer: null },
@@ -234,7 +235,7 @@ const dom = {
   get wikiBody() { return $('wiki-body'); },
   get wikiBc() { return $('wiki-breadcrumb'); },
   get searchInput() { return $('search-input'); },
-  get searchResults() { return $('search-results'); },
+  get wikiSearchStatus() { return $('wiki-search-status'); },
   get chatMessages() { return $('chat-messages'); },
   get chatInput() { return $('chat-input'); },
   get chatSend() { return $('chat-send'); },
@@ -303,18 +304,29 @@ const PILLAR_LABELS = [
 
 function buildSidebar(pages) {
   state.wikiPages = pages;
+  renderSidebar();
+  if (state.wikiSearch.query) updateWikiSearch();
   api.getGraph().then(data => {
+    if (state.wikiPages !== pages) return;
     state.graphData = data;
-    const groupMap = {};
-    data.nodes.forEach(node => { groupMap[node.id] = node.group; });
-    const grouped = {};
-    pages.forEach(page => {
-      const group = groupMap[page.name] || 0;
-      if (!grouped[group]) grouped[group] = [];
-      grouped[group].push(page);
-    });
-    renderSidebarGroups(grouped);
-  }).catch(() => renderSidebarGroups({ 0: pages }));
+    renderWikiSearchViews();
+  }).catch(() => {
+    if (state.wikiPages === pages) renderSidebar();
+  });
+}
+
+function renderSidebar() {
+  const groupMap = new Map((state.graphData?.nodes || []).map(node => [node.id, node.group]));
+  const grouped = {};
+  state.wikiPages.forEach(page => {
+    if (state.wikiSearch.pages && !state.wikiSearch.pages.has(page.name)) return;
+    const group = groupMap.get(page.name) || 0;
+    if (!grouped[group]) grouped[group] = [];
+    grouped[group].push(page);
+  });
+  renderSidebarGroups(grouped);
+  dom.wikiSearchStatus.textContent = wikiSearchMessage();
+  dom.sidebarBody.setAttribute('aria-busy', String(state.wikiSearch.pending));
 }
 
 function renderSidebarGroups(grouped) {
@@ -380,34 +392,61 @@ dom.wikiBc.addEventListener('click', event => {
 
 dom.searchInput.addEventListener('input', () => {
   dom.searchInput.value = stripEmoji(dom.searchInput.value);
+  updateWikiSearch();
+});
+dom.searchInput.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    dom.searchInput.value = '';
+    updateWikiSearch();
+  }
+});
+
+function updateWikiSearch() {
   clearTimeout(state.searchTimer);
   const query = dom.searchInput.value.trim();
-  if (!query) { hideSearch(); return; }
-  state.searchTimer = setTimeout(() => doSearch(query), 250);
-});
-dom.searchInput.addEventListener('keydown', event => { if (event.key === 'Escape') hideSearch(); });
-document.addEventListener('click', event => {
-  if (!dom.searchResults.contains(event.target) && event.target !== dom.searchInput) hideSearch();
-});
-
-async function doSearch(query) {
-  const results = await api.search(query);
-  dom.searchResults.innerHTML = results.length ? results.map(result => `
-    <button class="search-result-item" type="button" data-page="${escHtml(result.page)}">
-      <div class="search-result-page">${escHtml(result.page)}</div>
-      ${result.matches.slice(0, 2).map(match => `<div class="search-result-match">${escHtml(match.text)}</div>`).join('')}
-    </button>`).join('') : `<div class="search-no-results">No results for “<strong>${escHtml(query)}</strong>”</div>`;
-  dom.searchResults.classList.add('visible');
+  const revision = state.wikiSearch.revision + 1;
+  state.wikiSearch = { query, pages: query ? new Set() : null, pending: Boolean(query), error: '', revision };
+  renderWikiSearchViews();
+  if (query) state.searchTimer = setTimeout(() => doSearch(query, revision), 250);
 }
 
-function hideSearch() { dom.searchResults.classList.remove('visible'); }
+async function doSearch(query, revision) {
+  try {
+    const results = await api.search(query);
+    if (revision !== state.wikiSearch.revision) return;
+    state.wikiSearch.pages = new Set(results.map(result => result.page));
+  } catch (error) {
+    if (revision !== state.wikiSearch.revision) return;
+    state.wikiSearch.error = `Search could not be completed. ${error.message}`;
+  }
+  state.wikiSearch.pending = false;
+  renderWikiSearchViews();
+}
 
-dom.searchResults.addEventListener('click', event => {
-  const result = event.target.closest('.search-result-item[data-page]');
-  if (!result) return;
-  openPage(result.dataset.page);
-  hideSearch();
-});
+function wikiSearchMessage() {
+  const search = state.wikiSearch;
+  if (search.pending) return 'Searching wiki...';
+  if (search.error) return search.error;
+  if (search.query && !search.pages?.size) return `No pages match “${search.query}”.`;
+  return '';
+}
+
+function renderWikiSearchViews() {
+  renderSidebar();
+  // Only the all-pages graph panel participates in wiki search.
+  if (state.panel === 'graph' && state.graphData) drawGraph(state.graphData);
+}
+
+function filteredWikiGraph(data) {
+  const pages = state.wikiSearch.pages;
+  if (!pages) return data;
+  const nodes = data.nodes.filter(node => pages.has(node.id));
+  const visible = new Set(nodes.map(node => node.id));
+  return {
+    nodes,
+    edges: (data.edges || []).filter(edge => visible.has(edge.source) && visible.has(edge.target)),
+  };
+}
 
 const GROUP_COLORS = ['#fff', '#222', '#1c1c1c', '#fff', '#222', '#1c1c1c'];
 const GROUP_COLORS_LIGHT = ['#111', '#ccc', '#eee', '#111', '#ccc', '#eee'];
@@ -427,7 +466,9 @@ async function showGraph() {
     state.graphInit = true;
 
     // Wait for the active panel layout to be painted before measuring.
-    requestAnimationFrame(() => requestAnimationFrame(() => drawGraph(data)));
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (state.panel === 'graph') drawGraph(state.graphData);
+    }));
   } catch (error) {
     console.error('Unable to load graph:', error);
     setGraphStatus('The graph could not be loaded. Please try again.');
@@ -443,8 +484,9 @@ function drawGraph(data) {
     setGraphStatus('No graph data is available.');
     return;
   }
-  const nodes = data.nodes.map(d => ({...d}));
-  const links = (data.edges || []).map(d => ({...d}));
+  const filtered = filteredWikiGraph(data);
+  const nodes = filtered.nodes.map(d => ({...d}));
+  const links = (filtered.edges || []).map(d => ({...d}));
   
   const svg = d3.select('#graph-canvas');
   const panel = document.getElementById('panel-graph');
@@ -465,7 +507,9 @@ function drawGraph(data) {
   state.graph.resizeObserver?.disconnect();
   svg.selectAll('*').remove();
   svg.attr('width', '100%').attr('height', '100%').attr('viewBox', `0 0 ${W} ${H}`);
-  setGraphStatus(nodes.length ? '' : 'There are no pages to display yet.');
+  dom.graphLegend.innerHTML = '';
+  dom.graphTooltip.classList.remove('visible');
+  setGraphStatus(nodes.length ? '' : wikiSearchMessage() || 'There are no pages to display yet.');
   if (!nodes.length) return;
 
   const isLight = document.documentElement.dataset.theme === 'light';
@@ -1435,7 +1479,7 @@ async function refreshWiki() {
   const pages = await api.getWikiList();
   buildSidebar(pages);
   // Refresh current page if open
-  if (state.currentPage) openPage(state.currentPage, { historyMode: 'none' });
+  if (state.panel === 'wiki' && state.currentPage) openPage(state.currentPage, { historyMode: 'none' });
 }
 
 // ── Utility ────────────────────────────────────────────────────────
@@ -1448,7 +1492,6 @@ function escAttr(s) { return String(s).replace(/'/g,"\\'"); }
 window.app = { showPanel };
 window.openPage = openPage;
 window.openRawFile = openRawFile;
-window.hideSearch = hideSearch;
 
 function handleWikiRoute({ migrateLegacyHash = false } = {}) {
   let page = wikiPageFromPath(location.pathname);
