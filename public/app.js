@@ -475,6 +475,22 @@ async function showGraph() {
   }
 }
 
+function highlightGraphConnections(node, link, pageId = null) {
+  const neighbours = new Set([pageId]);
+  const endpointId = endpoint => endpoint.id ?? endpoint;
+  if (pageId !== null) {
+    link.each(edge => {
+      const source = endpointId(edge.source);
+      const target = endpointId(edge.target);
+      if (source === pageId) neighbours.add(target);
+      if (target === pageId) neighbours.add(source);
+    });
+  }
+  node.attr('opacity', page => pageId === null || neighbours.has(page.id) ? 1 : 0.15);
+  link.attr('opacity', edge => pageId === null
+    || endpointId(edge.source) === pageId || endpointId(edge.target) === pageId ? 1 : 0.08);
+}
+
 function drawGraph(data) {
   if (!window.d3) {
     setGraphStatus('The graph renderer could not be loaded.');
@@ -566,7 +582,8 @@ function drawGraph(data) {
       if (event.defaultPrevented) return;
       openPage(d.id);
     })
-    .on('mouseover', (event, d) => {
+    .on('mouseenter', (event, d) => {
+      highlightGraphConnections(node, link, d.id);
       const tooltip = document.getElementById('graph-tooltip');
       if (tooltip) { tooltip.textContent = stripEmoji(d.id); tooltip.classList.add('visible'); }
       d3.select(event.currentTarget).select('circle').attr('stroke', '#111');
@@ -578,7 +595,8 @@ function drawGraph(data) {
         tooltip.style.top  = (event.offsetY - 10) + 'px';
       }
     })
-    .on('mouseout', (event) => { 
+    .on('mouseleave', (event) => {
+      highlightGraphConnections(node, link);
       const tooltip = document.getElementById('graph-tooltip');
       if (tooltip) tooltip.classList.remove('visible');
       d3.select(event.currentTarget).select('circle').attr('stroke', isLight ? '#111' : '#fff');

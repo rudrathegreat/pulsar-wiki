@@ -24,6 +24,8 @@ Open the displayed loopback address, normally <http://127.0.0.1:3000>. PulsarWik
 
 The sidebar's **Search wiki** field filters pages by matching text in their names or contents, keeping the existing page groups. When the all-pages graph is open, it shows the same matching pages and only links between them. The filter stays active while browsing; clear the field or press Escape to restore all pages and graph nodes.
 
+Hover over a graph node to keep that page, its directly linked pages (incoming or outgoing), and its connecting lines bright while dimming the rest. Move away to restore normal brightness; click a node to open its page.
+
 ## Connect ChatGPT
 
 1. Select **Connect ChatGPT** in the top-right corner.

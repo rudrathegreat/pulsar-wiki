@@ -45,6 +45,6 @@ Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pul
 - [[active-reading]]: PDF reading with bounded rendering and on-demand text extraction, theme-aware highlight helpers, notes and AI requests, wiki-first reference discovery, and automatic agent-written wiki notes with the paper page selected by default and created on Add when missing.
 
 ---
-*Last updated: 2026-10-17 — wiki search now filters sidebar pages and the open all-pages graph.*
+*Last updated: 2026-10-17 — wiki search filters sidebar pages and the open all-pages graph; hovering over a graph node dims unrelated pages.*
 
 - [[stac3719]]: Reading notes for stac3719.pdf.
