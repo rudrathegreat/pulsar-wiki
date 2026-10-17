@@ -10,6 +10,8 @@
 
 ## Read and annotate
 
+The highlight helper closes automatically when you leave the reader or switch panels. (source: README.md)
+
 Open a PDF from Files, select text, and choose a highlight colour. Add optional categories and personal comments. Use Select region for equations, figures, or scanned passages; an entered transcription can support models without image input. Reading notes are local and private. (source: README.md)
 
 The reader opens PDFs from page metadata and extracts passage text on demand. Scrolling interrupts drawing and text work, then rendering resumes after a 120 ms pause with the current viewport prioritised. Completed nearby pages stay cached for direction changes; eviction targets five pages and 24 megapixels of canvas pixels, while near pages and active text selections remain protected. Older pages release their resources and rebuild when revisited. Interrupted text work can reuse its completed canvas, text batches yield to input and painting, and thumbnails share a rendering slot behind full-size pages. Paper search loads the complete text when requested. (source: README.md)

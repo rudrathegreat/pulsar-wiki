@@ -286,6 +286,7 @@ const dom = {
 };
 
 function showPanel(name) {
+  if (name !== state.panel) window.ActiveReading?.closeHelper();
   state.panel = name;
   const navigationPanel = name === 'document' ? 'files' : name;
   $('sidebar').classList.toggle('chat-mode', name === 'chat');

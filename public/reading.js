@@ -1184,5 +1184,5 @@
     const helperObserver = new ResizeObserver(positionHelper);
     helperObserver.observe(el('reading-selection-toolbar'));
   }
-  window.ActiveReading = { open, close, navigate, route, sanitizeHtml, isOpen: () => Boolean(r.pdf && r.document), library: guard(library), backlinks: guard(backlinks) };
+  window.ActiveReading = { open, close, closeHelper, navigate, route, sanitizeHtml, isOpen: () => Boolean(r.pdf && r.document), library: guard(library), backlinks: guard(backlinks) };
 })();
