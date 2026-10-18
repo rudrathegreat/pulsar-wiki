@@ -36,3 +36,9 @@ All major updates to the wiki are recorded here.
 | 2026-10-17 | Application workspaces / README.md | Added an editor-style welcome screen, local folder browsing and creation, recent workspaces, session restoration, and folder switching/closing. Scoped wiki, sources, chats, reading records, imports and file notifications to each workspace, preserved existing files and instructions, and added initialization, API isolation and session regression coverage. |
 
 | 2026-10-17 | Application workspaces / README.md | Replaced the custom folder browser with the system folder dialog and a plain path input with an Open button. Made the full current folder path visible and selectable at all screen sizes, added Change folder, retained session restoration, and removed custom folder-listing and creation APIs. |
+
+| 2026-10-18 | Application active reading / README.md | Removed the Reading Library sidebar entry, page, library controls and client handlers; redirected its old route to Files, preserved PDF highlights, comments, AI assistance, automatic wiki notes and existing local records, and updated the reading guide and index. |
+
+| 2026-10-18 | Reading notes / README.md / GEMINI.md | Made appended notes concise and topic-focused, replaced visible passage IDs with filename/page links, removed technical provenance and AI/model declarations from published pages, retained retry tracking in the operation log, and cleaned the existing stac3719 notes. |
+
+| 2026-10-18 | Selected reading notes / README.md / GEMINI.md | Added exact highlighted text as Markdown blockquotes with readable source links before each appended explanation; kept technical keys and model details out of paper pages and restored the quote in stac3719. |

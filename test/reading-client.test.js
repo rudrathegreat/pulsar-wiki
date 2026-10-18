@@ -14,11 +14,11 @@ function client({ performanceRecorder = null } = {}) {
   const staticIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]));
   const element = () => ({ style: {}, dataset: {}, value: '', children: [], listeners: {}, attributes: {}, hidden: false, innerHTML: '', offsetWidth: 350, offsetHeight: 45, classList: { add() {}, remove() {}, toggle() {} }, addEventListener(type, listener) { this.listeners[type] = listener; }, querySelectorAll() { return []; }, querySelector() { return null; }, contains() { return false; }, focus() {}, setAttribute(key, value) { this.attributes[key] = value; }, showModal() { this.open = true; }, close() { this.open = false; }, append(child) { this.children.push(child); }, getBoundingClientRect() { return { left: 100, top: 100, right: 500, bottom: 900, width: 400, height: 800 }; } });
   const document = { activeElement: null, getElementById(id) { if (!staticIds.has(id) && ![...nodes.values()].some(node => node.innerHTML.includes(`id="${id}"`))) return null; if (!nodes.has(id)) nodes.set(id, element()); return nodes.get(id); }, querySelectorAll() { return []; }, addEventListener() {}, createElement(tag) { const node = element(); if (tag === 'template') node.content = { querySelectorAll() { return []; } }; return node; } };
-  const context = { document, window: { addEventListener() {}, getSelection() { return null; }, requestAnimationFrame: callback => setTimeout(callback, 0), cancelAnimationFrame: clearTimeout, innerWidth: 1200, innerHeight: 900 }, state: { panel: 'reading' }, setTimeout, clearTimeout, ReadableStream, URL, URLSearchParams, Node: { TEXT_NODE: 3 }, renderMd(v) { return v; }, typesetMath() {} };
+  const context = { document, window: { addEventListener() {}, getSelection() { return null; }, requestAnimationFrame: callback => setTimeout(callback, 0), cancelAnimationFrame: clearTimeout, innerWidth: 1200, innerHeight: 900 }, state: { panel: 'document' }, setTimeout, clearTimeout, ReadableStream, URL, URLSearchParams, Node: { TEXT_NODE: 3 }, renderMd(v) { return v; }, typesetMath() {} };
   context.window.WorkspaceSession = { fetch: (...args) => context.fetch(...args), url: value => value };
   if (performanceRecorder) context.window.ReadingPerformance = { create({ sample }) { performanceRecorder.sample = sample; return performanceRecorder; } };
   vm.createContext(context);
-  vm.runInContext(source.replace('window.ActiveReading =', 'window.__readingTest = { r, selectedPayload, previewSnapshot, captureSelection, paintHighlights, diffHtml, renderWorkspace, filteredHighlights, library, joinHighlightRects, setHighlightsEnabled, saveSelection, deleteHighlight, undoDeletion, connectKnowledge, openHighlightHelper, closeHelper, watchTask, paperSummaryPage, renderPage, releasePage, releaseDistantPages, textChunks, close, layout, findNext, updateViewport, queueNearbyPages, queueThumbnail }; window.ActiveReading ='), context);
+  vm.runInContext(source.replace('window.ActiveReading =', 'window.__readingTest = { r, selectedPayload, previewSnapshot, captureSelection, paintHighlights, renderWorkspace, filteredHighlights, route, joinHighlightRects, setHighlightsEnabled, saveSelection, deleteHighlight, undoDeletion, connectKnowledge, openHighlightHelper, closeHelper, watchTask, paperSummaryPage, renderPage, releasePage, releaseDistantPages, textChunks, close, layout, findNext, updateViewport, queueNearbyPages, queueThumbnail }; window.ActiveReading ='), context);
   return { ...context.window.__readingTest, context, nodes, document };
 }
 function populate(c) {
@@ -76,18 +76,16 @@ test('highlight overlays transform saved geometry after zoom without modifying s
   assert.deepEqual(c.r.data.highlights[0].anchors[0].rects[0], [10, 20, 40, 30]);
 });
 
-test('concept diffs expose additions, removals, and reordered lines for review', () => {
-  const c = client();
-  const diff = c.diffHtml('Old claim\nShared line\nCaveat', 'Shared line\nNew result\nCaveat');
-  assert.match(diff, /<del>- Old claim<\/del>/); assert.match(diff, /<ins>\+ New result<\/ins>/); assert.match(diff, /Shared line/);
-  assert.ok(!c.diffHtml('<script>bad</script>', 'Safe').includes('<script>'));
-});
-
-test('workspace exposes cross-paper controls, optional AI and private backup without invoking assistance', () => {
-  const c = client(); populate(c); c.r.selected.add('highlight-one'); c.renderWorkspace();
-  const output = c.nodes.get('reading-library-content').innerHTML;
-  assert.doesNotMatch(output, /Local &amp; private/); assert.match(output, /Select shown/); assert.match(output, /Create artifact/); assert.match(output, /Export private backup/);
-  assert.match(output, /Include this comment in selected inputs/); assert.match(output, /reading-select="highlight-two"/);
+test('reading library is removed and its old route opens Files', async () => {
+  const c = client(); populate(c);
+  assert.doesNotMatch(html, /ib-reading|panel-reading|reading-library-content|reading-open-files/);
+  assert.equal(c.context.window.ActiveReading.library, undefined);
+  const panels = []; const urls = [];
+  c.context.showPanel = panel => panels.push(panel);
+  c.context.history = { replaceState(_state, _title, url) { urls.push(url); } };
+  assert.equal(await c.route('#reading'), true);
+  assert.deepEqual(panels, ['files']);
+  assert.deepEqual(urls, ['/#files']);
 });
 
 test('reader sidebar shows every matching highlight with filters and a delete action per highlight', () => {
@@ -145,17 +143,6 @@ test('reattaching a passage keeps earlier AI explanations with their original pr
   assert.doesNotMatch(c.nodes.get('reading-notes').innerHTML, /AI-generated comment|data-color="blue"/);
   assert.equal(task.snapshot.highlights[0].anchors[0].page, 1);
   assert.equal(task.response, 'This is the AI explanation of the timing result.');
-});
-
-test('opening the library resets stale filters and views without selecting private evidence', async () => {
-  const c = client(); populate(c);
-  c.r.tab = 'artifacts'; c.r.filter = { document: 'document-one', color: 'blue', category: 'result', query: 'missing', annotated: true };
-  c.context.fetch = async () => ({ ok: true, json: async () => c.r.data });
-  c.context.history = { replaceState() {} };
-  await c.library();
-  assert.equal(c.r.tab, 'highlights');
-  assert.equal(c.filteredHighlights().length, 2);
-  assert.equal(c.r.selected.size, 0);
 });
 
 test('word rectangles merge into continuous lines without joining columns or adjacent lines', () => {
@@ -400,7 +387,6 @@ test('researcher comments toggle preserves the filters and narrows the matching 
   assert.doesNotMatch(c.nodes.get('reading-notes').innerHTML, /data-reading-card="highlight-two"/);
   const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'reading.css'), 'utf8');
   assert.match(css, /#reading-notes\s*\{[^}]*scrollbar-gutter:stable/);
-  assert.match(css, /#panel-reading\s*\{[^}]*scrollbar-gutter:stable/);
 });
 
 function renderer({ count = 6, items = 2, holdCanvas = false, holdText = false, performanceRecorder = null } = {}) {

@@ -46,7 +46,7 @@ test('Add automatically creates a cited paper note using explicit agent instruct
   f.service.saveAnnotation({ highlightId: h.id, text: 'Unchecked private comment' });
   f.service.providerFactory = () => ({ async runTurn(input) {
     f.calls.push(input);
-    return { text: `### Timing noise\n\nTiming residuals reveal noise [H:${h.id}] (source: paper.txt).` };
+    return { text: `### Timing noise\n\nTiming residuals reveal noise [H:${h.id}] (source: paper.txt).\n\nInterpretation: Selected interpretation needs verification.` };
   } });
   const rawBefore = fs.readFileSync(path.join(f.rawDir, 'paper.txt'));
   const task = await f.service.createTask({ action: 'wiki-note', targetPage: 'paper', createMissingPage: true, highlightIds: [h.id], annotationIds: [included.id] });
@@ -55,9 +55,13 @@ test('Add automatically creates a cited paper note using explicit agent instruct
   assert.equal(result.status, 'completed'); assert.equal(result.publication.page, 'paper');
   const content = fs.readFileSync(path.join(f.wikiDir, 'paper.md'), 'utf8');
   assert.match(content, /### Timing noise/); assert.match(content, /\*\*Sources\*\*: paper.txt/);
-  assert.ok(content.includes(`[H:${h.id}](\/#reading/${h.documentId}/${h.id}?revision=${h.revision})`));
+  assert.ok(content.includes(`### Timing noise\n\n> ${h.text}\n\n[paper.txt, page 1]`));
+  assert.ok(content.indexOf(`> ${h.text}`) < content.indexOf('Timing residuals reveal noise'));
+  assert.ok(content.includes(`[paper.txt, page 1](/#reading/${h.documentId}/${h.id}?revision=${h.revision})`));
   assert.match(content, /Selected interpretation/); assert.doesNotMatch(content, /Unchecked private comment|researcher reviewed before publication/);
-  assert.match(content, /automatically saved after the researcher selected Add to wiki/);
+  assert.doesNotMatch(content, /SHA-256|Reading provenance|Reading-note operation|model:|AI explanations|\[H:/);
+  assert.match(f.calls[0].instructions, /Do not add declarations about AI use/);
+  assert.match(f.calls[0].instructions, /short, topic-focused section/);
   assert.match(fs.readFileSync(path.join(f.wikiDir, 'index.md'), 'utf8'), /\[\[paper\]\]/);
   assert.match(fs.readFileSync(path.join(f.wikiDir, 'log.md'), 'utf8'), /Automatically added reading note to paper/);
   assert.match(f.calls[0].instructions, /AUTOMATIC WIKI NOTE/);
@@ -67,6 +71,24 @@ test('Add automatically creates a cited paper note using explicit agent instruct
   assert.deepEqual(f.calls[0].tools, []);
   assert.equal(f.store.read().artifacts.length, 0);
   assert.deepEqual(fs.readFileSync(path.join(f.rawDir, 'paper.txt')), rawBefore);
+});
+
+test('automatic notes quote every selected passage, preserving multiline text as literal Markdown', async t => {
+  const f = fixture(t);
+  const selected = 'Timing **noise** matters.\n\nCompare [measurements].';
+  fs.writeFileSync(path.join(f.rawDir, 'paper.txt'), selected);
+  const first = await highlight(f, 'paper.txt', selected);
+  const second = await highlight(f, 'other.txt', 'An independent measurement challenges the stable rotation assumption.');
+  f.service.providerFactory = () => ({ async runTurn() {
+    return { text: `### Comparing measurements\n\nCompare these selections [H:${first.id}] [H:${second.id}] (source: paper.txt) (source: other.txt).` };
+  } });
+  const task = await f.service.createTask({ action: 'wiki-note', targetPage: 'paper', createMissingPage: true, highlightIds: [first.id, second.id] });
+  assert.equal((await completed(f.service, task.id)).status, 'completed');
+  const content = fs.readFileSync(path.join(f.wikiDir, 'paper.md'), 'utf8');
+  assert.ok(content.includes('> Timing \\*\\*noise\\*\\* matters.\n> \n> Compare \\[measurements\\].'));
+  assert.ok(content.includes(`> ${second.text}\n\n[other.txt, page 1]`));
+  assert.ok(content.indexOf(`> ${second.text}`) < content.indexOf('Compare these selections'));
+  assert.doesNotMatch(content, /SHA-256|Reading-note operation|model:|\[H:/);
 });
 
 test('automatic notes preserve the latest existing content, citations and concurrent edits', async t => {
@@ -238,7 +260,8 @@ test('all artifact types have immutable inputs and reviewed publication is atomi
   const result = f.service.publishArtifact(a.id, { revision: a.revision, reviewed: true, acceptOutdated: true, pageName: 'reading-summary' });
   assert.equal(result.page, 'reading-summary');
   const content = fs.readFileSync(path.join(f.wikiDir, 'reading-summary.md'), 'utf8');
-  assert.match(content, /Reading provenance/); assert.ok(content.includes(`[H:${h.id}]`)); assert.ok(content.includes(`/#reading/${h.documentId}/${h.id}`));
+  assert.match(content, /Source passages/); assert.ok(content.includes(`[paper.txt, page 1]`));
+  assert.doesNotMatch(content, /SHA-256|model:|AI generation|\[H:|\[A:/); assert.ok(content.includes(`/#reading/${h.documentId}/${h.id}`));
   assert.ok(content.includes('Publish this interpretation')); assert.ok(!content.includes('Keep this note private'));
   assert.ok(fs.readFileSync(path.join(f.wikiDir, 'index.md'), 'utf8').includes('[[reading-summary]]'));
   assert.match(fs.readFileSync(path.join(f.wikiDir, 'log.md'), 'utf8'), /active-reading summary/);
@@ -480,6 +503,6 @@ test('later concept updates preserve previously published provenance from other 
   const update = await f.service.createArtifact({ type: 'concept', title: 'Reading summary', targetPage: 'reading-summary', highlightIds: [second.id] });
   assert.equal(f.service.publishArtifact(update.id, { revision: update.revision, reviewed: true }).page, 'reading-summary');
   const published = fs.readFileSync(path.join(f.wikiDir, 'reading-summary.md'), 'utf8');
-  assert.ok(published.includes(`[H:${first.id}]`)); assert.ok(published.includes(`[H:${second.id}]`));
+  assert.ok(published.includes(`/#reading/${first.documentId}/${first.id}?revision=1`)); assert.ok(published.includes(`/#reading/${second.documentId}/${second.id}?revision=1`));
   assert.match(published, /\*\*Sources\*\*: paper.txt, other.txt/);
 });

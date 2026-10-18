@@ -39,7 +39,8 @@ When the researcher selects **Add to wiki**, treat Add as authorisation to gener
 3. Cite the supplied passage references and source filenames. Distinguish evidence from researcher interpretation and AI explanation; mark unsupported interpretations as needing verification.
 4. Preserve all existing notes and citations. The application inserts the generated note into the latest page instead of replacing that page with model output.
 5. Create a missing paper notes page when Add is selected. Update its sources, date, wiki index, and append-only log with the saved note.
-6. Show progress and a completion link in the helper. Do not open a Markdown editor, diff, or publication-review step for this action.
+6. Append short, topic-focused sections with descriptive headings, the exact highlighted text in Markdown blockquotes, and readable filename/page links. Place the concise explanation below the quoted selections. Keep hashes, internal IDs, AI-use declarations and model names out of published notes. Preserve scientific uncertainty using natural interpretation or open-question wording.
+7. Show progress and a completion link in the helper. Do not open a Markdown editor, diff, or publication-review step for this action.
 
 ## Page format
 

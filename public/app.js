@@ -307,7 +307,6 @@ function showPanel(name) {
   if (name === 'graph') showGraph();
   if (name === 'files') loadFiles();
   if (name === 'handover') loadHandoverWorkspace();
-  if (name === 'reading') window.ActiveReading?.library();
 }
 
 const PILLAR_LABELS = [

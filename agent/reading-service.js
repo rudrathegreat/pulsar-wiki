@@ -10,11 +10,11 @@ const TASK_ACTIONS = new Set(['explain', 'equation', 'methodology', 'assumptions
 const WIKI_NOTE_INSTRUCTIONS = `AUTOMATIC WIKI NOTE:
 The researcher selected Add to wiki and authorised saving this note without a Markdown review or further confirmation.
 1. Write a concise, useful reading note using only the selected passages and explicitly included comments, images and AI interpretations. Use the supplied destination page as context to avoid unnecessary repetition.
-2. Return only the note to insert, beginning with a descriptive ### heading. Do not return a complete page, metadata, a diff, code fences, a review checklist or a request for approval. The application inserts your note and updates page metadata, provenance, index and log automatically.
+2. Return only the note to insert, beginning with a descriptive ### heading. The application inserts the exact highlighted text as Markdown blockquotes with readable source links immediately after this heading; do not repeat those quotations in your response. Follow the heading with your concise explanation. Do not return a complete page, metadata, a diff, code fences, a review checklist or a request for approval. The application inserts your note and updates page metadata, index and log automatically.
 3. Preserve the paper's meaning, qualifications, uncertainty, equations and units. Do not infer results or claim to summarise the entire paper.
 4. Cite every selected passage using its exact supplied [H:id] reference and (source: filename) citation. Include each selected passage in the note. Never invent quotes, references, page numbers, facts or wiki links.
-5. Distinguish source evidence from researcher interpretation and AI explanation. Mark unsupported interpretations Needs verification. External abstracts are unverified candidates; AI explanations are not independent evidence.
-6. Write plain Markdown in clear language. Use only ### or deeper headings within the note. Do not include raw HTML or executable links. Existing page content and citations must remain intact.`;
+5. Separate findings from interpretation using natural wording such as Interpretation or Open question. Mark unsupported interpretations Needs verification. External abstracts are unverified candidates; explanations are not independent evidence. Do not add declarations about AI use, model names, hashes, operation IDs or technical provenance.
+6. Append a short, topic-focused section to the reading summary, using short paragraphs or a few bullets. Explain the useful takeaway directly; avoid repetitive boilerplate, duplicated excerpts and restating the page. Write plain Markdown in clear language. Use only ### or deeper headings within the note. Do not include raw HTML or executable links. Existing page content and citations must remain intact.`;
 const pageName = value => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && !['index', 'log'].includes(value);
 const quoteText = value => String(value).normalize('NFKC').replace(/\s+/g, ' ').trim();
 const passageUrl = (documentId, highlightId, page, revision) => `/#reading/${documentId}/${highlightId || ''}${revision ? `?revision=${revision}` : page ? `?page=${page}` : ''}`;
@@ -441,21 +441,24 @@ class ReadingService {
     if (!existing.exists && (!task.createMissingPage || task.snapshot.wikiPages.some(w => w.name === task.targetPage))) throw new ReadingError('The destination was removed while the note was being prepared. Reopen Add to wiki.', 'wiki-conflict', 409);
     const operationId = task.operationId || task.id;
     // Retrying a task whose wiki write succeeded but whose task-history write failed must not add it twice.
-    if (existing.content.includes(`Reading-note operation: ${operationId};`)) return { page: task.targetPage, contentHash: hash(existing.content), alreadySaved: true };
+    if (existing.content.includes(`Reading-note operation: ${operationId};`) || this.wikiTools.readWikiPage({ name: 'log', maxChars: 1000000 }).content.includes(`operation: ${operationId};`)) return { page: task.targetPage, contentHash: hash(existing.content), alreadySaved: true };
     const date = this.now().slice(0, 10);
     const sources = task.snapshot.documents.map(d => d.aliases[0]);
     let content = existing.content || `# ${task.targetPage}\n\n**Summary**: Researcher-selected reading notes.\n\n**Sources**: ${sources.join(', ')}\n\n**Last updated**: ${date}\n\n---\n\n## Research notes\n\n## Related pages\n\n- [[index]]\n`;
-    const linked = note.replace(/\[H:([^\]\n]+)\](?!\()/g, (match, id) => {
-      const h = task.snapshot.highlights.find(h => h.id === id);
-      return h ? `[H:${id}](${passageUrl(h.documentId, id, null, h.revision)})` : match;
-    });
-    const boundaries = ['\n## Related pages', '\n## Reading provenance'].map(heading => content.indexOf(heading)).filter(index => index >= 0);
+    const excerpts = task.snapshot.highlights.map(h => {
+      const quote = h.text
+        ? h.text.split(/\r?\n/).map(line => `> ${literal(line)}`).join('\n')
+        : 'Selected visual region; no transcription available.';
+      return `${quote}\n\n${this.readableReferences(`[H:${h.id}]`, task.snapshot)}`;
+    }).join('\n\n');
+    const linked = this.readableReferences(note, task.snapshot)
+      .replace(/^(### .+)(?:\r?\n|$)/, (_match, heading) => `${heading}\n\n${excerpts}\n\n`);
+    const boundaries = ['\n## Related pages', '\n## Reading provenance', '\n## Source passages'].map(heading => content.indexOf(heading)).filter(index => index >= 0);
     const insertion = boundaries.length ? Math.min(...boundaries) : content.length;
     // Insert into the latest page, so other notes or edits made during inference are preserved.
     content = content.slice(0, insertion).trimEnd() + `\n\n${linked}\n\n` + content.slice(insertion).trimStart();
     content = content.replace(/\*\*Sources\*\*:([^\n]*)/, (_match, current) => `**Sources**:${current}${sources.filter(source => !current.split(',').map(s => s.trim()).includes(source)).map(source => `, ${source}`).join('')}`)
       .replace(/\*\*Last updated\*\*:[^\n]*/, `**Last updated**: ${date}`);
-    content += this.provenance(task.snapshot) + `\nReading-note operation: ${operationId}; model: ${literal(model || 'not recorded')}; automatically saved after the researcher selected Add to wiki.\n`;
     if (content.length > 1000000) throw new ReadingError('The resulting wiki page is too large to save safely.');
     const currentIndex = this.wikiTools.readWikiPage({ name: 'index', maxChars: 1000000 });
     if (currentIndex.hasMore) throw new ReadingError('The wiki index is too large to update safely.');
@@ -497,12 +500,32 @@ class ReadingService {
     return this.store.update('artifacts', id, input.revision, { content, revisions: [...artifact.revisions, { content: artifact.content, savedAt: this.now() }].slice(-30) });
   }
 
+  readableReferences(content, snapshot) {
+    return content.replace(/\[([HAWDR]):([^\]\n]+)\](?:\([^\n)]*\))?/g, (match, kind, id) => {
+      if (kind === 'H') {
+        const h = snapshot.highlights.find(h => h.id === id);
+        if (!h) return match;
+        const document = snapshot.documents.find(d => d.id === h.documentId);
+        const pages = [...new Set(h.anchors.map(a => a.page))];
+        return `[${literal(document.aliases[0])}, ${pages.length > 1 ? 'pages' : 'page'} ${pages.join(', ')}](${passageUrl(h.documentId, id, null, h.revision)})`;
+      }
+      if (kind === 'W' && snapshot.wikiPages.some(w => w.name === id)) return `[[${id}]]`;
+      if (kind === 'D') {
+        const discovery = snapshot.discoveries.find(d => d.id === id);
+        if (discovery) return `[${literal(discovery.source.title)}](${discovery.source.recordUrl})`;
+      }
+      if (kind === 'A' && snapshot.annotations.some(a => a.id === id)) return '(researcher interpretation)';
+      if (kind === 'R' && snapshot.responses.some(r => r.id === id)) return '(interpretation; needs verification)';
+      return match;
+    });
+  }
+
   provenance(snapshot) {
-    return `\n\n## Reading provenance\n\nSelected inputs captured ${snapshot.capturedAt}. AI explanations are not independent evidence.\n\n${snapshot.highlights.map(h => {
+    return `\n\n## Source passages\n\n${snapshot.highlights.map((h, index) => {
       const d = snapshot.documents.find(d => d.id === h.documentId);
       const comments = snapshot.annotations.filter(a => a.highlightId === h.id);
-      return `### Passage ${h.id}\n\n[Open original selection](${passageUrl(h.documentId, h.id, null, h.revision)}) - ${literal(d.aliases[0])}, page${h.anchors.length > 1 ? 's' : ''} ${h.anchors.map(a => literal(a.label)).join(', ')}; SHA-256: ${d.hash}\n\n${h.text ? h.text.split('\n').map(line => `> ${literal(line)}`).join('\n') : '> Visual region; no verified transcription recorded.'}\n\n(source: ${d.aliases[0]})${comments.map(a => `\n\nResearcher interpretation [A:${a.id}]: ${literal(a.text)}`).join('')}`;
-    }).join('\n\n')}${snapshot.discoveries.map(d => `\n\nExternal candidate [D:${d.id}]: ${literal(d.source.title)}. Abstract only; full text not verified. ${d.source.recordUrl}`).join('')}${snapshot.responses.map(response => `\n\n### Included AI interpretation ${response.id}\n\nModel: ${literal(response.model || 'not recorded')}. This is not independent scientific evidence.\n\n${response.response.split('\n').map(line => `> ${literal(line)}`).join('\n')}`).join('')}\n`;
+      return `### Selection ${index + 1}\n\n${this.readableReferences(`[H:${h.id}]`, snapshot)}\n\n${h.text ? h.text.split('\n').map(line => `> ${literal(line)}`).join('\n') : '> Visual region; no verified transcription recorded.'}\n\n(source: ${d.aliases[0]})${comments.map(a => `\n\nResearcher interpretation: ${literal(a.text)}`).join('')}`;
+    }).join('\n\n')}${snapshot.discoveries.map(d => `\n\nExternal candidate: ${literal(d.source.title)}. Abstract only; full text not verified. ${d.source.recordUrl}`).join('')}${snapshot.responses.map(response => `\n\n### Interpretation\n\nNeeds verification.\n\n${this.readableReferences(response.response, snapshot).split('\n').map(line => `> ${line}`).join('\n')}`).join('')}\n`;
   }
 
   publishArtifact(id, input) {
@@ -520,13 +543,10 @@ class ReadingService {
     if (!/^# .+/m.test(content) || !['**Summary**:', '**Sources**:', '**Last updated**:', '## Related pages'].every(s => content.includes(s))) throw new ReadingError('The draft needs a title, Summary, Sources, Last updated, and Related pages.');
     this.checkCitations(content, artifact.snapshot, true);
     const date = this.now().slice(0, 10);
-    const linked = content.replace(/\[H:([^\]\n]+)\](?!\()/g, (match, id) => {
-      const h = artifact.snapshot.highlights.find(h => h.id === id);
-      return h ? `[H:${id}](${passageUrl(h.documentId, id, null, h.revision)})` : match;
-    });
-    const generatedTask = artifact.generatedBy ? this.store.get('tasks', artifact.generatedBy) : null;
+    const linked = this.readableReferences(content, artifact.snapshot);
     const sourced = linked.replace(/\*\*Sources\*\*:([^\n]*)/, (_match, existingSources) => `**Sources**:${existingSources}${artifact.snapshot.documents.filter(d => !existingSources.includes(d.aliases[0])).map(d => `, ${d.aliases[0]}`).join('')}`);
-    const finalContent = sourced.replace(/\*\*Last updated\*\*:[^\n]*/, `**Last updated**: ${date}`) + this.provenance(artifact.snapshot) + (generatedTask ? `\nDraft assistance: ${generatedTask.id}; model: ${literal(generatedTask.model || 'not recorded')}; researcher reviewed before publication.\n` : '\nResearcher-authored draft; no AI generation recorded.\n');
+    const finalContent = sourced.replace(/\*\*Last updated\*\*:[^\n]*/, `**Last updated**: ${date}`) + this.provenance(artifact.snapshot);
+    if (/<\/?[a-z][^>]*>/i.test(finalContent) || /\]\(\s*(?:javascript|data|vbscript):/i.test(finalContent)) throw new ReadingError('Use plain Markdown without raw HTML or executable links in published artifacts.', 'unsafe-markdown');
     let index = this.wikiTools.readWikiPage({ name: 'index', maxChars: 1000000 });
     if (index.hasMore) throw new ReadingError('The wiki index is too large to update safely.');
     index = index.content || '# Wiki index\n';

@@ -26,6 +26,7 @@ Use only selected passages and explicitly included comments, visual regions and 
 Write a concise note with a descriptive heading, preserving meaning, qualifications, equations and units. Do not imply the whole paper was read.
 Cite passage references and source filenames. Distinguish source evidence, researcher interpretation and AI explanation; mark unsupported interpretations Needs verification.
 Preserve existing notes and citations. Insert into the latest page instead of replacing it. Create a missing paper notes page on Add and update sources, date, index and append-only log together.
+Append short, topic-focused sections with descriptive headings, the exact highlighted text in Markdown blockquotes, and readable filename/page links. Place the concise explanation below the quoted selections. Keep hashes, internal IDs, AI-use declarations and model names out of published notes. Preserve scientific uncertainty using natural interpretation or open-question wording.
 Show progress and a completion link without opening an editor or publication review.
 `;
 
