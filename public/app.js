@@ -299,6 +299,7 @@ const dom = {
 function showPanel(name) {
   if (name !== state.panel) window.ActiveReading?.closeHelper();
   state.panel = name;
+  document.body.classList.toggle('notebook-mode', name === 'notebooks');
   const navigationPanel = name === 'document' ? 'files' : name;
   $('sidebar').classList.toggle('chat-mode', name === 'chat');
   document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === `panel-${name}`));
@@ -307,6 +308,7 @@ function showPanel(name) {
   if (name === 'graph') showGraph();
   if (name === 'files') loadFiles();
   if (name === 'handover') loadHandoverWorkspace();
+  if (name === 'notebooks') window.ResearchNotebooks?.show();
 }
 
 const PILLAR_LABELS = [
@@ -385,6 +387,10 @@ async function openPage(name, { historyMode = 'push' } = {}) {
     const data = await api.getWikiPage(page);
     dom.wikiBody.innerHTML = `<div class="md-body">${renderMd(data.content)}</div>`;
     typesetMath(dom.wikiBody);
+    const notebookAction = document.createElement('button');
+    notebookAction.type = 'button'; notebookAction.className = 'btn'; notebookAction.textContent = 'Add page reference to notebook';
+    notebookAction.addEventListener('click', () => window.ResearchNotebooks?.transfer({ kind: 'wiki', page }));
+    dom.wikiBody.prepend(notebookAction);
     window.ActiveReading?.backlinks(page, dom.wikiBody);
     dom.wikiBody.querySelectorAll('a.wiki-link').forEach(link => link.addEventListener('click', event => {
       event.preventDefault();
@@ -1495,6 +1501,7 @@ $('ib-theme').addEventListener('click', () => {
 
 function applyTheme(t) {
   document.documentElement.dataset.theme = t;
+  window.ResearchNotebooks?.theme(t);
   $('theme-icon-dark').style.display = t === 'dark' ? 'block' : 'none';
   $('theme-icon-light').style.display = t === 'light' ? 'block' : 'none';
 }
@@ -1535,6 +1542,7 @@ function handleWikiRoute({ migrateLegacyHash = false } = {}) {
 }
 
 window.addEventListener('popstate', () => {
+  if (/^#notebook\/[a-f0-9-]{36}(?:\?|$)/.test(location.hash)) return;
   if (!handleWikiRoute()) {
     state.currentPage = null;
     highlightSidebarItem(null);
@@ -2020,6 +2028,7 @@ dom.chatAbort.addEventListener('click', () => {
   buildSidebar(pages);
   const routedToWiki = handleWikiRoute({ migrateLegacyHash: true });
   const hash = location.hash;
+  if (!routedToWiki && await window.ResearchNotebooks?.route(hash)) return;
   if (!routedToWiki && await window.ActiveReading?.route(hash)) return;
   if (!routedToWiki && (hash === '#sources' || hash === '#sources/saved')) {
     showPanel('files');

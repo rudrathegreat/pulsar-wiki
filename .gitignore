@@ -20,6 +20,8 @@ build/
 coverage/
 .cache/
 .tmp/
+__pycache__/
+*.pyc
 
 # Editor settings
 .idea/
@@ -31,3 +33,6 @@ coverage/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+.ipynb_checkpoints/
+notebooks/

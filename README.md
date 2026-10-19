@@ -8,6 +8,8 @@ PulsarWiki is a local browser interface for source-backed research workspaces. O
 - An eligible ChatGPT subscription
 - Permission to grant PulsarWiki direct ChatGPT plan usage during sign-in
 
+Research notebooks additionally need a local Python environment with JupyterLab 4, `ipykernel`, `nbformat`, and `nbclient`. Plotting and widget packages are optional. Notebook editing and execution do not require a ChatGPT connection; AI recall does.
+
 ChatGPT subscription sharing is currently a preview feature. Eligibility, model availability, and usage limits are determined by the connected ChatGPT account and workspace.
 
 ## Install and run
@@ -76,6 +78,54 @@ All agent writes use one validated local operation:
 - normal page changes require an accompanying `wiki/index.md` update;
 - `wiki/log.md` is appended automatically; and
 - failed operations roll back their local file changes.
+
+## Research notebooks
+
+Open **Notebooks** in the activity bar to work in JupyterLab inside PulsarWiki. Use **New notebook** or **Import** to create a standard `.ipynb` notebook. Write and run Python manually, interleave Markdown and LaTeX, and retain plots and visualisations with the notebook. JupyterLab supplies optional headings, table of contents, and collapsible cells; there is no required analysis template.
+
+Expand **Python environment**, enter the interpreter path for your chosen environment, and select **Check environment**, then **Start Python**. For example, create an isolated environment from the workspace root:
+
+```powershell
+python -m venv .pulsarwiki/python-env
+.pulsarwiki/python-env/Scripts/python.exe -m pip install "jupyterlab>=4,<5" ipykernel nbformat nbclient matplotlib ipywidgets
+```
+
+Select that environment's full `python.exe` path in PulsarWiki. On macOS/Linux, use the environment's `bin/python` instead. Scientific packages belong to this selected environment. The application starts one authenticated, loopback-only Jupyter process per workspace and embeds it on a separate browser origin. Its prebuilt bridge is included; no Jupyter extension installation or Node build is needed for normal use. Python runs with the local researcher's file permissions, rather than in a sandbox. The file browser starts in `notebooks/`; the application does not write to `raw/`.
+
+Switching panels retains the editor and kernel. **Save** saves open notebooks; Jupyter autosave also creates history when content changes. Closing or switching workspace folders waits for notebook saves and then stops that workspace's runtime. A save conflict leaves the folder open. Stop an active clean rerun before closing its workspace. **Stop** and **Reconnect** retain saved files and history; stopping Python discards its in-memory variables.
+
+### Bringing research into a notebook
+
+Choose **Add to notebook** on a paper highlight, or **Add page reference to notebook** on a wiki page. Choose a notebook or create one. Paper passages become exact quoted Markdown with revision-qualified source links; wiki references retain the page's captured content privately in cell metadata. Visual selections are included only when checked. Other researcher comments are excluded by default. Material goes after the editor's active cell for that notebook, or at its end when unopened. The editor is saved first; concurrent changes are rejected or left for Jupyter's conflict handling rather than overwritten. Source links return to the paper or wiki inside PulsarWiki.
+
+Under **Sources**, associate existing workspace files with the analysis. The notebook records the filename, size and SHA-256 fingerprint. Read local datasets from Python using paths such as `../raw/data.csv`; treat the source files as immutable. Plots and findings stay in the notebook. There is no notebook-to-wiki publishing workflow or separate result library.
+
+### History and reproducibility
+
+Editable notebooks live in `notebooks/`. Changed saves, named **Checkpoints**, source associations, and restores create local revisions under `.pulsarwiki/notebooks/`. **History** opens read-only snapshots with saved code, Markdown, text outputs and raster plots. Active HTML and JavaScript outputs are not executed in historical previews. Restoring creates a new revision, and historical cell links retain their original content even after cell deletion or notebook renaming. External notebook edits are captured when the workspace next scans notebooks. A notebook has a 25 MB limit.
+
+Execution records retain the notebook revision, cell ID, execution count, timestamps, success/failure, associated source fingerprints, and the Python/package environment captured at runtime startup. **Run a clean copy** executes all cells in order in a fresh kernel and saves a separate notebook, including partial outputs if a cell fails. Its report lists unavailable or changed associated inputs and changed outputs. The current working notebook is preserved. Individual cells have a two-minute execution timeout in clean reruns, and the complete rerun has a ten-minute limit. A completed rerun does not establish scientific correctness or guarantee identical results.
+
+**Export** downloads the current `.ipynb`, or a JSON bundle containing saved revisions, provenance and run/environment records. Associated source bytes are included only when explicitly checked; bundles have a 100 MB limit. Local history, Python settings and recall requests are ignored by Git in this project, so preserve `.pulsarwiki/notebooks/` with the workspace or export the notebook history when moving projects.
+
+### Recall earlier work
+
+Use **Recall** to ask about earlier assumptions, exclusions, decisions, limitations or observations. Search the current notebook or all notebooks in the active workspace, including historical cells. Only matching saved code, Markdown and text-output excerpts are sent through the existing ChatGPT connection. **Evidence sent** shows the exact excerpts used. Responses must cite supplied evidence; unknown or missing references fail safely. Evidence links open the original read-only notebook revision and cell, with an option to return to the current notebook. No match produces a local answer without an AI request.
+
+Recall distinguishes recorded statements from AI inference and reports insufficient evidence. It does not insert cells, run code, generate an analysis, or publish results. Requests can be cancelled and explicitly retried with their original preserved evidence; a server restart marks unfinished requests as interrupted. Notebook content is treated as evidence, never as instructions to the AI.
+
+### Notebook development and verification
+
+Run `npm test` for workspace, persistence, rollback, source transfer, citation, recall, client and API checks. To rebuild the shipped JupyterLab bridge after editing its source, run `npm run build:notebooks`; this installs build dependencies only under `integrations/jupyterlab/`.
+
+To run the real local Jupyter/kernel integration test in PowerShell:
+
+```powershell
+$env:PULSARWIKI_TEST_PYTHON = 'C:\full\path\to\python.exe'
+node --test test/notebooks-live.test.js
+```
+
+That environment needs `matplotlib` as well as the notebook requirements. The test verifies authentication, framing policy, private service credentials, versioned Jupyter saves, Python execution over WebSocket, and clean reruns with saved plots. It uses disposable workspaces and no AI subscription usage. Browser visual verification and a real AI recall request are separate manual checks.
 
 ## Document viewing
 

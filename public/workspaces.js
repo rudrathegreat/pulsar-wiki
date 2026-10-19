@@ -35,6 +35,7 @@
     setBusy(true);
     $('workspace-error').textContent = ''; $('workspace-status').hidden = true;
     try {
+      if (info?.active) await window.ResearchNotebooks?.prepareToLeave();
       const result = await post('/api/workspaces/open', { path });
       workspaceId = result.active.id;
       sessionStorage.setItem('pw-workspace', workspaceId);
@@ -65,6 +66,7 @@
   $('workspace-path-form').addEventListener('submit', event => { event.preventDefault(); return select($('workspace-path').value); });
   $('workspace-close').addEventListener('click', async () => {
     try {
+      await window.ResearchNotebooks?.prepareToLeave();
       await post('/api/workspaces/close', {});
       sessionStorage.setItem('pw-workspace', 'closed'); location.assign('/');
     } catch (error) { showError(error); }

@@ -230,7 +230,7 @@
       el('reading-helper-details').hidden = true;
       el('reading-helper-body').innerHTML = '';
       el('reading-selection-toolbar').classList.remove('expanded');
-      for (const action of ['wiki', 'ask', 'note', 'connect']) el(`reading-selection-${action}`).setAttribute('aria-expanded', 'false');
+      for (const action of ['wiki', 'ask', 'note', 'connect', 'notebook']) el(`reading-selection-${action}`).setAttribute('aria-expanded', 'false');
       positionHelper();
     } else el('reading-dialog').close();
   }
@@ -596,8 +596,8 @@
     helper.busy = true;
     if (next) {
       helper.expanded = true;
-      for (const action of ['wiki', 'ask', 'note', 'connect']) el(`reading-selection-${action}`).setAttribute('aria-expanded', String(action === next));
-      dialog({ wiki: 'Add to wiki', ask: 'Ask AI', note: 'Add note', connect: 'Connect to related knowledge' }[next], '<p role="status">Loading…</p>');
+      for (const action of ['wiki', 'ask', 'note', 'connect', 'notebook']) el(`reading-selection-${action}`).setAttribute('aria-expanded', String(action === next));
+      dialog({ wiki: 'Add to wiki', ask: 'Ask AI', note: 'Add note', connect: 'Connect to related knowledge', notebook: 'Add to notebook' }[next], '<p role="status">Loading…</p>');
     }
     try {
       let highlight = helper.highlightId ? record('highlights', helper.highlightId) : null;
@@ -616,6 +616,7 @@
         if (next === 'ask') await assistanceDialog(); else await newArtifactDialog();
       }
       if (next === 'connect') await connectKnowledge(highlight.id);
+      if (next === 'notebook') await window.ResearchNotebooks?.transfer({ kind: 'passages', highlightIds: [highlight.id], highlightRevisions: { [highlight.id]: highlight.revision }, annotationIds: [] });
       positionHelper();
       return highlight;
     } finally {
@@ -917,6 +918,7 @@
   el('reading-selection-note').addEventListener('click', guard(() => saveSelection('yellow', 'note')));
   el('reading-selection-ask').addEventListener('click', guard(() => saveSelection('yellow', 'ask')));
   el('reading-selection-connect').addEventListener('click', guard(() => saveSelection('yellow', 'connect')));
+  el('reading-selection-notebook').addEventListener('click', guard(() => saveSelection('yellow', 'notebook')));
   el('reading-helper-close').addEventListener('click', () => {
     closeHelper();
   });

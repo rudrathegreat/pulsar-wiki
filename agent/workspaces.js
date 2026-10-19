@@ -20,6 +20,11 @@ Read wiki/index.md first to find project context. Do not assume a research topic
 ## Full-source ingestion
 Read each source in full, discuss key takeaways with the researcher before writing, then create summaries and concept pages, connect related pages, and update index and log.
 
+## Research notebooks
+notebooks/ contains editable standard Jupyter notebooks; .pulsarwiki/notebooks/ retains private local history, provenance and execution records.
+Researchers manually write and execute analyses. Paper and wiki material may be brought into notebooks with source links; results remain in notebooks.
+AI recall uses only supplied saved excerpts, cites exact historical cells, distinguishes recorded statements from inference, and states when evidence is insufficient. It must not execute code, insert cells, or publish notebook results.
+
 ## Selected reading notes
 Selecting Add to wiki authorises generating and saving that note automatically without another confirmation or Markdown review.
 Use only selected passages and explicitly included comments, visual regions and AI interpretations, with the destination page as context.

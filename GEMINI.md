@@ -30,6 +30,12 @@ When the user adds a new source to `raw/` and asks you to ingest it:
 
 A single source may touch 10-15 wiki pages. That is normal.
 
+## Research notebooks
+
+`notebooks/` contains editable standard Jupyter notebooks. Private version history, source provenance, execution records and recall requests live in `.pulsarwiki/notebooks/`.
+
+Researchers write and execute analyses manually. Paper passages and wiki references may be brought into notebooks with original source links; findings and plots remain in the notebook. AI recall uses only supplied saved excerpts, cites exact historical cells, distinguishes recorded statements from inference, and states when evidence is insufficient. Recall must not execute code, insert cells or publish notebook results. Preserve immutable `raw/` sources.
+
 ## Adding selected reading notes
 
 When the researcher selects **Add to wiki**, treat Add as authorisation to generate and save the selected note automatically. This is a selected-passage workflow, separate from full-source ingestion; do not require a Markdown review or another confirmation.

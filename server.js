@@ -20,6 +20,10 @@ const { FILTERS: SOURCE_FILTERS, SourceDiscoveryService } = require('./agent/sou
 const { ReadingStore } = require('./agent/reading-store');
 const { ReadingService } = require('./agent/reading-service');
 const { createReadingRouter } = require('./agent/reading-router');
+const { NotebookStore } = require('./agent/notebook-store');
+const { NotebookRuntime } = require('./agent/notebook-runtime');
+const { NotebookService } = require('./agent/notebook-service');
+const { createNotebookRouter } = require('./agent/notebook-router');
 
 const app = express();
 const server = http.createServer(app);
@@ -54,6 +58,9 @@ function openWorkspace(folder) {
   workspace.readingService = new ReadingService({ store: new ReadingStore({ dataDir: path.join(dataDir, 'reading') }), wikiTools: workspace.wikiTools, authService: chatgptAuth, discovery: workspace.sourceDiscovery, instructions });
   workspace.ingestJobs = new Map();
   workspace.readingRouter = createReadingRouter({ service: workspace.readingService, requireLocalSession, requireLocalMutation, onImport: queueSourceIngest });
+  const notebookStore = new NotebookStore({ rootDir, dataDir });
+  workspace.notebookService = new NotebookService({ store: notebookStore, runtime: new NotebookRuntime({ store: notebookStore }), wikiTools: workspace.wikiTools, readingService: workspace.readingService, authService: chatgptAuth });
+  workspace.notebookRouter = createNotebookRouter({ service: workspace.notebookService, requireLocalSession, requireLocalMutation });
   workspace.watcher = chokidar.watch([wikiDir, rawDir], { ignoreInitial: true }).on('all', (event, filePath) => {
     const payload = JSON.stringify({ type: 'filechange', event, path: filePath });
     wss.clients.forEach(client => { if (client.workspace === workspace && client.readyState === WebSocket.OPEN) client.send(payload); });
@@ -139,6 +146,7 @@ function resumePendingIngestJobs() {
 }
 
 app.use('/api/reading/import', express.json({ limit: '110mb' }));
+app.use('/api/notebooks', express.json({ limit: '28mb' }));
 app.use(express.json({ limit: '10mb' }));
 app.use((_req, res, next) => {
   // The browser never sees this per-launch secret, but automatically includes
@@ -430,6 +438,7 @@ app.post('/api/upload', requireLocalMutation, async (req, res) => {
 });
 
 app.use('/api/reading', (req, res, next) => currentWorkspace().readingRouter(req, res, next));
+app.use('/api/notebooks', (req, res, next) => currentWorkspace().notebookRouter(req, res, next));
 
 // --- Research source discovery and import ---
 app.get('/api/sources/filters', requireLocalSession, (_req, res) => {
@@ -713,6 +722,7 @@ server.listen(PORT, HOST, () => {
 
 async function shutdown() {
   for (const workspace of workspaces.values()) workspace.readingService.close();
+  await Promise.all([...workspaces.values()].map(workspace => workspace.notebookService.close()));
   await Promise.all([...workspaces.values()].map(workspace => workspace.watcher.close()));
   for (const client of wss.clients) client.close();
   await new Promise(resolve => server.close(resolve));

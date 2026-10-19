@@ -1,0 +1,26 @@
+{
+  "name": "pulsarwiki-notebook-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Embedded JupyterLab integration for PulsarWiki",
+  "main": "src/index.js",
+  "license": "ISC",
+  "scripts": {
+    "build": "build-labextension --core-path ./core . && node normalize-build.js"
+  },
+  "dependencies": {
+    "@jupyterlab/notebook": "^4.4.0",
+    "@jupyterlab/apputils": "^4.4.0"
+  },
+  "devDependencies": {
+    "@jupyterlab/builder": "^4.4.0"
+  },
+  "jupyterlab": {
+    "extension": true,
+    "outputDir": "extensions/pulsarwiki-notebook-bridge",
+    "_build": {
+      "load": "static/remoteEntry.0f3b7cd2c4536175f448.js",
+      "extension": "./extension"
+    }
+  }
+}

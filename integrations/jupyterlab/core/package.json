@@ -1,0 +1,11 @@
+{
+  "name": "pulsarwiki-jupyterlab-shared-contract",
+  "private": true,
+  "dependencies": {
+    "@jupyterlab/notebook": "^4.4.0",
+    "@jupyterlab/apputils": "^4.4.0"
+  },
+  "jupyterlab": {
+    "singletonPackages": ["@jupyterlab/notebook", "@jupyterlab/apputils"]
+  }
+}

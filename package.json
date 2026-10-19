@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "build:notebooks": "npm --prefix integrations/jupyterlab ci && npm --prefix integrations/jupyterlab run build"
   },
   "keywords": [],
   "author": "",
