@@ -52,3 +52,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-20 | Notebook creation / README.md | Added a shared barebones template with Title, Objective, Live notes, and Preliminary analysis Markdown cells to new notebooks created through JupyterLab and the notebook service. Preserved imported and existing contents, copies, and later edits; added creation and preservation regression coverage and updated the guide and index. |
 
 | 2026-10-21 | Project opening / README.md | Added a themed loading animation while opening a folder and loading initial project data, including first-time opening; blocked background interaction, respected reduced-motion preferences, and cleared loading on failure with a visible error. Updated workspace guidance and index. |
+
+| 2026-10-21 | Application interface / public | Padded Close folder and made its text white, moved wiki scrolling to the panel's right edge while retaining centered content, placed the notebook reference action beside the breadcrumb, removed the selected sidebar page edge marker, and shared button hover transitions using the existing 150 ms easing token. Updated the wiki index. |

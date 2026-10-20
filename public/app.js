@@ -388,9 +388,9 @@ async function openPage(name, { historyMode = 'push' } = {}) {
     dom.wikiBody.innerHTML = `<div class="md-body">${renderMd(data.content)}</div>`;
     typesetMath(dom.wikiBody);
     const notebookAction = document.createElement('button');
-    notebookAction.type = 'button'; notebookAction.className = 'btn'; notebookAction.textContent = 'Add page reference to notebook';
+    notebookAction.type = 'button'; notebookAction.className = 'btn wiki-notebook-action'; notebookAction.textContent = 'Add page reference to notebook';
     notebookAction.addEventListener('click', () => window.ResearchNotebooks?.transfer({ kind: 'wiki', page }));
-    dom.wikiBody.prepend(notebookAction);
+    dom.wikiBc.append(notebookAction);
     window.ActiveReading?.backlinks(page, dom.wikiBody);
     dom.wikiBody.querySelectorAll('a.wiki-link').forEach(link => link.addEventListener('click', event => {
       event.preventDefault();

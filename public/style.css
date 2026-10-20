@@ -23,8 +23,7 @@ body.workspace-ready #workspace-welcome { display: none; }
 .workspace-titlebar { flex-shrink: 0; display: flex; align-items: center; gap: 16px; min-height: 44px; padding: 8px 20px; flex-wrap: wrap; border-bottom: 1px solid var(--border); font-size: 12px; }
 #workspace-current-name { white-space: nowrap; }
 #workspace-current-path { flex: 1 1 200px; font: 12px var(--mono); overflow-wrap: anywhere; user-select: all; }
-#workspace-close { margin-left: auto; flex-shrink: 0; background: none; color: inherit; opacity: .6; border: 0; font: inherit; cursor: pointer; }
-#workspace-close:hover { opacity: 1; }
+#workspace-close { margin-left: auto; flex-shrink: 0; padding: 3px 8px; background: none; color: #fff !important; border: 0; font: inherit; cursor: pointer; }
 #workspace-path-form label { display: block; font-size: 12px; margin-bottom: 8px; }
 .workspace-path-row { display: flex; flex-wrap: wrap; gap: 8px; }
 #workspace-path { flex: 1 1 100%; min-width: 0; padding: 10px; font: 12px var(--mono); color: var(--text-1); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; }
@@ -36,7 +35,7 @@ body.workspace-loading #workspace-loading { position: fixed; inset: 0; z-index: 
 .workspace-spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--text-1); border-radius: 50%; animation: workspace-spin 1s linear infinite; }
 @keyframes workspace-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .workspace-spinner { animation: none; } }
-#workspace-welcome button, #workspace-close { color: var(--text-1) !important; }
+#workspace-welcome button { color: var(--text-1) !important; }
 #workspace-welcome .workspace-recent { border-color: transparent !important; }
 @media (max-width: 650px) {
   .welcome-content { margin-top: 4vh; padding: 20px 28px 40px; }
@@ -401,17 +400,6 @@ body {
   background: var(--surface-3) !important;
 }
 
-.nav-item.active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--accent);
-  border-radius: 0 2px 2px 0;
-}
-
 .nav-item svg {
   width: 14px;
   height: 14px;
@@ -575,6 +563,10 @@ body {
 
 /* ── Wiki Panel ──────────────────────────────────────────────────── */
 #panel-wiki {
+  width: 100%;
+}
+
+.wiki-page {
   padding: 56px 48px 40px;
   max-width: 900px;
   margin: 0 auto;
@@ -587,7 +579,17 @@ body {
   margin-bottom: 24px;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
+}
+
+.wiki-breadcrumb > span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.wiki-breadcrumb .wiki-notebook-action {
+  margin-left: auto;
 }
 
 .wiki-breadcrumb a {
@@ -2043,6 +2045,14 @@ button,
   border-radius: var(--radius-sm);
   color: var(--button-text) !important;
   box-shadow: none !important;
+  transition: color var(--transition), background-color var(--transition), border-color var(--transition), box-shadow var(--transition), opacity var(--transition), transform var(--transition), filter var(--transition) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button,
+  .document-action {
+    transition: none !important;
+  }
 }
 
 button,
