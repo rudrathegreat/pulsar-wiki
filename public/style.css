@@ -23,7 +23,7 @@ body.workspace-ready #workspace-welcome { display: none; }
 .workspace-titlebar { flex-shrink: 0; display: flex; align-items: center; gap: 16px; min-height: 44px; padding: 8px 20px; flex-wrap: wrap; border-bottom: 1px solid var(--border); font-size: 12px; }
 #workspace-current-name { white-space: nowrap; }
 #workspace-current-path { flex: 1 1 200px; font: 12px var(--mono); overflow-wrap: anywhere; user-select: all; }
-#workspace-close { margin-left: auto; flex-shrink: 0; padding: 3px 8px; background: none; color: #fff !important; border: 0; font: inherit; cursor: pointer; }
+#workspace-close { margin-left: auto; flex-shrink: 0; padding: 3px 8px; background: none; color: var(--button-text) !important; border: 0; font: inherit; cursor: pointer; }
 #workspace-path-form label { display: block; font-size: 12px; margin-bottom: 8px; }
 .workspace-path-row { display: flex; flex-wrap: wrap; gap: 8px; }
 #workspace-path { flex: 1 1 100%; min-width: 0; padding: 10px; font: 12px var(--mono); color: var(--text-1); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; }
@@ -77,6 +77,7 @@ body.workspace-loading #workspace-loading { position: fixed; inset: 0; z-index: 
 }
 
 [data-theme="light"] {
+  color-scheme: light;
   --bg: #fff;
   --surface: #eee;
   --surface-2: #fff;
@@ -94,15 +95,22 @@ body.workspace-loading #workspace-loading { position: fixed; inset: 0; z-index: 
   --node-3: #eee;
   --node-4: #111;
   --node-5: #ccc;
-  --button-bg: #111;
-  --button-text: #fff;
-  --button-border: #111;
+  --button-bg: #eee;
+  --button-text: #111;
+  --button-border: #ccc;
   --focus: #111;
 }
 
 [data-theme="light"] #iconbar,
 [data-theme="light"] #sidebar {
+  background: var(--bg);
+  border-right-color: var(--border-sub);
   color: #111;
+}
+
+[data-theme="light"] #sidebar,
+[data-theme="light"] #search-input {
+  background: var(--bg);
 }
 
 [data-theme="light"] #iconbar button,
@@ -387,7 +395,7 @@ body {
 #sidebar .nav-item:hover {
   background: transparent !important;
   color: var(--text-2) !important;
-  border-bottom-color: #fff !important;
+  border-bottom-color: var(--focus) !important;
 }
 
 #sidebar .nav-item.active {
@@ -592,6 +600,13 @@ body {
   margin-left: auto;
 }
 
+.wiki-breadcrumb .breadcrumb-link {
+  border: 0 !important;
+  border-radius: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
 .wiki-breadcrumb a {
   color: var(--text-2);
   text-decoration: none;
@@ -761,7 +776,7 @@ body {
 
 .chat-msg.ai .chat-bubble a,
 .chat-msg.ai .chat-bubble a:visited {
-  color: #fff !important;
+  color: var(--text-1) !important;
   text-decoration: none !important;
   border-bottom: 1px solid #ccc !important;
   padding-bottom: 1px;
@@ -770,14 +785,8 @@ body {
 
 .chat-msg.ai .chat-bubble a:hover,
 .chat-msg.ai .chat-bubble a:focus-visible {
-  color: #fff !important;
-  border-bottom-color: #fff !important;
-}
-
-[data-theme="light"] .chat-msg.ai .chat-bubble a,
-[data-theme="light"] .chat-msg.ai .chat-bubble a:visited {
-  color: #111 !important;
-  border-bottom-color: #ccc !important;
+  color: var(--text-1) !important;
+  border-bottom-color: var(--focus) !important;
 }
 
 .md-body a:not(.wiki-link) {

@@ -6,7 +6,7 @@ Application workspace guide: [Research workspaces](../README.md#research-workspa
 
 Notebook guide: [Research notebooks](../README.md#research-notebooks). New notebooks start with editable Title, Objective, Live notes, and Preliminary analysis sections.
 
-Interface: wiki pages keep centered content with the scrollbar at the right edge, and the notebook reference action sits beside the breadcrumb. Buttons share consistent hover timing; Close folder has padding and white text, and selected sidebar pages have no edge marker.
+Interface: wiki pages keep centered content with the scrollbar at the right edge, and the notebook reference action sits beside the borderless Wiki breadcrumb. Buttons share consistent hover timing; Close folder has padding and theme-aware text, and selected sidebar pages have no edge marker. Light mode uses white sidebar, icon bar, and wiki search backgrounds, light grey borders, and black text and hover accents.
 
 ## Pillar 1: Foundational Physics
 - [[neutron-star]]: The ultra-dense physical nature of pulsars and the nuclear Equation of State.

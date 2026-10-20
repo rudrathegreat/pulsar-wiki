@@ -82,6 +82,7 @@
 /* The helper follows the application theme, including its expanded forms. */
 #reading-selection-toolbar { --button-text:var(--text-1); position:fixed; display:block; z-index:40; padding:7px; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--text-1); box-shadow:0 3px 18px rgb(0 0 0 / .35); width:max-content; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); overflow:auto; overscroll-behavior:contain; color-scheme:dark; }
 [data-theme="light"] #reading-selection-toolbar { color-scheme:light; }
+[data-theme="light"] #reading-selection-toolbar { color-scheme:light; }
 #reading-selection-toolbar[hidden] { display:none; }
 #reading-selection-toolbar.expanded { width:min(720px,calc(100vw - 16px)); }
 .reading-helper-actions { display:flex; flex-wrap:wrap; align-items:center; gap:5px; }

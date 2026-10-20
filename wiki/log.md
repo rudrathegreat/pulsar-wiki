@@ -54,3 +54,11 @@ All major updates to the wiki are recorded here.
 | 2026-10-21 | Project opening / README.md | Added a themed loading animation while opening a folder and loading initial project data, including first-time opening; blocked background interaction, respected reduced-motion preferences, and cleared loading on failure with a visible error. Updated workspace guidance and index. |
 
 | 2026-10-21 | Application interface / public | Padded Close folder and made its text white, moved wiki scrolling to the panel's right edge while retaining centered content, placed the notebook reference action beside the breadcrumb, removed the selected sidebar page edge marker, and shared button hover transitions using the existing 150 ms easing token. Updated the wiki index. |
+
+| 2026-10-21 | Light-mode interface / public | Applied grey sidebar, icon bar and wiki search backgrounds with light grey borders, corrected light-mode button and Close folder text, replaced white sidebar and chat-link hover accents with theme-aware black accents, and matched native reading helper controls to light mode. Updated the wiki index. |
+
+| 2026-10-21 | Light-mode sidebar / public | Changed the sidebar and wiki search backgrounds to white while keeping the icon bar grey. Updated the wiki index. |
+
+| 2026-10-21 | Light-mode icon bar / public | Changed the icon bar background to white to match the sidebar and wiki search. Updated the wiki index. |
+
+| 2026-10-21 | Wiki breadcrumb / public | Removed the border around the Wiki breadcrumb button while preserving navigation and keyboard focus styling. Updated the wiki index. |
