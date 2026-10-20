@@ -4,13 +4,13 @@
 
 **Sources**: README.md
 
-**Last updated**: 2026-10-19
+**Last updated**: 2026-10-20
 
 ---
 
 ## Working with notes and code
 
-Open Notebooks, select a local Python environment, and start Python. Create or import standard Jupyter notebooks and combine executable code, Markdown, LaTeX and visualisations without a prescribed format. Headings, navigation and cell collapse remain optional. Editing and execution work without an AI connection. (source: README.md)
+Open Notebooks to start the workspace?s local Python environment automatically. A loading animation stays visible until the embedded JupyterLab editor is ready; startup failures offer retry and interpreter settings. The separate PulsarWiki file sidebar and filename/action bar are removed. Use JupyterLab?s controls to create, upload, and open standard Jupyter notebooks and combine executable code, Markdown, LaTeX and visualisations without a prescribed format. Headings, navigation and cell collapse remain optional. Editing and execution work without an AI connection. (source: README.md)
 
 ## Bringing in research context
 

@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const e = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const n = { data: null, selected: null, historical: null, launch: null, ready: false, pending: new Map(), selection: {}, tray: '', poll: null, refreshing: false };
+  const n = { data: null, selected: null, historical: null, launch: null, ready: false, pending: new Map(), selection: {}, tray: '', poll: null, refreshing: false, autoStarted: false, starting: null, loading: false, connectionTimer: null, connectionFailed: false };
   const message = value => { $('notebook-status').textContent = value || ''; };
   const guard = fn => async (...args) => { try { return await fn(...args); } catch (error) { message(error.message); } };
   const request = (suffix = '', method = 'GET', body) => WorkspaceSession.fetch(`/api/notebooks${suffix}`, { method, ...(body === undefined ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }) }).then(response => readJsonResponse(response, 'Notebooks'));
@@ -32,17 +32,14 @@
   async function refresh() {
     if (n.refreshing) return n.refreshing;
     n.refreshing = (async () => {
-      n.data = await request(); renderList(); renderRuntime(); renderToolbar();
+      n.data = await request(); renderRuntime();
       if (n.tray === 'recall') renderRecallTasks();
       if (n.tray === 'history') renderHistory();
-      if (n.data.runtime.state === 'running' && !n.launch) await connect();
-      if (n.data.runtime.state === 'failed') { message(n.data.runtime.error); disconnect(); }
+      if (n.data.runtime.state === 'running' && !n.launch && !n.connectionFailed) await connect();
+      if (n.data.runtime.state === 'failed') failStartup(n.data.runtime.error);
       if (n.tray === 'sources') renderRuns();
     })();
     try { await n.refreshing; } finally { n.refreshing = false; }
-  }
-  function renderList() {
-    $('notebook-list').innerHTML = (n.data?.notebooks || []).map(book => `<button type="button" data-notebook="${e(book.id)}" class="${book.id === n.selected ? 'active' : ''}"><strong>${e(book.path.replace(/\.ipynb$/, ''))}</strong><small>${book.available ? `${book.history.length} saved revisions` : 'File missing · history preserved'}</small></button>`).join('') || '<p class="notebook-muted" style="padding:12px">Your notebooks will stay in this workspace.</p>';
   }
   function renderRuntime() {
     const runtime = n.data.runtime;
@@ -56,23 +53,19 @@
     $('notebook-environment').textContent = env ? env.ready ? `${env.python}\n${env.executable}\n${env.packages.length} packages recorded` : `Missing: ${(env.missing || []).join(', ') || env.error}` : '';
     if (runtime.error) { message(runtime.error); $('notebook-python-details').open = true; }
   }
-  function renderToolbar() {
-    const book = entry(); $('notebook-title').textContent = book ? book.path : 'Research notebook';
-    for (const id of ['save', 'rename', 'checkpoint', 'history', 'sources', 'export']) $(`notebook-${id}`).disabled = !book;
-    $('notebook-save').disabled = !n.ready || !book || Boolean(n.historical);
-    $('notebook-kernel').textContent = n.historical ? `Historical revision ${n.historical.revision} · read only` : n.ready && n.selection.kernel ? n.selection.kernel : book ? 'Standard Jupyter notebook' : '';
-  }
   async function show() {
     try {
+      if (!n.data && !n.ready) setLoading(true);
       await refresh();
       if (!n.poll) n.poll = setInterval(() => { if ($('panel-notebooks').classList.contains('active') || n.data?.runtime.state === 'starting' || n.data?.recalls.some(t => ['queued', 'running'].includes(t.status)) || n.data?.runs.some(t => t.status === 'running')) void guard(refresh)(); }, 1500);
-    } catch (error) { message(error.message); }
+      if (!n.autoStarted && n.data.runtime.state === 'stopped') { n.autoStarted = true; await start(); }
+    } catch (error) { failStartup(error.message); }
   }
   async function open(id, options = {}) {
     showPanel('notebooks'); await show();
     n.selected = id; n.historical = options.revision ? { revision: Number(options.revision), cellId: options.cellId } : null;
     const book = entry(); if (!book) throw new Error('This notebook is not in the active workspace.');
-    renderList(); renderToolbar();
+
     if (n.ready && !n.historical && book.available) {
       $('notebook-frame').hidden = false; $('notebook-preview').hidden = true;
       await bridge('open', { path: book.path, cellId: options.cellId });
@@ -102,17 +95,44 @@
     typesetMath($('notebook-preview'));
     if (cellId) [...$('notebook-preview').querySelectorAll('[data-notebook-cell]')].find(el => el.dataset.notebookCell === cellId)?.scrollIntoView({ block: 'center' });
   }
+  function setLoading(loading) {
+    n.loading = loading;
+    $('notebook-loading').hidden = !loading;
+    if (loading) $('notebook-recovery').hidden = true;
+  }
+  function failStartup(error) {
+    disconnect(); n.connectionFailed = true; setLoading(false);
+    $('notebook-recovery').hidden = false;
+    $('notebook-python-details').open = true;
+    message(error || 'JupyterLab could not connect. Retry to reconnect.');
+  }
+  async function start() {
+    if (n.starting) return n.starting;
+    n.autoStarted = true; n.connectionFailed = false; setLoading(true); message('');
+    n.starting = (async () => {
+      if (n.data?.runtime.state === 'running') { await flush(); await connect(); }
+      else {
+        if ($('notebook-python').value !== n.data?.runtime.python) await request('/runtime/python', 'PUT', { python: $('notebook-python').value });
+        await request('/runtime/start', 'POST', {}); await refresh();
+      }
+    })();
+    try { await n.starting; } catch (error) { failStartup(error.message); } finally { n.starting = null; }
+  }
   function disconnect() {
+    clearTimeout(n.connectionTimer); n.connectionTimer = null;
     n.ready = false; n.launch = null; n.selection = {};
     for (const task of n.pending.values()) { clearTimeout(task.timeout); task.reject(new Error('Notebook editor disconnected.')); } n.pending.clear();
-    $('notebook-frame').removeAttribute('src'); $('notebook-frame').hidden = true; $('notebook-preview').hidden = false; renderToolbar();
+    $('notebook-frame').removeAttribute('src'); $('notebook-frame').hidden = true; $('notebook-preview').hidden = false;
   }
   async function connect() {
     if (n.launch) disconnect();
-    n.launch = await request('/runtime/launch', 'POST', {});
+    setLoading(true);
+    n.connectionTimer = setTimeout(() => failStartup('JupyterLab took too long to connect. Retry to reconnect.'), 90000);
+    try { n.launch = await request('/runtime/launch', 'POST', {}); }
+    catch (error) { failStartup(error.message); throw error; }
     $('notebook-frame').src = n.launch.url;
     if (!n.historical) { $('notebook-frame').hidden = false; $('notebook-preview').hidden = true; }
-    message('Connecting JupyterLab…');
+    message('');
   }
   window.addEventListener('message', guard(async event => {
     if (!n.launch || event.source !== $('notebook-frame').contentWindow || event.origin !== n.launch.origin) return;
@@ -120,8 +140,8 @@
     if (data?.type === 'pulsarwiki-bootstrap') { $('notebook-frame').contentWindow.postMessage({ type: 'pulsarwiki-auth', ticket: n.launch.ticket }, n.launch.origin); delete n.launch.ticket; return; }
     if (data?.channel !== n.launch.channel) return;
     if (data.type === 'pulsarwiki-reply') { const task = n.pending.get(data.requestId); if (task) { clearTimeout(task.timeout); n.pending.delete(data.requestId); data.error ? task.reject(new Error(data.error)) : task.resolve(data.result); } }
-    if (data.type === 'pulsarwiki-ready') { n.ready = true; message(''); await bridge('theme', { theme: document.documentElement.dataset.theme }); if (entry() && !n.historical) await bridge('open', { path: entry().path }); renderToolbar(); }
-    if (data.type === 'pulsarwiki-selection') { n.selection = { path: data.path, cellId: data.cellId, dirty: data.dirty, kernel: data.kernel }; const book = n.data.notebooks.find(b => b.path === data.path); if (book && !n.historical) { n.selected = book.id; renderList(); } renderToolbar(); }
+    if (data.type === 'pulsarwiki-ready') { try { clearTimeout(n.connectionTimer); n.connectionTimer = null; n.ready = true; message(''); await bridge('theme', { theme: document.documentElement.dataset.theme }); if (entry() && !n.historical) await bridge('open', { path: entry().path }); setLoading(false); } catch (error) { failStartup(error.message); } }
+    if (data.type === 'pulsarwiki-selection') { n.selection = { path: data.path, cellId: data.cellId, dirty: data.dirty, kernel: data.kernel }; const book = n.data.notebooks.find(b => b.path === data.path); if (book && !n.historical) { n.selected = book.id; } }
     if (data.type === 'pulsarwiki-saved') await refresh();
     if (data.type === 'pulsarwiki-execution') { await request('/executions', 'POST', { path: data.path, cellId: data.cellId, success: data.success, startedAt: data.startedAt }); await refresh(); }
     if (data.type === 'pulsarwiki-warning') message(String(data.message).slice(0, 2000));
@@ -143,7 +163,7 @@
   }
   async function reload(id, cellId) {
     await refresh(); n.historical = null; n.selected = id;
-    if (n.ready) { await bridge('reload', { path: entry().path, cellId }); $('notebook-frame').hidden = false; $('notebook-preview').hidden = true; renderToolbar(); }
+    if (n.ready) { await bridge('reload', { path: entry().path, cellId }); $('notebook-frame').hidden = false; $('notebook-preview').hidden = true; }
     else await open(id, { cellId });
   }
   async function sources() {
@@ -194,19 +214,11 @@
     const match = /^#notebook\/([a-f0-9-]{36})(?:\?(.*))?$/.exec(hashValue); if (!match) return false;
     const query = new URLSearchParams(match[2]); await open(match[1], { revision: query.get('revision') || undefined, cellId: query.get('cell'), history: false }); return true;
   }
-  async function prepareToLeave() { await flush(); if (n.data?.runtime.state === 'running' || n.data?.runtime.state === 'starting') await request('/runtime/stop', 'POST', {}); disconnect(); }
-  $('notebook-new').addEventListener('click', newNotebook); $('notebook-empty-new').addEventListener('click', newNotebook);
-  $('notebook-list').addEventListener('click', guard(event => { const button = event.target.closest('[data-notebook]'); if (button) return open(button.dataset.notebook); }));
-  $('notebook-import').addEventListener('click', () => $('notebook-file').click());
-  $('notebook-file').addEventListener('change', guard(async () => { const file = $('notebook-file').files[0]; if (!file) return; if (file.size > 25 * 1024 * 1024) throw new Error('Choose a notebook smaller than 25 MB.'); const notebook = JSON.parse(await file.text()); const book = await request('', 'POST', { name: file.name, notebook }); $('notebook-file').value = ''; await refresh(); await open(book.id); }));
-  $('notebook-start').addEventListener('click', guard(async () => { if (n.data?.runtime.state === 'running') { await flush(); await connect(); } else { if ($('notebook-python').value !== n.data?.runtime.python) await request('/runtime/python', 'PUT', { python: $('notebook-python').value }); await request('/runtime/start', 'POST', {}); message('Starting local JupyterLab…'); await refresh(); } }));
+  async function prepareToLeave() { await flush(); if (n.data?.runtime.state === 'running' || n.data?.runtime.state === 'starting') await request('/runtime/stop', 'POST', {}); disconnect(); setLoading(false); n.autoStarted = false; n.connectionFailed = false; n.data = null; n.selected = null; n.historical = null; }
+  $('notebook-empty-new').addEventListener('click', newNotebook);
+  $('notebook-start').addEventListener('click', () => void start());
   $('notebook-stop').addEventListener('click', guard(async () => { await flush(); await request('/runtime/stop', 'POST', {}); disconnect(); await refresh(); if (entry()) await preview(n.selected); message('Python stopped. Saved notebooks and history are preserved.'); }));
   $('notebook-python-save').addEventListener('click', guard(async () => { message('Checking Python…'); await request('/runtime/python', 'PUT', { python: $('notebook-python').value }); await refresh(); message(n.data.runtime.environment?.ready ? 'Python environment is ready.' : 'Install the missing packages in this Python environment.'); }));
-  $('notebook-save').addEventListener('click', guard(async () => { await flush(); await refresh(); message('Notebook saved.'); }));
-  $('notebook-rename').addEventListener('click', guard(async () => { await flush(); await refresh(); const book = entry(); dialog('Rename notebook', field('notebook-name', 'Filename', book.path), 'Rename', async () => { if (n.ready) await bridge('close'); await request(`/${book.id}`, 'PATCH', { name: $('notebook-name').value, revision: book.revision }); await refresh(); await open(book.id); }); }));
-  $('notebook-checkpoint').addEventListener('click', () => dialog('Save a checkpoint', field('notebook-checkpoint-label', 'Name', '', 'Before changing the noise model'), 'Save checkpoint', async () => { await flush(); await refresh(); await request(`/${n.selected}/checkpoints`, 'POST', { revision: entry().revision, label: $('notebook-checkpoint-label').value }); await refresh(); message('Named checkpoint saved.'); }));
-  $('notebook-history').addEventListener('click', guard(async () => { await flush(); await refresh(); tray('history', 'Version history'); renderHistory(); }));
-  $('notebook-sources').addEventListener('click', guard(sources)); $('notebook-recall').addEventListener('click', recall); $('notebook-export').addEventListener('click', guard(exportDialog));
   $('notebook-tray-close').addEventListener('click', () => { n.tray = ''; $('notebook-tray').hidden = true; }); $('notebook-dialog-close').addEventListener('click', () => $('notebook-dialog').close());
   document.addEventListener('click', guard(async event => { const link = event.target.closest('a[href^="/#notebook/"]'); if (link && event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey) { event.preventDefault(); await route(new URL(link.href).hash); history.pushState(null, '', link.getAttribute('href')); } }));
   window.addEventListener('popstate', guard(() => route())); window.addEventListener('hashchange', guard(() => route()));

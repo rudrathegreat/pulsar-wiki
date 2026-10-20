@@ -32,7 +32,7 @@ function client(handler) {
     showPanel() {},
   };
   vm.createContext(context);
-  vm.runInContext(source.replace('window.ResearchNotebooks =', 'window.__test = { n, refresh, open, bridge, flush, preview, renderRecallTasks }; window.ResearchNotebooks ='), context);
+  vm.runInContext(source.replace('window.ResearchNotebooks =', 'window.__test = { n, refresh, open, bridge, flush, preview, renderRecallTasks, start, failStartup }; window.ResearchNotebooks ='), context);
   return { ...window.__test, context, nodes, events, requests, posts, api: window.ResearchNotebooks, node: id => document.getElementById(id) };
 }
 const book = { id: '00000000-0000-0000-0000-000000000001', path: 'scratch.ipynb', revision: 1, history: [{ revision: 1, savedAt: '2026-10-19T00:00:00Z' }], available: true };
@@ -41,11 +41,65 @@ const snapshot = () => ({ entry: book, notebookId: book.id, revision: 1, savedAt
 
 test('simultaneous notebook opens wait for the same workspace fetch and retain historical cell identity', async () => {
   let release; const gate = new Promise(resolve => { release = resolve; });
-  const c = client(async url => { if (url === '/api/notebooks') { await gate; return state(); } return snapshot(); });
+  const c = client(async url => { if (url === '/api/notebooks') { await gate; return { ...state(), runtime: { state: 'starting', python: 'python' } }; } return snapshot(); });
   const refreshing = c.refresh(); const opening = c.open(book.id, { revision: 1, cellId: 'original-cell', history: false }); release(); await Promise.all([refreshing, opening]);
   assert.equal(c.requests.filter(r => r.url === '/api/notebooks').length, 1);
   assert.equal(c.n.selected, book.id); assert.equal(c.n.historical.revision, 1); assert.equal(c.node('notebook-frame').hidden, true);
   assert.match(c.node('notebook-preview').innerHTML, /data-notebook-cell="original-cell"/);
+});
+
+test('opening Notebooks starts Python once and keeps loading until the editor bridge is ready', async () => {
+  let runtimeState = 'stopped';
+  const c = client(async url => {
+    if (url.endsWith('/runtime/start')) { runtimeState = 'starting'; return {}; }
+    if (url.endsWith('/runtime/launch')) return { origin: 'http://127.0.0.1:9000', channel: 'session-channel', url: 'http://127.0.0.1:9000/_bridge/bootstrap' };
+    return { ...state(), runtime: { state: runtimeState, python: 'python' } };
+  });
+  await Promise.all([c.api.show(), c.api.show()]);
+  assert.equal(c.requests.filter(r => r.url.endsWith('/runtime/start')).length, 1);
+  assert.equal(c.node('notebook-loading').hidden, false);
+  runtimeState = 'running'; await c.refresh();
+  assert.equal(c.node('notebook-loading').hidden, false, 'HTTP readiness alone does not finish loading');
+  const ready = c.events.get('message')({ source: c.node('notebook-frame').contentWindow, origin: c.n.launch.origin, data: { type: 'pulsarwiki-ready', channel: 'session-channel' } });
+  const command = c.posts.at(-1).data;
+  await c.events.get('message')({ source: c.node('notebook-frame').contentWindow, origin: c.n.launch.origin, data: { type: 'pulsarwiki-reply', channel: 'session-channel', requestId: command.requestId, result: {} } });
+  await ready;
+  assert.equal(c.node('notebook-loading').hidden, true);
+  assert.equal(c.node('notebook-recovery').hidden, true);
+  await c.api.show();
+  assert.equal(c.requests.filter(r => r.url.endsWith('/runtime/start')).length, 1);
+});
+
+test('startup failure stops loading and exposes recovery without repeatedly starting Python', async () => {
+  let failed = false;
+  const c = client(async url => {
+    if (url.endsWith('/runtime/start')) { failed = true; throw new Error('Python unavailable'); }
+    return { ...state(), runtime: { state: failed ? 'failed' : 'stopped', python: 'python', error: failed ? 'Python unavailable' : '' } };
+  });
+  await c.api.show(); await c.api.show();
+  assert.equal(c.node('notebook-loading').hidden, true);
+  assert.equal(c.node('notebook-recovery').hidden, false);
+  assert.match(c.node('notebook-status').textContent, /Python unavailable/);
+  assert.equal(c.requests.filter(r => r.url.endsWith('/runtime/start')).length, 1);
+  assert.doesNotMatch(html, /class="notebook-sidebar"|class="notebook-toolbar"/);
+});
+
+test('a bridge connection failure waits for explicit retry before reconnecting', async () => {
+  const c = client(async url => {
+    if (url.endsWith('/runtime/launch')) return { origin: 'http://127.0.0.1:9000', channel: 'session-channel', url: 'http://127.0.0.1:9000/_bridge/bootstrap' };
+    return { ...state(), runtime: { state: 'running', python: 'python' } };
+  });
+  await c.api.show();
+  c.failStartup('JupyterLab took too long to connect.');
+  await c.refresh();
+  assert.equal(c.node('notebook-loading').hidden, true);
+  assert.equal(c.node('notebook-recovery').hidden, false);
+  assert.equal(c.requests.filter(r => r.url.endsWith('/runtime/launch')).length, 1);
+  await c.start();
+  assert.equal(c.node('notebook-loading').hidden, false);
+  assert.equal(c.node('notebook-recovery').hidden, true);
+  assert.equal(c.requests.filter(r => r.url.endsWith('/runtime/launch')).length, 2);
+  c.failStartup('Test complete');
 });
 
 test('historical previews escape code and text outputs and never render active HTML output', async () => {

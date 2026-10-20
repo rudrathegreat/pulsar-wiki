@@ -1,15 +1,6 @@
 body.notebook-mode #sidebar { display: none; }
 #panel-notebooks.active { display: flex !important; overflow: hidden; padding: 0; }
-.notebook-sidebar { width: 226px; flex: 0 0 226px; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--surface); overflow: auto; }
-.notebook-sidebar > header { padding: 28px 20px 18px; }
-.notebook-sidebar h2 { font-size: 22px; font-weight: 500; margin: 7px 0; letter-spacing: -.6px; }
-.notebook-sidebar p { font-size: 12px; line-height: 1.7; opacity: .6; }
 .notebook-create-actions { display: flex; gap: 6px; padding: 0 16px 16px; flex-wrap: wrap; }
-#notebook-list { flex: 1; padding: 0 8px 20px; min-height: 100px; }
-#notebook-list button { width: 100%; border: 0; text-align: left; background: transparent; color: inherit; padding: 11px 12px; font: inherit; cursor: pointer; border-radius: 4px; }
-#notebook-list button:hover, #notebook-list button.active { background: var(--surface-2); }
-#notebook-list strong { display: block; overflow-wrap: anywhere; font-size: 12px; font-weight: 500; }
-#notebook-list small { display: block; font-size: 10px; opacity: .5; margin-top: 5px; }
 .notebook-runtime { border-top: 1px solid var(--border); padding: 16px; font-size: 11px; }
 .notebook-runtime > div:first-child { display: flex; gap: 10px; justify-content: space-between; margin-bottom: 12px; }
 .notebook-runtime details { margin-bottom: 14px; }
@@ -20,15 +11,15 @@ body.notebook-mode #sidebar { display: none; }
 .notebook-runtime code { display: block; font-size: 10px; overflow-wrap: anywhere; margin: 8px 0; }
 .notebook-runtime pre { white-space: pre-wrap; font: 10px var(--mono); max-height: 180px; overflow: auto; margin-top: 10px; }
 .notebook-workspace { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.notebook-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); padding: 12px 18px; flex-wrap: wrap; }
-.notebook-toolbar strong { font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
-#notebook-kernel { display: block; font-size: 10px; opacity: .5; margin-top: 3px; }
-.notebook-tools { display: flex; gap: 5px; flex-wrap: wrap; }
-.notebook-tools .btn { padding: 5px 8px; font-size: 10px; }
 .notebook-status { font-size: 12px; line-height: 1.6; padding: 8px 18px; margin: 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
 .notebook-status:empty { display: none; }
 .notebook-main { display: flex; flex: 1; min-height: 0; min-width: 0; }
 .notebook-stage { flex: 1; min-width: 0; position: relative; }
+.notebook-loading { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: var(--bg); color: var(--text-1); font-size: 13px; }
+.notebook-loading[hidden], #notebook-recovery[hidden] { display: none; }
+.notebook-spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--text-1); border-radius: 50%; animation: notebook-spin 1s linear infinite; }
+@keyframes notebook-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .notebook-spinner { animation: none; } }
 #notebook-frame { width: 100%; height: 100%; display: block; border: 0; background: var(--bg); }
 #notebook-frame[hidden], .notebook-tray[hidden], #notebook-preview[hidden] { display: none; }
 #notebook-preview { height: 100%; overflow: auto; }
@@ -66,5 +57,5 @@ body.notebook-mode #sidebar { display: none; }
 #notebook-dialog h2 { font-size: 17px; font-weight: 500; }
 #notebook-dialog-error { font-size: 12px; margin: 12px 0; }
 .notebook-muted { opacity: .5; font-size: 12px; line-height: 1.7; }
-@media (max-width: 1000px) { .notebook-sidebar { width: 185px; flex-basis: 185px; } .notebook-tray { width: 280px; flex-basis: 280px; } }
-@media (max-width: 760px) { .notebook-sidebar { width: 150px; flex-basis: 150px; } .notebook-sidebar > header { padding: 18px 12px; } .notebook-sidebar h2 { font-size: 18px; } .notebook-main { position: relative; } .notebook-tray { position: absolute; inset: 0 0 0 auto; width: min(340px, 100%); z-index: 3; } .notebook-toolbar { padding: 10px; } .notebook-cells { padding: 15px 10px; } }
+@media (max-width: 1000px) { .notebook-tray { width: 280px; flex-basis: 280px; } }
+@media (max-width: 760px) { .notebook-main { position: relative; } .notebook-tray { position: absolute; inset: 0 0 0 auto; width: min(340px, 100%); z-index: 3; } .notebook-cells { padding: 15px 10px; } }
