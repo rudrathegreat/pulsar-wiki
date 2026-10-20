@@ -14,6 +14,12 @@
   const setBusy = busy => {
     for (const id of ['workspace-open', 'workspace-submit', 'workspace-switch', 'workspace-change', 'workspace-close']) $(id).disabled = busy;
   };
+  window.setWorkspaceLoading = loading => {
+    if (loading) document.body.classList.add('workspace-loading');
+    else document.body.classList.remove('workspace-loading');
+    $('workspace-welcome').inert = loading;
+    $('app').inert = loading;
+  };
   const json = (url, options) => workspaceFetch(url, options).then(response => readJsonResponse(response, 'Workspace'));
   const post = (url, body) => json(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
@@ -33,6 +39,7 @@
     if (opening) return;
     opening = true;
     setBusy(true);
+    window.setWorkspaceLoading(true);
     $('workspace-error').textContent = ''; $('workspace-status').hidden = true;
     try {
       if (info?.active) await window.ResearchNotebooks?.prepareToLeave();
@@ -43,7 +50,7 @@
       try { localStorage.setItem('pw-recent-workspaces', JSON.stringify(recent)); } catch { /* optional history */ }
       // Reinitialise all caches, timers and document state when changing projects.
       if (info?.active) location.assign('/'); else location.reload();
-    } catch (error) { showError(error); }
+    } catch (error) { window.setWorkspaceLoading(false); showError(error); }
     finally { opening = false; setBusy(picking); }
   }
 
@@ -73,20 +80,21 @@
   });
 
   window.initializeWorkspaceUi = async () => {
+    window.setWorkspaceLoading(true);
     try {
       info = await json('/api/workspaces');
       renderRecent(info.recent);
       $('workspace-path').value = info.active?.path || info.defaultPath;
       if (!info.active) {
         workspaceId = 'closed'; sessionStorage.setItem('pw-workspace', 'closed');
-        document.body.classList.remove('workspace-loading'); return false;
+        window.setWorkspaceLoading(false); return false;
       }
       workspaceId = info.active.id; sessionStorage.setItem('pw-workspace', workspaceId);
       $('workspace-current-name').textContent = info.active.name;
       $('workspace-current-path').textContent = info.active.path; $('workspace-current-path').title = info.active.path;
       document.title = `${info.active.name} — PulsarWiki`;
-      document.body.classList.add('workspace-ready'); document.body.classList.remove('workspace-loading');
+      document.body.classList.add('workspace-ready');
       return true;
-    } catch (error) { document.body.classList.remove('workspace-loading'); showError(error); return false; }
+    } catch (error) { window.setWorkspaceLoading(false); showError(error); return false; }
   };
 })();

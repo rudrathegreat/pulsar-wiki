@@ -30,6 +30,8 @@ On a new server session, the welcome screen shows a plain **Workspace folder** p
 
 Each selected folder holds its own `wiki/`, immutable `raw/` sources, `.pulsarwiki/chat/` conversations, and `.pulsarwiki/reading/` annotations and drafts. Missing folders, `GEMINI.md`, and starter index/log pages are created without replacing existing content. A new workspace starts with general research instructions; existing projects retain their own instructions and sources. Existing source files should be placed in that project's `raw/` folder to appear in Files.
 
+An animated loading screen appears while a project opens and its initial data loads, including the first opening of a new folder. It follows the current theme and respects reduced-motion preferences. If opening fails, the loading screen clears and the error is displayed.
+
 The selected folder is remembered throughout the running browser/server session, including refreshes, direct page links, and the ChatGPT sign-in round trip. Each tab pins its own workspace, so different projects can be open in separate tabs. Recent paths remain in this browser for reopening after a server restart. ChatGPT account settings are shared across projects.
 
 Use **Change folder** in the title bar or the folder icon in the activity bar to switch projects with the system dialog. The title bar always shows the full active folder path, including on small screens; **Close folder** returns to the welcome screen. Switching reloads the interface to clear the previous project's document and search state. Save any draft edits before switching or closing; saved files and notes remain in their project folders.

@@ -74,6 +74,56 @@ test('opening a folder remembers its identity and recent path before reloading',
   assert.equal(JSON.parse(c.stored.get('pw-recent-workspaces'))[0].path, active.path);
   assert.deepEqual(c.navigations, ['reload']);
   assert.equal(JSON.parse(c.requests.at(-1).options.body).path, active.path);
+  assert.equal(c.document.body.classList.contains('workspace-loading'), true, 'keep loading visible until navigation');
+});
+
+test('first folder opening shows loading while the request is pending and recovers on failure', async () => {
+  let rejectOpen;
+  const c = client({ fetchHandler: url => url.endsWith('/open')
+    ? new Promise((resolve, reject) => { rejectOpen = reject; })
+    : { active: null, recent: [], defaultPath: 'E:\\Research' } });
+  await c.initialize();
+  const opening = c.nodes.get('workspace-path-form').listeners.submit({ preventDefault() {} });
+  assert.equal(c.document.body.classList.contains('workspace-loading'), true);
+  assert.equal(c.nodes.get('app').inert, true);
+  assert.equal(c.nodes.get('workspace-welcome').inert, true);
+  rejectOpen(new Error('Cannot open this folder.'));
+  await opening;
+  assert.equal(c.document.body.classList.contains('workspace-loading'), false);
+  assert.equal(c.nodes.get('workspace-welcome').inert, false);
+  assert.equal(c.nodes.get('workspace-error').textContent, 'Cannot open this folder.');
+  assert.equal(c.nodes.get('workspace-submit').disabled, false);
+});
+
+test('project loading lasts through initial data and clears on success or failure', async () => {
+  for (const fail of [false, true]) {
+    const active = { id: 'project', name: 'Project', path: 'E:\\Research' };
+    const c = client({ active });
+    let finishPages;
+    const pages = new Promise(resolve => { finishPages = resolve; });
+    Object.assign(c.context, {
+      initializeWorkspaceUi: c.initialize,
+      connectDirectAgentWS() {}, URLSearchParams,
+      location: { search: '', hash: '' },
+      refreshChatGPTStatus: async () => {}, refreshThreads: async () => {},
+      api: { getWikiList: () => pages },
+      buildSidebar() { if (fail) throw new Error('Could not load pages.'); },
+      handleWikiRoute: () => false,
+      openPage: async () => {
+        assert.equal(c.document.body.classList.contains('workspace-loading'), true);
+      },
+      $: id => c.document.getElementById(id), stripEmoji: text => text,
+    });
+    const initialized = vm.runInContext(appSource.slice(appSource.indexOf('(async function init()')), c.context);
+    // Let workspace discovery and the preceding startup requests finish.
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(c.document.body.classList.contains('workspace-loading'), true);
+    finishPages([]);
+    await initialized;
+    assert.equal(c.document.body.classList.contains('workspace-loading'), false);
+    assert.equal(c.nodes.get('app').inert, false);
+    if (fail) assert.match(c.nodes.get('workspace-status').textContent, /Could not load pages/);
+  }
 });
 
 test('a failed folder open leaves the current selection intact and displays the error', async () => {

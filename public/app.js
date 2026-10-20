@@ -2011,38 +2011,46 @@ dom.chatAbort.addEventListener('click', () => {
 // ── Bootstrap ──────────────────────────────────────────────────────
 (async function init() {
   if (!await initializeWorkspaceUi()) return;
-  connectDirectAgentWS();
-
-  const callbackCode = new URLSearchParams(location.search).get('chatgpt');
-  const callbackMessage = callbackCode ? (CHATGPT_CALLBACK_MESSAGES[callbackCode] || 'ChatGPT connection status changed.') : '';
-  await refreshChatGPTStatus({ open: Boolean(callbackCode), message: callbackMessage });
-  if (callbackCode) history.replaceState(null, '', location.pathname + location.hash);
-
   try {
-    await refreshThreads({ createIfEmpty: true });
-  } catch (error) {
-    dom.chatStatus.textContent = stripEmoji(error.message);
-  }
+    connectDirectAgentWS();
 
-  const pages = await api.getWikiList();
-  buildSidebar(pages);
-  const routedToWiki = handleWikiRoute({ migrateLegacyHash: true });
-  const hash = location.hash;
-  if (!routedToWiki && await window.ResearchNotebooks?.route(hash)) return;
-  if (!routedToWiki && await window.ActiveReading?.route(hash)) return;
-  if (!routedToWiki && (hash === '#sources' || hash === '#sources/saved')) {
-    showPanel('files');
-    setSourceView(hash.endsWith('/saved') ? 'saved' : 'add');
-    return;
-  }
-  if (!routedToWiki && hash.startsWith('#file/')) {
-    const name = decodeURIComponent(hash.slice(6).split('?')[0]);
-    const files = await api.getRawList();
-    const file = files.find(item => item.name === name);
-    if (file) {
-      await openRawFile(file.name, file.ext, file, false);
+    const callbackCode = new URLSearchParams(location.search).get('chatgpt');
+    const callbackMessage = callbackCode ? (CHATGPT_CALLBACK_MESSAGES[callbackCode] || 'ChatGPT connection status changed.') : '';
+    await refreshChatGPTStatus({ open: Boolean(callbackCode), message: callbackMessage });
+    if (callbackCode) history.replaceState(null, '', location.pathname + location.hash);
+
+    try {
+      await refreshThreads({ createIfEmpty: true });
+    } catch (error) {
+      dom.chatStatus.textContent = stripEmoji(error.message);
+    }
+
+    const pages = await api.getWikiList();
+    buildSidebar(pages);
+    const routedToWiki = handleWikiRoute({ migrateLegacyHash: true });
+    const hash = location.hash;
+    if (!routedToWiki && await window.ResearchNotebooks?.route(hash)) return;
+    if (!routedToWiki && await window.ActiveReading?.route(hash)) return;
+    if (!routedToWiki && (hash === '#sources' || hash === '#sources/saved')) {
+      showPanel('files');
+      setSourceView(hash.endsWith('/saved') ? 'saved' : 'add');
       return;
     }
+    if (!routedToWiki && hash.startsWith('#file/')) {
+      const name = decodeURIComponent(hash.slice(6).split('?')[0]);
+      const files = await api.getRawList();
+      const file = files.find(item => item.name === name);
+      if (file) {
+        await openRawFile(file.name, file.ext, file, false);
+        return;
+      }
+    }
+    if (!routedToWiki) await openPage('index', { historyMode: 'replace' });
+  } catch (error) {
+    const status = $('workspace-status');
+    status.textContent = `Could not finish opening project: ${stripEmoji(error.message)}`;
+    status.hidden = false;
+  } finally {
+    window.setWorkspaceLoading(false);
   }
-  if (!routedToWiki) await openPage('index', { historyMode: 'replace' });
 })();
