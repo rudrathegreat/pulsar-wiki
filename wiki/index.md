@@ -6,6 +6,8 @@ Application workspace guide: [Research workspaces](../README.md#research-workspa
 
 Notebook guide: [Research notebooks](../README.md#research-notebooks). New notebooks start with editable Title, Objective, Live notes, and Preliminary analysis sections.
 
+Graph key: a borderless light grey (`#eee`) box with black labels.
+
 Interface: wiki pages keep centered content with the scrollbar at the right edge, and the notebook reference action sits beside the borderless Wiki breadcrumb. Buttons share consistent hover timing; Close folder has padding and theme-aware text, and selected sidebar pages have no edge marker. Light mode uses white sidebar, icon bar, and wiki search backgrounds, light grey borders, and black text and hover accents.
 
 ## Pillar 1: Foundational Physics

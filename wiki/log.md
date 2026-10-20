@@ -62,3 +62,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-21 | Light-mode icon bar / public | Changed the icon bar background to white to match the sidebar and wiki search. Updated the wiki index. |
 
 | 2026-10-21 | Wiki breadcrumb / public | Removed the border around the Wiki breadcrumb button while preserving navigation and keyboard focus styling. Updated the wiki index. |
+
+| 2026-10-21 | Graph key / public | Set the graph legend background to #eee, removed its border, and used black labels for contrast. Updated the wiki index. |
