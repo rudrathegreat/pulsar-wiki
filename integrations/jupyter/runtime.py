@@ -35,6 +35,23 @@ def serve():
     from tornado.web import HTTPError
 
     class VersionedContentsManager(FileContentsManager):
+        def new(self, model=None, path=""):
+            model = dict(model or {})
+            notebook_type = model.get("type", "notebook" if path.endswith(".ipynb") else "file")
+            # Only initialise new notebooks: imports, copies and later saves
+            # already supply content, including intentionally empty notebooks.
+            if notebook_type == "notebook" and "content" not in model:
+                sections = json.loads(Path(__file__).with_name("notebook-template.json").read_text(encoding="utf-8"))
+                model["content"] = nbformat.v4.new_notebook(
+                    cells=[nbformat.v4.new_markdown_cell(source) for source in sections],
+                    metadata={
+                        "kernelspec": {"name": "pulsarwiki-python", "display_name": "Workspace Python", "language": "python"},
+                        "language_info": {"name": "python"},
+                    },
+                )
+                model["format"] = "json"
+            return super().new(model, path)
+
         def save(self, model, path=""):
             if model.get("type") != "notebook":
                 return super().save(model, path)

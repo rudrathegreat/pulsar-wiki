@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const templateSections = require('../integrations/jupyter/notebook-template.json');
 
 const MAX_NOTEBOOK_BYTES = 25 * 1024 * 1024;
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -43,6 +44,11 @@ function normalizeNotebook(value, id) {
 }
 const serialize = value => `${JSON.stringify(value, null, 2)}\n`;
 function blankNotebook() { return { nbformat: 4, nbformat_minor: 5, metadata: { kernelspec: { name: 'pulsarwiki-python', display_name: 'Workspace Python', language: 'python' }, language_info: { name: 'python' } }, cells: [{ id: uuid(), cell_type: 'markdown', metadata: {}, source: '' }] }; }
+function researchNotebook() {
+  const notebook = blankNotebook();
+  notebook.cells = templateSections.map(source => ({ id: uuid(), cell_type: 'markdown', metadata: {}, source }));
+  return notebook;
+}
 
 class NotebookStore {
   constructor({ rootDir, dataDir, fsModule = fs }) {
@@ -134,7 +140,7 @@ class NotebookStore {
     if (!entry.history.some(r => r.revision === number)) throw new NotebookError('Notebook revision not found.', 'revision-not-found', 404);
     return JSON.parse(this.fs.readFileSync(this.snapshotPath(id, number), 'utf8'));
   }
-  create(name, notebook = blankNotebook()) {
+  create(name, notebook = researchNotebook()) {
     const file = this.path(name);
     if (fs.existsSync(file) || this.load().notebooks.some(n => n.path === name)) throw new NotebookError('Choose another notebook filename.', 'notebook-conflict', 409);
     return this.savePath(name, notebook, 0);

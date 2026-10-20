@@ -48,3 +48,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-19 | Research notebook startup / JupyterLab bridge | Removed the bridge activation wait on application restoration, which created a circular startup dependency and plugin activation warnings; rebuilt the shipped extension and added a regression test that requires activation to complete before restoration. |
 
 | 2026-10-20 | Notebook workspace UI / README.md | Removed the PulsarWiki notebook file sidebar and filename/action bar, automatically started local Python when Notebooks opens, and added an accessible loading animation through JupyterLab bridge readiness with startup recovery and retry controls. Updated notebook guidance and index. |
+
+| 2026-10-20 | Notebook creation / README.md | Added a shared barebones template with Title, Objective, Live notes, and Preliminary analysis Markdown cells to new notebooks created through JupyterLab and the notebook service. Preserved imported and existing contents, copies, and later edits; added creation and preservation regression coverage and updated the guide and index. |

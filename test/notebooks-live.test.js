@@ -33,6 +33,21 @@ test('live Jupyter embeds securely, saves versioned notebooks, executes Python o
   };
   const html = await fetch(`${launch.origin}/lab`, { headers }); const page = await html.text(); assert.equal(html.status, 200); assert.match(page, /pulsarwiki-notebook-bridge/); assert.ok(!page.includes(runtime.token));
   const foreign = await fetch(`${launch.origin}/api/contents`, { method: 'POST', headers: { ...headers, origin: 'http://evil.example' }, body: '{}' }); assert.equal(foreign.status, 403);
+  // The launcher uses POST without content; initialise before its first save.
+  const created = await api('/api/contents', 'POST', { type: 'notebook' });
+  const initial = await api(`/api/contents/${created.path}`);
+  assert.deepEqual(initial.content.cells.map(cell => [cell.cell_type, cell.source.trim()]), [
+    ['markdown', '# Title'], ['markdown', '## Objective'],
+    ['markdown', '## Live notes'], ['markdown', '## Preliminary analysis'],
+  ]);
+  assert.equal(store.sync().find(book => book.path === created.path).revision, 1);
+  initial.content.cells = [];
+  await api(`/api/contents/${created.path}`, 'PUT', { type: 'notebook', format: 'json', content: initial.content });
+  assert.deepEqual((await api(`/api/contents/${created.path}`)).content.cells, []);
+  const copy = await api('/api/contents', 'POST', { copy_from: created.path });
+  assert.deepEqual((await api(`/api/contents/${copy.path}`)).content.cells, []);
+  const named = await api('/api/contents/named.ipynb', 'PUT', { type: 'notebook' });
+  assert.equal((await api(`/api/contents/${named.path}`)).content.cells.length, 4);
   const notebook = blankNotebook(); notebook.cells[0].source = '# Small analysis\n\n$$y = x^2$$';
   notebook.cells.push({ id: 'code-one', cell_type: 'code', metadata: {}, execution_count: null, outputs: [], source: 'print(2 + 2)' });
   notebook.cells.push({ id: 'plot-one', cell_type: 'code', metadata: {}, execution_count: null, outputs: [], source: 'import matplotlib.pyplot as plt\nplt.plot([1, 2, 3], [1, 4, 9])\nplt.show()' });

@@ -4,6 +4,8 @@ Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pul
 
 Application workspace guide: [Research workspaces](../README.md#research-workspaces). Choose a project folder with the system folder dialog or plain path field; the full selected path stays visible in the title bar, and each workspace keeps its own sources, pages, chats and reading notes, and the folder stays selected for the session.
 
+Notebook guide: [Research notebooks](../README.md#research-notebooks). New notebooks start with editable Title, Objective, Live notes, and Preliminary analysis sections.
+
 ## Pillar 1: Foundational Physics
 - [[neutron-star]]: The ultra-dense physical nature of pulsars and the nuclear Equation of State.
 - [[pulsar]]: An overview of the pulsar phenomenon and power sources.

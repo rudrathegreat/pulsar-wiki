@@ -32,6 +32,28 @@ function fixture(t, overrides = {}) {
 function analysis() { const book = blankNotebook(); book.cells[0].source = 'Assumption: stable rotation. Excluded observations have calibration drift.'; book.cells.push({ id: 'fit-code', cell_type: 'code', metadata: {}, source: 'print(2 + 2)', outputs: [{ output_type: 'stream', name: 'stdout', text: '4\n' }], execution_count: 1 }); return book; }
 async function waitRecall(service, id) { for (let i = 0; i < 100; i++) { const task = service.task(id); if (!['queued', 'running'].includes(task.status)) return task; await new Promise(resolve => setTimeout(resolve, 5)); } throw Error('Recall did not finish'); }
 
+test('new notebooks receive editable observation sections once, while imports and existing files retain their cells', t => {
+  const f = fixture(t);
+  const entry = f.service.create({ name: 'observations.ipynb' });
+  const notebook = f.store.read(entry.id).notebook;
+  assert.deepEqual(notebook.cells.map(cell => [cell.cell_type, cell.source.trim()]), [
+    ['markdown', '# Title'], ['markdown', '## Objective'],
+    ['markdown', '## Live notes'], ['markdown', '## Preliminary analysis'],
+  ]);
+  assert.equal(new Set(notebook.cells.map(cell => cell.id)).size, 4);
+  const another = f.store.create('another.ipynb');
+  assert.ok(f.store.read(another.id).notebook.cells.every(cell => !notebook.cells.some(old => old.id === cell.id)));
+  notebook.cells = [];
+  f.store.savePath(entry.path, notebook, 1);
+  f.store.sync();
+  assert.deepEqual(f.store.read(entry.id).notebook.cells, [], 'deleting the template is permanent');
+  const imported = f.store.create('imported.ipynb', blankNotebook());
+  assert.equal(f.store.read(imported.id).notebook.cells.length, 1);
+  fs.writeFileSync(f.store.path('external.ipynb'), JSON.stringify(blankNotebook()));
+  const external = f.store.sync().find(book => book.path === 'external.ipynb');
+  assert.equal(f.store.read(external.id).notebook.cells.length, 1);
+});
+
 test('notebooks round-trip standard cells and outputs, deduplicate saves, and retain immutable history', t => {
   const f = fixture(t); const entry = f.store.create('scratch.ipynb', analysis());
   const first = f.store.read(entry.id); const unchanged = f.store.savePath(entry.path, first.notebook, 1);
