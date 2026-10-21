@@ -12,7 +12,7 @@ Chat sidebar: the saved chats panel uses a white background in light mode, and t
 
 Chat input: the bottom input area has a white background in light mode. In dark mode, the bottom area is `#111` and the chat input is `#222`.
 
-Chat options: menus open to the right of the sidebar with a white background in light mode, a `#ccc` outer border, and dividers between unboxed options. Options use a pointer cursor, eased hover shading to `#eee`, and hidden overflow.
+Chat options: menus open to the right of the sidebar with a white background and `#ccc` outer border in light mode, a `#333` outer border in dark mode, and dividers between unboxed options. Options use a pointer cursor, eased hover shading to `#eee` in light mode or `#222` in dark mode, and hidden overflow.
 
 Interface: wiki pages keep centered content with the scrollbar at the right edge, and the notebook reference action sits beside the borderless Wiki breadcrumb. Buttons share consistent hover timing; Close folder has padding and theme-aware text, and selected sidebar pages have no edge marker. Light mode uses white sidebar, icon bar, and wiki search backgrounds, light grey borders, and black text and hover accents.
 

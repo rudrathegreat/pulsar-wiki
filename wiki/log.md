@@ -82,3 +82,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-21 | Chat input area / public | Set the bottom chat input bar background to white in light mode. Updated the wiki index. |
 
 | 2026-10-21 | Dark-mode chat input / public | Set the bottom input area to #111 and the chat input and its wrapper to #222 using dark-mode-only rules. Preserved light-mode styling and updated the wiki index. |
+
+| 2026-10-21 | Dark-mode chat menu / public | Set chat menu option hover backgrounds to #222 and the menu outer border to #333 in dark mode, preserving easing and light-mode styling. Updated the wiki index. |

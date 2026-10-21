@@ -920,6 +920,10 @@ body {
   background: #fff;
 }
 
+[data-theme="dark"] .chat-thread-actions {
+  border-color: #333;
+}
+
 .chat-thread-actions[hidden] {
   display: none !important;
 }
@@ -942,6 +946,10 @@ body {
 
 .chat-thread-actions button:hover {
   background: #eee !important;
+}
+
+[data-theme="dark"] .chat-thread-actions button:hover {
+  background: #222 !important;
 }
 
 .chat-thread-actions .chat-thread-delete {
