@@ -1656,6 +1656,12 @@ function renderThreads() {
       closeThreadMenus();
       actions.hidden = !willOpen;
       menu.setAttribute('aria-expanded', String(willOpen));
+      if (willOpen) {
+        const sidebarRect = $('sidebar').getBoundingClientRect();
+        const buttonRect = menu.getBoundingClientRect();
+        actions.style.left = `${sidebarRect.right + 4}px`;
+        actions.style.top = `${Math.max(4, Math.min(buttonRect.top, window.innerHeight - actions.offsetHeight - 4))}px`;
+      }
     });
     menuWrap.append(menu, actions);
     row.append(select, menuWrap);
@@ -1978,6 +1984,8 @@ document.addEventListener('click', event => {
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') closeThreadMenus();
 });
+dom.chatThreadList.addEventListener('scroll', closeThreadMenus);
+window.addEventListener('resize', closeThreadMenus);
 
 dom.chatgptSettingsButton.addEventListener('click', () => { void refreshChatGPTStatus({ open: true }); });
 dom.chatgptClose.addEventListener('click', closeChatGPTSettings);

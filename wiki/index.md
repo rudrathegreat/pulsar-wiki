@@ -6,7 +6,13 @@ Application workspace guide: [Research workspaces](../README.md#research-workspa
 
 Notebook guide: [Research notebooks](../README.md#research-notebooks). New notebooks start with editable Title, Objective, Live notes, and Preliminary analysis sections.
 
-Graph key: a borderless light grey (`#eee`) box with black labels.
+Graph key: a borderless box with a light grey (`#eee`) background and black labels in light mode, or a dark grey (`#222`) background and white labels in dark mode.
+
+Chat sidebar: the saved chats panel uses a white background in light mode, and the chat list fills the remaining height below the header with scrolling for longer lists.
+
+Chat input: the bottom input area has a white background in light mode. In dark mode, the bottom area is `#111` and the chat input is `#222`.
+
+Chat options: menus open to the right of the sidebar with a white background in light mode, a `#ccc` outer border, and dividers between unboxed options. Options use a pointer cursor, eased hover shading to `#eee`, and hidden overflow.
 
 Interface: wiki pages keep centered content with the scrollbar at the right edge, and the notebook reference action sits beside the borderless Wiki breadcrumb. Buttons share consistent hover timing; Close folder has padding and theme-aware text, and selected sidebar pages have no edge marker. Light mode uses white sidebar, icon bar, and wiki search backgrounds, light grey borders, and black text and hover accents.
 

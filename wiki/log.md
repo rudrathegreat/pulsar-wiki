@@ -64,3 +64,21 @@ All major updates to the wiki are recorded here.
 | 2026-10-21 | Wiki breadcrumb / public | Removed the border around the Wiki breadcrumb button while preserving navigation and keyboard focus styling. Updated the wiki index. |
 
 | 2026-10-21 | Graph key / public | Set the graph legend background to #eee, removed its border, and used black labels for contrast. Updated the wiki index. |
+
+| 2026-10-21 | Dark-mode graph key / public | Set the graph key background to #222 with white labels in dark mode, retaining its borderless appearance and light-mode styling. Updated the wiki index. |
+
+| 2026-10-21 | Chat sidebar / public | Set the saved chats sidebar background to white in light mode. Updated the wiki index. |
+
+| 2026-10-21 | Chat list height / public | Made the saved chat list fill the sidebar below its fixed-height header and scroll when needed, preserving chat row heights. Updated the wiki index. |
+
+| 2026-10-21 | Chat options menu / public | Set the chat options menu background to white in light mode, removed its outer border and individual option boxes, and added dividers between options. Updated the wiki index. |
+
+| 2026-10-21 | Chat options border / public | Restored the chat options menu outer border as 1px solid #ccc, retaining dividers between unboxed options. Updated the wiki index. |
+
+| 2026-10-21 | Chat options positioning and hover / public | Positioned menus outside the sidebar on its right, kept them within the viewport height, and closed them on list scroll or window resize. Added a pointer cursor and visible hover shading using the shared easing transition and reduced-motion preference. Updated the wiki index. |
+
+| 2026-10-21 | Chat option hover and overflow / public | Set menu option hover backgrounds to #eee and overflow to hidden on each option button, retaining the shared easing animation. Updated the wiki index. |
+
+| 2026-10-21 | Chat input area / public | Set the bottom chat input bar background to white in light mode. Updated the wiki index. |
+
+| 2026-10-21 | Dark-mode chat input / public | Set the bottom input area to #111 and the chat input and its wrapper to #222 using dark-mode-only rules. Preserved light-mode styling and updated the wiki index. |
