@@ -928,24 +928,6 @@
   el('reading-region').addEventListener('click', () => { if (!r.highlightsEnabled) return; r.region = !r.region; el('document-stage').classList.toggle('reading-region-mode', r.region); el('reading-region').setAttribute('aria-pressed', String(r.region)); if (r.region) notify('Drag a rectangle around an equation, figure, or scanned passage.'); });
   el('reading-rotate').addEventListener('click', guard(async () => { r.rotation = (r.rotation + 90) % 360; await navigate(state.pdf.page); }));
   el('reading-highlights-toggle').addEventListener('click', () => setHighlightsEnabled(!r.highlightsEnabled));
-  function saveLagRecording() {
-    clearTimeout(r.diagnosticTimer);
-    const report = diagnostics?.stop();
-    const button = el('reading-record-lag'); button.textContent = 'Record lag'; button.setAttribute('aria-pressed', 'false');
-    if (!report) return;
-    const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
-    const link = document.createElement('a'); link.href = url; link.download = 'pulsarwiki-lag.json'; link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    notify('Local lag report saved. It contains timing and rendering metadata, without paper text or annotations.');
-  }
-  el('reading-record-lag').addEventListener('click', () => {
-    if (!diagnostics) return;
-    if (diagnostics.recording) { saveLagRecording(); return; }
-    diagnostics.start();
-    const button = el('reading-record-lag'); button.textContent = 'Stop & save lag report'; button.setAttribute('aria-pressed', 'true');
-    notify('Recording timing for 30 seconds. Reproduce the scrolling lag; the report saves locally.');
-    r.diagnosticTimer = setTimeout(saveLagRecording, 30000);
-  });
   el('reading-notes-toggle').addEventListener('click', guard(async () => { el('reading-notes').hidden = !el('reading-notes').hidden; el('reading-notes-toggle').setAttribute('aria-expanded', String(!el('reading-notes').hidden)); await navigate(state.pdf.page); }));
   el('reading-thumbnails-toggle').addEventListener('click', guard(async () => {
     const nav = el('reading-thumbnails'); nav.hidden = !nav.hidden; el('reading-thumbnails-toggle').setAttribute('aria-pressed', String(!nav.hidden));

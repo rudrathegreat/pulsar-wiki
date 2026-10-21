@@ -84,3 +84,15 @@ All major updates to the wiki are recorded here.
 | 2026-10-21 | Dark-mode chat input / public | Set the bottom input area to #111 and the chat input and its wrapper to #222 using dark-mode-only rules. Preserved light-mode styling and updated the wiki index. |
 
 | 2026-10-21 | Dark-mode chat menu / public | Set chat menu option hover backgrounds to #222 and the menu outer border to #333 in dark mode, preserving easing and light-mode styling. Updated the wiki index. |
+
+| 2026-10-21 | Reading workspace appearance / public | Set reading workspace surfaces to white with readable text in either app theme, made right-hand highlight cards borderless with #eee backgrounds, and set file title, size and type text to regular weight. Updated the wiki index. |
+
+| 2026-10-21 | Reading toolbar / public | Removed the Record lag button and its recording/download event handler. Updated the wiki index. |
+
+| 2026-10-21 | Dark-mode reading workspace / public | Set reading workspace and helper surfaces to #222, inputs and borderless highlight cards to #333, and text to white in dark mode. Preserved light-mode styling and updated the wiki index. |
+
+| 2026-10-21 | Reading background adjustment / public | Changed dark-mode reading workspace and helper backgrounds to #1c1c1c, retaining #333 inputs and highlight cards. Updated the wiki index. |
+
+| 2026-10-21 | Reading input and card colours / public | Set dark-mode reading inputs and highlight cards to #222, with #111 for the page number input. Updated the wiki index. |
+
+| 2026-10-21 | Dark-mode reading input borders / public | Made the page number input transparent and removed borders from right-hand reading sidebar inputs and the Find in paper search bar, only in dark mode. Updated the wiki index. |
