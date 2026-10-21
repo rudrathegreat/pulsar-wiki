@@ -65,7 +65,7 @@
     <button class="icon-btn" id="ib-handover" title="Project Handover" aria-label="Project Handover" data-panel="handover">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 4V2h6v2M8 9h8M8 13h5M15 16l2 2 3-4"/></svg>
     </button>
-    <button class="icon-btn chatgpt-settings-icon" id="chatgpt-settings-button" type="button" title="ChatGPT subscription settings" aria-label="ChatGPT subscription settings">
+    <button class="icon-btn chatgpt-settings-icon" id="chatgpt-settings-button" type="button" title="Settings" aria-label="Settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06-2 2-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V20h-3v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06-2-2 .06-.06A1.65 1.65 0 0 0 7.4 15a1.65 1.65 0 0 0-1.51-1H5.8v-3h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06 2-2 .06.06A1.65 1.65 0 0 0 10.89 6.5h.01A1.65 1.65 0 0 0 12 5V4.8h3V5a1.65 1.65 0 0 0 1 1.5 1.65 1.65 0 0 0 1.82-.33l.06-.06 2 2-.06.06A1.65 1.65 0 0 0 19.5 10v.01A1.65 1.65 0 0 0 21 11h.2v3H21a1.65 1.65 0 0 0-1.6 1z"/></svg>
       <span class="dot-online" id="ws-dot"></span>
       <span class="sr-only" id="chatgpt-settings-label">Connect ChatGPT</span>
@@ -224,12 +224,10 @@
 
             <form class="source-search-form" id="source-search-form">
               <div class="source-search-box" id="source-search-box">
-                <svg class="source-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 <input id="source-search-input" type="text" autocomplete="off" spellcheck="false" aria-autocomplete="list" aria-controls="source-filter-suggestions" placeholder="Ask a question or enter a title, DOI, arXiv ID, or ADS link"/>
-                <span class="source-query-intent" id="source-query-intent">Smart search</span>
-                <button class="source-search-submit" id="source-search-submit" type="submit">Search</button>
                 <div class="source-filter-suggestions" id="source-filter-suggestions" role="listbox"></div>
               </div>
+              <button class="source-search-submit" id="source-search-submit" type="submit">Search</button>
               <div class="source-search-help">
                 <span>Refine in the search bar:</span>
                 <button type="button" data-filter-example="author:&quot;&quot;">author:</button>
@@ -434,7 +432,8 @@
 <!-- ChatGPT subscription settings -->
 <div class="setup-overlay" id="chatgpt-settings-modal" style="display:none">
   <section class="setup-dialog chatgpt-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="chatgpt-settings-title">
-    <h2 id="chatgpt-settings-title">Connect ChatGPT</h2>
+    <h2 id="chatgpt-settings-title">Settings</h2>
+    <h3>ChatGPT</h3>
     <div class="chatgpt-account" id="chatgpt-account"></div>
     <p class="chatgpt-connection-status" id="chatgpt-connection-status"></p>
     <div class="chatgpt-connect-actions">
@@ -445,6 +444,16 @@
       <select id="chatgpt-model"></select>
     </label>
     <div class="setup-error" id="chatgpt-error" role="alert"></div>
+    <form id="ads-settings-form" class="ads-settings">
+      <label class="chatgpt-field" for="ads-token">NASA ADS API token</label>
+      <input id="ads-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your token" aria-describedby="ads-token-note ads-token-status" required maxlength="4096"/>
+      <p id="ads-token-note">Saved on this computer for literature searches across workspaces.</p>
+      <p id="ads-token-status" role="status" aria-live="polite"></p>
+      <div class="chatgpt-connect-actions">
+        <button class="btn btn-primary" id="ads-token-save" type="submit">Save token</button>
+        <button class="btn" id="ads-token-remove" type="button" disabled>Remove saved token</button>
+      </div>
+    </form>
     <div class="setup-actions">
       <button class="btn btn-danger" id="chatgpt-forget" type="button">Forget account</button>
       <button class="btn" id="chatgpt-disconnect" type="button">Disconnect</button>

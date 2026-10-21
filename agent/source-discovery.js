@@ -258,7 +258,7 @@ class SourceDiscoveryService {
     const results = deduplicate(settled.flatMap(item => item.results)).slice(0, rows);
     this.remember(results);
     const warnings = settled.filter(item => item.error).map(item => `${item.source}: ${item.error}`);
-    if (!this.adsToken && sourceFilter !== 'arxiv') warnings.push('NASA ADS is unavailable until NASA_ADS_API_TOKEN is configured; arXiv results are shown.');
+    if (!this.adsToken && sourceFilter !== 'arxiv') warnings.push('NASA ADS is unavailable until a NASA ADS API token is added in Settings; arXiv results are shown.');
     return { query: { intent: query.intent, terms: query.terms, filters: query.filters }, results, warnings, filters: FILTERS };
   }
 

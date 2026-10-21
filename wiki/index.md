@@ -6,11 +6,17 @@ Application workspace guide: [Research workspaces](../README.md#research-workspa
 
 Notebook guide: [Research notebooks](../README.md#research-notebooks). New notebooks start with editable Title, Objective, Live notes, and Preliminary analysis sections.
 
+Settings: add, replace or remove a NASA ADS API token for literature searches. Tokens are saved locally across workspaces and applied immediately; an existing server environment token remains the fallback.
+
+After updating the application, restart its server and refresh the browser to load new settings endpoints. NASA ADS settings show a restart instruction if the running server does not support token saving.
+
 AI-assisted reading workspace: white surfaces with borderless light grey (`#eee`) highlight cards in light mode; `#1c1c1c` surfaces with `#222` inputs and highlight cards in dark mode, with a transparent page number input and borderless sidebar inputs and Find in paper search bar. The filename, file details, back and download header is removed; the reading toolbar remains above the document. The toolbar omits the Record lag button.
 
 Sources sidebar: opening Sources shows saved files from the current workspace. Select a file to open it in the reading space; PDFs open with AI-assisted reading tools. The source list stays visible while reading, with the current file marked and an Add sources action for finding or uploading more documents.
 
 Source tabs: Search online contains the literature search without the numbered introductory cards. Upload a file has its own adjacent tab, followed by Saved sources.
+
+Online search input: no search icon or intent tag; the Search button sits beside the input box at the same height, with filter shortcuts below. The input box has a #222 background and no visible border until it transitions to #fff while the input is focused. The Search button border transitions from #333 to #fff on hover.
 
 Graph key: a borderless box with a light grey (`#eee`) background and black labels in light mode, or a dark grey (`#222`) background and white labels in dark mode.
 
@@ -66,6 +72,6 @@ Interface: wiki pages keep centered content with the scrollbar at the right edge
 - [[active-reading]]: PDF reading without a separate Reading Library, with scroll-aware scheduling, bounded nearby-page caching, cancellable text extraction, software-canvas settings and local lag diagnostics, theme-aware highlight helpers that close when leaving the reader, notes and AI requests, wiki-first reference discovery, and automatic agent-written wiki notes with the paper page selected by default and created on Add when missing.
 
 ---
-*Last updated: 2026-10-19 - added integrated research notebooks.*
+*Last updated: 2026-10-21*
 
 - [[stac3719]]: Selected reading notes for stac3719.pdf, with quoted highlights and links to the original passages.

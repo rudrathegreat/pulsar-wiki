@@ -102,3 +102,14 @@ All major updates to the wiki are recorded here.
 | 2026-10-21 | Reading header / public | Removed the top document header containing the filename, file icon, size, type, back and download controls, along with its unused handlers and styles. Kept the reading toolbar and saved-source sidebar. Updated the wiki index. |
 
 | 2026-10-21 | Source tabs / public | Renamed the Add sources tab to Search online, removed the numbered cards beneath the search bar, and moved the upload action into an adjacent Upload a file tab. Updated the wiki index. |
+
+| 2026-10-21 | Search input / public | Removed the search icon and Smart search intent tag, moved the Search button outside the input box, and retained form submission and filter suggestions. Updated the wiki index. |
+
+| 2026-10-21 | Search bar styling / public | Set the search bar background to #222 and border to #333, transitioning to #fff only while its input is focused. Matched the Search button to the input box height and kept input text white for contrast. Updated the wiki index. |
+
+| 2026-10-21 | Search border states / public | Hid the search input border until focus and set the Search button border to #333 with a transition to #fff on hover. Preserved matching control heights and updated the wiki index. |
+
+| 2026-10-21 | NASA ADS settings / application | Added a masked NASA ADS API token input with save and remove actions in Settings, local persistence shared across workspaces, immediate search updates and environment-token fallback. Updated the wiki index. |
+
+| 2026-10-21 | NASA ADS saving diagnosis / application | Identified an older running server without the ADS settings endpoint. Added a clear restart instruction for missing or workspace-gated settings routes and a regression check. Updated the wiki index. |
+- 2026-10-21: Automatically added reading note to stac3719; operation: b2bafbb5-3718-4b26-b498-6b42986c53ad; sources: stac3719.pdf.

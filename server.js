@@ -17,6 +17,7 @@ const { ThreadStore, ThreadStoreError } = require('./agent/thread-store');
 const { WikiTools, WikiToolError } = require('./agent/wiki-tools');
 const { ProviderError } = require('./agent/providers');
 const { FILTERS: SOURCE_FILTERS, SourceDiscoveryService } = require('./agent/source-discovery');
+const { SourceSettings } = require('./agent/source-settings');
 const { ReadingStore } = require('./agent/reading-store');
 const { ReadingService } = require('./agent/reading-service');
 const { createReadingRouter } = require('./agent/reading-router');
@@ -43,6 +44,7 @@ const CHAT_TIMEOUT_MS = 120000;
 let boundPort = null;
 
 const chatgptAuth = new ChatGPTAuthService();
+const sourceSettings = new SourceSettings({ dataDir: path.join(ROOT_DIR, '.pulsarwiki') });
 
 function openWorkspace(folder) {
   if (typeof folder !== 'string' || !folder.trim() || !path.isAbsolute(folder.trim())) throw new Error('Enter an absolute folder path.');
@@ -54,7 +56,7 @@ function openWorkspace(folder) {
   const { rootDir, wikiDir, rawDir, dataDir, instructions } = workspace;
   workspace.wikiTools = new WikiTools({ rootDir, wikiDir, rawDir, dataDir });
   workspace.agentService = new AgentService({ threadStore: new ThreadStore({ dataDir: path.join(dataDir, 'chat') }), authService: chatgptAuth, wikiTools: workspace.wikiTools, instructions });
-  workspace.sourceDiscovery = new SourceDiscoveryService({ rawDir });
+  workspace.sourceDiscovery = new SourceDiscoveryService({ rawDir, adsToken: sourceSettings.token });
   workspace.readingService = new ReadingService({ store: new ReadingStore({ dataDir: path.join(dataDir, 'reading') }), wikiTools: workspace.wikiTools, authService: chatgptAuth, discovery: workspace.sourceDiscovery, instructions });
   workspace.ingestJobs = new Map();
   workspace.readingRouter = createReadingRouter({ service: workspace.readingService, requireLocalSession, requireLocalMutation, onImport: queueSourceIngest });
@@ -279,6 +281,31 @@ app.post('/api/workspaces/close', requireLocalMutation, (_req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/api/settings/ads', requireLocalSession, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(sourceSettings.status());
+});
+app.put('/api/settings/ads', requireLocalMutation, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const status = sourceSettings.save(req.body?.token);
+    for (const workspace of workspaces.values()) workspace.sourceDiscovery.adsToken = sourceSettings.token;
+    res.json(status);
+  } catch (error) {
+    res.status(error instanceof TypeError ? 400 : 500).json({ error: error instanceof TypeError ? error.message : 'The NASA ADS token could not be saved.' });
+  }
+});
+app.delete('/api/settings/ads', requireLocalMutation, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const status = sourceSettings.remove();
+    for (const workspace of workspaces.values()) workspace.sourceDiscovery.adsToken = sourceSettings.token;
+    res.json(status);
+  } catch {
+    res.status(500).json({ error: 'The NASA ADS token could not be removed.' });
+  }
+});
+
 app.use('/api', (req, res, next) => {
   if (req.path.startsWith('/chatgpt/')) return next();
   return requireLocalSession(req, res, () => {
@@ -442,7 +469,7 @@ app.use('/api/notebooks', (req, res, next) => currentWorkspace().notebookRouter(
 
 // --- Research source discovery and import ---
 app.get('/api/sources/filters', requireLocalSession, (_req, res) => {
-  res.json({ filters: SOURCE_FILTERS, adsConfigured: Boolean(process.env.NASA_ADS_API_TOKEN) });
+  res.json({ filters: SOURCE_FILTERS, adsConfigured: Boolean(currentWorkspace().sourceDiscovery.adsToken) });
 });
 
 app.post('/api/sources/search', requireLocalSession, async (req, res) => {

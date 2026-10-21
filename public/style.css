@@ -1582,7 +1582,8 @@ body {
   font-weight: 600;
 }
 
-.chatgpt-field select {
+.chatgpt-field select,
+.ads-settings input {
   width: 100%;
   margin-top: 6px;
   padding: 9px 11px;
@@ -1594,8 +1595,26 @@ body {
   font: 13px var(--font);
 }
 
-.chatgpt-field select:focus {
+.chatgpt-field select:focus,
+.ads-settings input:focus {
   border-color: var(--text-2);
+}
+
+.ads-settings {
+  margin: 20px 0;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.ads-settings p {
+  margin: 8px 0;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.chatgpt-settings-dialog {
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
 }
 
 .chatgpt-account {
@@ -2187,6 +2206,10 @@ button:disabled {
 }
 
 .source-search-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
   margin-top: 24px;
 }
 
@@ -2195,47 +2218,30 @@ button:disabled {
   min-height: 58px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 7px 8px 7px 17px;
-  border: 1px solid var(--text-3);
+  min-width: 0;
+  padding: 7px 17px;
+  border: 1px solid transparent;
   border-radius: var(--radius);
-  background: var(--surface);
+  background: #222;
+  transition: border-color var(--transition);
 }
 
-.source-search-box:focus-within {
-  border-color: var(--focus);
-}
-
-.source-search-icon {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 auto;
-  color: var(--text-3);
+.source-search-box:has(#source-search-input:focus) {
+  border-color: #fff;
 }
 
 #source-search-input {
   flex: 1;
-  min-width: 100px;
+  min-width: 0;
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--text-1);
+  color: #fff;
   font: 13px var(--font);
 }
 
 #source-search-input::placeholder {
   color: var(--text-3);
-}
-
-.source-query-intent {
-  flex: 0 0 auto;
-  padding: 4px 7px;
-  border: 1px solid var(--border);
-  border-radius: 99px;
-  color: var(--text-3);
-  font: 9px var(--mono);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
 }
 
 .source-search-submit,
@@ -2246,6 +2252,16 @@ button:disabled {
   color: var(--text-1) !important;
   font: 500 12px var(--font);
   cursor: pointer;
+}
+
+.source-search-submit {
+  align-self: stretch;
+  min-height: 58px;
+  border-color: #333 !important;
+}
+
+.source-search-submit:hover:not(:disabled) {
+  border-color: #fff !important;
 }
 
 .source-import-button:disabled {
@@ -2266,6 +2282,7 @@ button:disabled {
 }
 
 .source-search-help {
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2654,22 +2671,6 @@ button:disabled {
   .source-results-header {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .source-search-box {
-    flex-wrap: wrap;
-  }
-
-  #source-search-input {
-    min-width: calc(100% - 42px);
-  }
-
-  .source-query-intent {
-    margin-left: 30px;
-  }
-
-  .source-search-submit {
-    margin-left: auto;
   }
 
   .source-result-main {

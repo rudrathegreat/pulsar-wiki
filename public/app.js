@@ -275,7 +275,6 @@ const dom = {
   get filesCount() { return $('files-count'); },
   get sourceSearchForm() { return $('source-search-form'); },
   get sourceSearchInput() { return $('source-search-input'); },
-  get sourceQueryIntent() { return $('source-query-intent'); },
   get sourceFilterSuggestions() { return $('source-filter-suggestions'); },
   get sourceSearchStatus() { return $('source-search-status'); },
   get sourceResultsSection() { return $('source-results-section'); },
@@ -987,18 +986,6 @@ const SOURCE_FILTERS = [
   { key: 'bibcode', label: 'ADS bibcode', example: 'bibcode:2024ApJ...' },
 ];
 
-function sourceIntent(value) {
-  const query = String(value || '').trim();
-  if (!query) return { label: 'Smart search', intent: 'empty' };
-  if (/https?:\/\//i.test(query) || /\b10\.\d{4,9}\//i.test(query) || /\b(?:arxiv:)?\d{4}\.\d{4,5}\b/i.test(query) || /\b(?:doi|bibcode|title):/i.test(query)) {
-    return { label: 'Exact lookup', intent: 'specific' };
-  }
-  if (/\?$/.test(query) || /^(what|when|where|which|who|why|how|does|do|can|is|are)\b/i.test(query)) {
-    return { label: 'Research question', intent: 'research-question' };
-  }
-  return { label: 'Keyword search', intent: 'keywords' };
-}
-
 function setSourceView(name) {
   state.sourceView = ['add', 'upload', 'saved'].includes(name) ? name : 'add';
   document.querySelectorAll('[data-source-view]').forEach(button => {
@@ -1186,7 +1173,6 @@ function insertSourceFilter(value) {
   input.focus();
   input.setSelectionRange(nextCaret, nextCaret);
   dom.sourceFilterSuggestions.classList.remove('visible');
-  dom.sourceQueryIntent.textContent = sourceIntent(input.value).label;
 }
 
 async function importSelectedSources() {
@@ -1248,7 +1234,6 @@ function monitorSourceJob(id) {
 document.querySelectorAll('[data-source-view]').forEach(button => button.addEventListener('click', () => setSourceView(button.dataset.sourceView)));
 dom.sourceSearchForm.addEventListener('submit', event => { event.preventDefault(); void runSourceSearch(); });
 dom.sourceSearchInput.addEventListener('input', () => {
-  dom.sourceQueryIntent.textContent = sourceIntent(dom.sourceSearchInput.value).label;
   updateFilterSuggestions();
 });
 dom.sourceSearchInput.addEventListener('click', updateFilterSuggestions);
@@ -1819,10 +1804,57 @@ function openChatGPTSettings(message = '') {
   renderChatGPTSettings();
   dom.chatgptError.textContent = stripEmoji(message || state.chatgpt?.error?.message || '');
   dom.chatgptSettingsModal.style.display = 'flex';
+  void refreshAdsSettings();
 }
 
 function closeChatGPTSettings() {
+  $('ads-token').value = '';
   dom.chatgptSettingsModal.style.display = 'none';
+}
+
+async function readAdsSettingsResponse(response) {
+  if (response.status === 404 || response.status === 409) {
+    throw new Error('Restart the PulsarWiki server, then refresh this page to enable saving NASA ADS tokens.');
+  }
+  return readJsonResponse(response, 'NASA ADS settings');
+}
+
+function renderAdsSettings(status) {
+  $('ads-token-remove').disabled = !status.saved;
+  $('ads-token').placeholder = status.configured ? 'Enter a replacement token' : 'Paste your token';
+  $('ads-token-status').textContent = status.fromEnvironment
+    ? 'Using the token configured in the server environment.'
+    : status.configured ? 'Token saved. NASA ADS searches are enabled.' : 'No token configured. Searches use arXiv.';
+}
+
+async function refreshAdsSettings() {
+  $('ads-token').value = '';
+  $('ads-token-remove').disabled = true;
+  $('ads-token-status').textContent = 'Loading NASA ADS settings...';
+  try {
+    renderAdsSettings(await readAdsSettingsResponse(await workspaceFetch('/api/settings/ads')));
+  } catch (error) {
+    $('ads-token-status').textContent = error.message;
+  }
+}
+
+async function updateAdsSettings(remove = false) {
+  const hadSavedToken = !$('ads-token-remove').disabled;
+  $('ads-token-save').disabled = true;
+  $('ads-token-remove').disabled = true;
+  try {
+    const status = await readAdsSettingsResponse(await workspaceFetch('/api/settings/ads', {
+      method: remove ? 'DELETE' : 'PUT',
+      ...(remove ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: $('ads-token').value }) }),
+    }));
+    $('ads-token').value = '';
+    renderAdsSettings(status);
+  } catch (error) {
+    $('ads-token-status').textContent = error.message;
+    $('ads-token-remove').disabled = !hadSavedToken;
+  } finally {
+    $('ads-token-save').disabled = false;
+  }
 }
 
 async function refreshChatGPTStatus({ open = false, message = '' } = {}) {
@@ -2021,6 +2053,8 @@ window.addEventListener('resize', closeThreadMenus);
 
 dom.chatgptSettingsButton.addEventListener('click', () => { void refreshChatGPTStatus({ open: true }); });
 dom.chatgptClose.addEventListener('click', closeChatGPTSettings);
+$('ads-settings-form').addEventListener('submit', event => { event.preventDefault(); void updateAdsSettings(); });
+$('ads-token-remove').addEventListener('click', () => { void updateAdsSettings(true); });
 dom.chatgptModelSave.addEventListener('click', () => { void saveChatGPTModel(); });
 dom.chatgptConnect.addEventListener('click', () => { window.location.assign('/auth/chatgpt/start'); });
 dom.chatgptNewAccount.addEventListener('click', () => { void useAnotherChatGPTAccount(); });
