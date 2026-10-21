@@ -30,6 +30,8 @@ Chat options: menus open to the right of the sidebar with a white background and
 
 Interface: wiki pages keep centered content with the scrollbar at the right edge, and the notebook reference action sits beside the borderless Wiki breadcrumb. Buttons share consistent hover timing; Close folder has padding and theme-aware text, and selected sidebar pages have no edge marker. Light mode uses white sidebar, icon bar, and wiki search backgrounds, light grey borders, and black text and hover accents.
 
+Project handover: a four-stage form for selecting evidence, generating a draft, reviewing it, and publishing the guide. Back and Next preserve entered details, selections and edits; publication requires a reviewed, nonempty draft.
+
 ## Pillar 1: Foundational Physics
 - [[neutron-star]]: The ultra-dense physical nature of pulsars and the nuclear Equation of State.
 - [[pulsar]]: An overview of the pulsar phenomenon and power sources.

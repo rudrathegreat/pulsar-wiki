@@ -299,14 +299,14 @@
           </header>
 
           <ol class="handover-steps" aria-label="Handover workflow">
-            <li class="active" data-handover-step="1"><span>1</span><div><strong>Select</strong><small>Choose evidence</small></div></li>
+            <li class="active" data-handover-step="1" aria-current="step"><span>1</span><div><strong>Select</strong><small>Choose evidence</small></div></li>
             <li data-handover-step="2"><span>2</span><div><strong>Generate</strong><small>Organise with AI</small></div></li>
             <li data-handover-step="3"><span>3</span><div><strong>Review</strong><small>Edit and verify</small></div></li>
             <li data-handover-step="4"><span>4</span><div><strong>Publish</strong><small>Update the wiki</small></div></li>
           </ol>
 
           <div class="handover-layout">
-            <section class="handover-card handover-materials" aria-labelledby="handover-materials-title">
+            <section class="handover-card handover-materials" data-handover-stage="1" aria-labelledby="handover-materials-title">
               <div class="handover-card-header">
                 <div><span class="handover-kicker">Source set</span><h3 id="handover-materials-title">What should be carried forward?</h3></div>
                 <span class="handover-count" id="handover-selection-count">0 selected</span>
@@ -335,6 +335,13 @@
                 <div class="handover-options" id="handover-file-options"><div class="handover-loading">Loading research materials...</div></div>
               </div>
 
+            </section>
+
+            <section class="handover-card handover-generation" data-handover-stage="2" aria-labelledby="handover-generation-title" hidden>
+              <div class="handover-card-header">
+                <div><span class="handover-kicker">Draft preparation</span><h3 id="handover-generation-title">Generate your handover</h3></div>
+              </div>
+              <p class="handover-stage-copy" id="handover-generation-summary"></p>
               <div class="handover-ai-note">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
                 <p>AI will organise only the material you select. It will flag missing evidence and unresolved questions instead of inventing answers.</p>
@@ -342,7 +349,7 @@
               <button class="handover-primary" id="handover-generate" type="button">Generate handover draft</button>
             </section>
 
-            <section class="handover-card handover-draft" aria-labelledby="handover-draft-title">
+            <section class="handover-card handover-draft" data-handover-stage="3" hidden aria-labelledby="handover-draft-title">
               <div class="handover-card-header">
                 <div><span class="handover-kicker">Review workspace</span><h3 id="handover-draft-title">Handover draft</h3></div>
                 <div class="handover-view-tabs" role="tablist" aria-label="Draft view">
@@ -358,20 +365,32 @@
               </div>
               <textarea id="handover-editor" class="handover-editor" aria-label="Handover Markdown draft" spellcheck="true" hidden></textarea>
               <div id="handover-preview" class="handover-preview md-body" hidden></div>
-              <div class="handover-status" id="handover-status" role="status" aria-live="polite"></div>
 
               <div class="handover-review" id="handover-review" hidden>
                 <label>
                   <input id="handover-reviewed" type="checkbox"/>
                   <span><strong>I have reviewed this handover</strong><small>I checked claims, references, assumptions, decisions, open questions, and next steps.</small></span>
                 </label>
-                <div class="handover-publish-row">
-                  <span>Publishes as <code>project-handover.md</code></span>
-                  <button class="handover-primary" id="handover-publish" type="button" disabled>Publish reviewed guide</button>
-                </div>
+              </div>
+            </section>
+
+            <section class="handover-card handover-publication" data-handover-stage="4" aria-labelledby="handover-publication-title" hidden>
+              <div class="handover-card-header">
+                <div><span class="handover-kicker">Ready to share</span><h3 id="handover-publication-title">Publish your reviewed guide</h3></div>
+              </div>
+              <p class="handover-stage-copy">Your reviewed draft will be saved to the wiki with its index entry and activity log. Use Back to make any final edits.</p>
+              <div class="handover-publish-row">
+                <span>Publishes as <code>project-handover.md</code></span>
+                <button class="handover-primary" id="handover-publish" type="button" disabled>Publish reviewed guide</button>
               </div>
             </section>
           </div>
+          <div class="handover-status" id="handover-status" role="status" aria-live="polite"></div>
+          <nav class="handover-navigation" aria-label="Handover stages">
+            <button class="handover-secondary" id="handover-back" type="button" disabled>Back</button>
+            <span id="handover-stage-count">Step 1 of 4</span>
+            <button class="handover-primary" id="handover-next" type="button">Next</button>
+          </nav>
         </div>
       </div>
 

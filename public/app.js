@@ -244,7 +244,7 @@ const state = {
   documentSession: 0,
   currentDocument: null,
   pdf: { lib: null, doc: null, page: 1, scale: 1, fitWidth: true, renderTask: null, renderId: 0, resizeTimer: null },
-  handover: { loaded: false, generating: false, publishing: false, selectedPages: new Set(), selectedSources: new Set(), draft: '' },
+  handover: { step: 1, loaded: false, generating: false, publishing: false, selectedPages: new Set(), selectedSources: new Set(), draft: '' },
 };
 
 const $ = id => document.getElementById(id);
@@ -799,10 +799,60 @@ function handoverOptionMarkup(type, name, detail, checked) {
   </label>`;
 }
 
+function updateHandoverNavigation() {
+  const { step, generating, publishing } = state.handover;
+  const busy = generating || publishing;
+  const hasDraft = !!$('handover-editor').value.trim();
+  $('handover-back').disabled = step === 1 || busy;
+  $('handover-next').hidden = step === 4;
+  $('handover-next').disabled = busy || (step === 2 && !hasDraft)
+    || (step === 3 && (!hasDraft || !$('handover-reviewed').checked));
+  $('handover-stage-count').textContent = `Step ${step} of 4`;
+}
+
 function setHandoverStep(step) {
+  state.handover.step = step;
   document.querySelectorAll('[data-handover-step]').forEach(item => {
-    item.classList.toggle('active', Number(item.dataset.handoverStep) <= step);
+    const current = Number(item.dataset.handoverStep) === step;
+    item.classList.toggle('active', current);
+    if (current) item.setAttribute('aria-current', 'step');
+    else item.removeAttribute('aria-current');
   });
+  document.querySelectorAll('[data-handover-stage]').forEach(stage => {
+    stage.hidden = Number(stage.dataset.handoverStage) !== step;
+  });
+  if (step === 2) {
+    const total = state.handover.selectedPages.size + state.handover.selectedSources.size;
+    $('handover-generation-summary').textContent = `${$('handover-project-name').value.trim()}: ${total} selected workspace items. Generate a draft, then continue to review it.`;
+  }
+  updateHandoverNavigation();
+  const heading = document.querySelector(`[data-handover-stage="${step}"] h3`);
+  if (heading) {
+    heading.setAttribute('tabindex', '-1');
+    heading.focus({ preventScroll: true });
+  }
+  $('panel-handover').scrollTop = 0;
+}
+
+function advanceHandover() {
+  if (state.handover.generating || state.handover.publishing) return;
+  const step = state.handover.step;
+  if (step === 1) {
+    if (!$('handover-project-name').value.trim()) {
+      setHandoverStatus('Add a project name before continuing.', true);
+      $('handover-project-name').focus();
+      return;
+    }
+    if (!state.handover.selectedPages.size && !state.handover.selectedSources.size) {
+      setHandoverStatus('Select at least one workspace item.', true);
+      return;
+    }
+  }
+  if (step === 2 && !$('handover-editor').value.trim()) return;
+  if (step === 3 && (!$('handover-editor').value.trim() || !$('handover-reviewed').checked)) return;
+  if (step >= 4) return;
+  setHandoverStatus();
+  setHandoverStep(step + 1);
 }
 
 function setHandoverStatus(message = '', error = false) {
@@ -865,6 +915,7 @@ function setHandoverView(view) {
 }
 
 async function generateHandover() {
+  if (state.handover.generating || state.handover.publishing) return;
   const projectName = $('handover-project-name').value.trim();
   if (!projectName) {
     setHandoverStatus('Add a project name before generating the handover.', true);
@@ -901,26 +952,26 @@ async function generateHandover() {
     $('handover-reviewed').checked = false;
     $('handover-publish').disabled = true;
     setHandoverView('edit');
-    setHandoverStep(3);
-    setHandoverStatus('Draft ready. Edit it as needed, verify every claim and reference, then confirm your review.');
+    setHandoverStatus('Draft ready. Select Next to edit it and verify every claim and reference.');
   } catch (error) {
-    setHandoverStep(1);
     setHandoverStatus(error.message, true);
   } finally {
     state.handover.generating = false;
     $('handover-generate').textContent = state.handover.draft ? 'Regenerate from selection' : 'Generate handover draft';
     updateHandoverSelection();
+    updateHandoverNavigation();
   }
 }
 
 async function publishHandover() {
-  if (!$('handover-reviewed').checked) return;
+  if (state.handover.step !== 4 || state.handover.generating || state.handover.publishing || !$('handover-reviewed').checked) return;
   const content = $('handover-editor').value.trim();
   if (!content) {
     setHandoverStatus('The reviewed handover is empty.', true);
     return;
   }
   state.handover.publishing = true;
+  updateHandoverNavigation();
   $('handover-publish').disabled = true;
   $('handover-publish').textContent = 'Publishing...';
   setHandoverStatus('Saving the reviewed guide, index entry and audit log together.');
@@ -939,6 +990,7 @@ async function publishHandover() {
   } finally {
     state.handover.publishing = false;
     $('handover-publish').disabled = !$('handover-reviewed').checked;
+    updateHandoverNavigation();
   }
 }
 
@@ -962,6 +1014,13 @@ document.querySelectorAll('[data-handover-toggle]').forEach(button => button.add
   updateHandoverSelection();
 }));
 
+$('handover-next').addEventListener('click', advanceHandover);
+$('handover-back').addEventListener('click', () => {
+  if (state.handover.step > 1 && !state.handover.generating && !state.handover.publishing) {
+    setHandoverStatus();
+    setHandoverStep(state.handover.step - 1);
+  }
+});
 $('handover-generate').addEventListener('click', () => { void generateHandover(); });
 $('handover-edit-tab').addEventListener('click', () => setHandoverView('edit'));
 $('handover-preview-tab').addEventListener('click', () => setHandoverView('preview'));
@@ -970,10 +1029,12 @@ $('handover-editor').addEventListener('input', () => {
   $('handover-reviewed').checked = false;
   $('handover-publish').disabled = true;
   $('handover-publish').textContent = 'Publish reviewed guide';
+  updateHandoverNavigation();
   if (!$('handover-preview').hidden) setHandoverView('preview');
 });
 $('handover-reviewed').addEventListener('change', () => {
   $('handover-publish').disabled = !$('handover-reviewed').checked || state.handover.publishing;
+  updateHandoverNavigation();
 });
 $('handover-publish').addEventListener('click', () => { void publishHandover(); });
 $('handover-open-page').addEventListener('click', () => { void openPage('project-handover'); });

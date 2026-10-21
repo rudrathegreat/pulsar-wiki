@@ -117,3 +117,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-21 | Paper search keywords / application | Added automatic AI topic keywords from abstracts beneath paper authors in place of category codes. Uses the connected ChatGPT model, background requests with three workers, session caching and duplicate-request sharing, abstract labels and loading/unavailable states. Added regression coverage and updated the wiki index. |
 
 | 2026-10-21 | Source card appearance / public | Removed the Research workspace, Discover and AI keywords · abstract labels from Sources. Removed search result card outer borders and set bottom-row action borders to #333, including hover. Updated keyword rendering coverage and the wiki index. |
+
+| 2026-10-22 | Project handover / public | Split the handover into separate Select, Generate, Review and Publish stages with Back and Next navigation, retained form state, validation, and review-gated publication. Updated the wiki index. |
