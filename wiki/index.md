@@ -30,7 +30,7 @@ Chat options: menus open to the right of the sidebar with a white background and
 
 Interface: wiki pages keep centered content with the scrollbar at the right edge, and the notebook reference action sits beside the borderless Wiki breadcrumb. Buttons share consistent hover timing; Close folder has padding and theme-aware text, and selected sidebar pages have no edge marker. Light mode uses white sidebar, icon bar, and wiki search backgrounds, light grey borders, and black text and hover accents.
 
-Project handover: a four-stage form for selecting evidence, generating a draft, reviewing it, and publishing the guide. Back and Next preserve entered details, selections and edits; publication requires a reviewed, nonempty draft.
+Project handover: step 1 collects the project name, description and additional context; step 2 selects wiki pages, research materials and saved research notebooks. Next generates the draft and opens step 3 for review, followed by publication. Back preserves inputs and edits; unchanged selections reuse the draft. Notebook evidence cites saved cells without executing code.
 
 ## Pillar 1: Foundational Physics
 - [[neutron-star]]: The ultra-dense physical nature of pulsars and the nuclear Equation of State.

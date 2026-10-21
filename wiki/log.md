@@ -119,3 +119,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-21 | Source card appearance / public | Removed the Research workspace, Discover and AI keywords · abstract labels from Sources. Removed search result card outer borders and set bottom-row action borders to #333, including hover. Updated keyword rendering coverage and the wiki index. |
 
 | 2026-10-22 | Project handover / public | Split the handover into separate Select, Generate, Review and Publish stages with Back and Next navigation, retained form state, validation, and review-gated publication. Updated the wiki index. |
+
+| 2026-10-22 | Project handover stages / application | Separated project details from evidence selection, removed the standalone generation stage, and made Next generate the draft before opening review. Added selection and bounded saved-cell evidence for research notebooks, project descriptions, and reuse of unchanged drafts. Updated the wiki index. |

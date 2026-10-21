@@ -81,6 +81,25 @@ class NotebookService {
     meta.sources = [...(meta.sources || []).filter(s => s.name !== source.name), source];
     return this.store.savePath(entry.path, snapshot.notebook, input.revision);
   }
+  handoverEvidence(ids) {
+    return ids.map(id => {
+      const entry = this.store.entry(id);
+      const snapshot = this.store.read(id);
+      let remaining = 12000;
+      const cells = [];
+      for (const cell of snapshot.notebook.cells) {
+        const body = cellText(cell);
+        if (!body.trim()) continue;
+        if (remaining <= 0) { cells.push('[Further cells omitted; needs verification.]'); break; }
+        const excerpt = body.slice(0, Math.min(3500, remaining));
+        remaining -= excerpt.length;
+        cells.push(`Cell ${cell.id} (${cell.cell_type}) [saved cell](${notebookUrl(id, snapshot.revision, cell.id)})
+${excerpt}${excerpt.length < body.length ? '\n[Cell truncated; needs verification.]' : ''}`);
+      }
+      return `Notebook: notebooks/${entry.path}, saved revision ${snapshot.revision}
+${cells.join('\n\n') || '[No saved cell content.]'}`;
+    }).join('\n\n');
+  }
   search(query, notebookId) {
     this.store.sync(); const terms = [...new Set((query.toLowerCase().match(/[\p{L}\p{N}_]+/gu) || []).filter(t => t.length > 1 && !RECALL_STOP_WORDS.has(t)).map(t => t.length > 4 && t.endsWith('s') && !/(ss|is|us)$/.test(t) ? t.slice(0, -1) : t))];
     if (!terms.length) return [];

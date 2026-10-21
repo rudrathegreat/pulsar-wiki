@@ -25,7 +25,7 @@ function client() {
   const stages = [1, 2, 3, 4].map(n => ({ dataset: { handoverStage: String(n) }, hidden: n !== 1 }));
   let generate = async () => ({ draft: '# Handover\nEvidence and next steps.' });
   let publish = async () => {};
-  const state = { handover: { step: 1, selectedPages: new Set(), selectedSources: new Set(), draft: '', generating: false, publishing: false }, chatgpt: { ready: true } };
+  const state = { handover: { step: 1, selectedPages: new Set(), selectedSources: new Set(), selectedNotebooks: new Set(), generatedInput: '', draft: '', generating: false, publishing: false }, chatgpt: { ready: true } };
   const context = {
     $, state, document: {
       querySelectorAll(selector) {
@@ -34,8 +34,8 @@ function client() {
         return [];
       }, querySelector() { return null; },
     },
-    api: { generateHandover: data => generate(data), publishHandover: data => publish(data), getWikiList: async () => [] },
-    stripEmoji: String, renderMd: String, typesetMath() {}, buildSidebar() {},
+    api: { getHandoverNotebooks: async () => ({ notebooks: [{ id: 'book-1', path: 'timing.ipynb', available: true }, { id: 'missing', path: 'missing.ipynb', available: false }] }), getRawList: async () => [], generateHandover: data => generate(data), publishHandover: data => publish(data), getWikiList: async () => [] },
+    stripEmoji: String, escHtml: String, renderMd: String, typesetMath() {}, buildSidebar() {},
   };
   function $(id) { return node(id); }
   vm.createContext(context);
@@ -45,6 +45,7 @@ function client() {
 
 function select(c) {
   c.node('handover-project-name').value = 'Timing campaign';
+  c.node('handover-description').value = 'Measure pulsar timing residuals';
   c.node('handover-context').value = 'Finish the analysis';
   c.state.handover.selectedPages.add('pulsar-timing');
   c.advanceHandover();
@@ -58,13 +59,11 @@ test('handover validates selection and shows one stage at a time while retaining
   c.node('handover-project-name').value = 'Timing campaign';
   c.advanceHandover();
   assert.equal(c.state.handover.step, 1);
-  assert.match(c.node('handover-status').textContent, /at least one/);
+  assert.match(c.node('handover-status').textContent, /project description/);
   select(c);
   assert.deepEqual(c.stages.map(s => s.hidden), [true, false, true, true]);
   assert.equal(c.steps[1].attributes['aria-current'], 'step');
-  assert.equal(c.node('handover-next').disabled, true);
-  c.advanceHandover();
-  assert.equal(c.state.handover.step, 2);
+  assert.equal(c.node('handover-next').disabled, false);
   c.node('handover-back').handlers.click();
   assert.equal(c.state.handover.step, 1);
   assert.equal(c.node('handover-back').disabled, true);
@@ -77,15 +76,13 @@ test('generation, review, editing and publication are separate, review-gated sta
   select(c);
   let release;
   c.setGenerate(() => new Promise(resolve => { release = resolve; }));
-  const pending = c.generateHandover();
+  const pending = c.advanceHandover();
   assert.equal(c.node('handover-back').disabled, true);
   c.node('handover-back').handlers.click();
   assert.equal(c.state.handover.step, 2);
   release({ draft: '# Reviewed guide' });
   await pending;
-  assert.equal(c.state.handover.step, 2);
-  assert.equal(c.node('handover-next').disabled, false);
-  c.advanceHandover();
+  assert.equal(c.state.handover.step, 3);
   assert.deepEqual(c.stages.map(s => s.hidden), [true, true, false, true]);
   assert.equal(c.node('handover-next').disabled, true);
   c.node('handover-reviewed').checked = true;
@@ -115,11 +112,51 @@ test('generation failures retain selection and allow retry or Back', async () =>
   const c = client();
   select(c);
   c.setGenerate(async () => { throw new Error('Connection interrupted'); });
-  await c.generateHandover();
+  await c.advanceHandover();
   assert.equal(c.state.handover.step, 2);
   assert.equal(c.node('handover-back').disabled, false);
-  assert.equal(c.node('handover-next').disabled, true);
-  assert.equal(c.node('handover-generate').disabled, false);
+  assert.equal(c.node('handover-next').disabled, false);
   assert.match(c.node('handover-status').textContent, /Connection interrupted/);
   assert.ok(c.state.handover.selectedPages.has('pulsar-timing'));
+});
+
+
+test('notebooks load separately and notebook-only selection generates a draft with project details', async () => {
+  const c = client();
+  await c.loadHandoverWorkspace();
+  assert.match(c.node('handover-notebook-options').innerHTML, /timing.ipynb/);
+  assert.doesNotMatch(c.node('handover-notebook-options').innerHTML, /missing.ipynb/);
+  select(c);
+  c.state.handover.selectedPages.clear();
+  c.state.handover.selectedNotebooks.add('book-1');
+  let sent;
+  let count = 0;
+  c.setGenerate(async input => { sent = input; count++; return { draft: '# Notebook handover' }; });
+  await c.advanceHandover();
+  assert.equal(c.state.handover.step, 3);
+  assert.equal(sent.description, 'Measure pulsar timing residuals');
+  assert.equal(sent.context, 'Finish the analysis');
+  assert.equal(sent.notebooks[0], 'book-1');
+  c.node('handover-editor').value = '# My edited notebook guide';
+  c.node('handover-editor').handlers.input();
+  c.node('handover-back').handlers.click();
+  await c.advanceHandover();
+  assert.equal(count, 1);
+  assert.equal(c.node('handover-editor').value, '# My edited notebook guide');
+  c.node('handover-back').handlers.click();
+  c.node('handover-back').handlers.click();
+  c.node('handover-context').value = 'New deadline';
+  await c.advanceHandover();
+  await c.advanceHandover();
+  assert.equal(count, 2);
+  assert.equal(sent.context, 'New deadline');
+});
+
+test('empty material selection stays on step 2', async () => {
+  const c = client();
+  select(c);
+  c.state.handover.selectedPages.clear();
+  await c.advanceHandover();
+  assert.equal(c.state.handover.step, 2);
+  assert.match(c.node('handover-status').textContent, /at least one/);
 });

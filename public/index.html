@@ -299,26 +299,35 @@
           </header>
 
           <ol class="handover-steps" aria-label="Handover workflow">
-            <li class="active" data-handover-step="1" aria-current="step"><span>1</span><div><strong>Select</strong><small>Choose evidence</small></div></li>
-            <li data-handover-step="2"><span>2</span><div><strong>Generate</strong><small>Organise with AI</small></div></li>
+            <li class="active" data-handover-step="1" aria-current="step"><span>1</span><div><strong>Project</strong><small>Describe the work</small></div></li>
+            <li data-handover-step="2"><span>2</span><div><strong>Materials</strong><small>Choose evidence</small></div></li>
             <li data-handover-step="3"><span>3</span><div><strong>Review</strong><small>Edit and verify</small></div></li>
             <li data-handover-step="4"><span>4</span><div><strong>Publish</strong><small>Update the wiki</small></div></li>
           </ol>
 
           <div class="handover-layout">
-            <section class="handover-card handover-materials" data-handover-stage="1" aria-labelledby="handover-materials-title">
+            <section class="handover-card" data-handover-stage="1" aria-labelledby="handover-project-title">
               <div class="handover-card-header">
-                <div><span class="handover-kicker">Source set</span><h3 id="handover-materials-title">What should be carried forward?</h3></div>
-                <span class="handover-count" id="handover-selection-count">0 selected</span>
+                <div><span class="handover-kicker">Project details</span><h3 id="handover-project-title">Introduce your project</h3></div>
               </div>
 
               <label class="handover-field">Project name
                 <input id="handover-project-name" type="text" maxlength="120" placeholder="e.g. MeerKAT timing campaign"/>
               </label>
-              <label class="handover-field">Context for the next researcher <span>Optional</span>
+              <label class="handover-field">Project description
+                <textarea id="handover-description" rows="4" maxlength="4000" placeholder="Describe the research question, goals, and current state of the project."></textarea>
+              </label>
+              <label class="handover-field">Additional context <span>Optional</span>
                 <textarea id="handover-context" rows="3" maxlength="2000" placeholder="Add scope, deadlines, ownership, or details that may not yet be in the workspace."></textarea>
               </label>
 
+            </section>
+
+            <section class="handover-card handover-materials" data-handover-stage="2" aria-labelledby="handover-materials-title" hidden>
+              <div class="handover-card-header">
+                <div><span class="handover-kicker">Source set</span><h3 id="handover-materials-title">What should be carried forward?</h3></div>
+                <span class="handover-count" id="handover-selection-count">0 selected</span>
+              </div>
               <div class="handover-selector" id="handover-wiki-selector">
                 <div class="handover-selector-header">
                   <div><strong>Wiki pages</strong><small>Methods, decisions, findings and context</small></div>
@@ -335,18 +344,18 @@
                 <div class="handover-options" id="handover-file-options"><div class="handover-loading">Loading research materials...</div></div>
               </div>
 
-            </section>
-
-            <section class="handover-card handover-generation" data-handover-stage="2" aria-labelledby="handover-generation-title" hidden>
-              <div class="handover-card-header">
-                <div><span class="handover-kicker">Draft preparation</span><h3 id="handover-generation-title">Generate your handover</h3></div>
+              <div class="handover-selector" id="handover-notebook-selector">
+                <div class="handover-selector-header">
+                  <div><strong>Research notebooks</strong><small>Saved analysis, notes and outputs</small></div>
+                  <button type="button" data-handover-toggle="notebook">Select all</button>
+                </div>
+                <div class="handover-options" id="handover-notebook-options"><div class="handover-loading">Loading research notebooks...</div></div>
               </div>
-              <p class="handover-stage-copy" id="handover-generation-summary"></p>
               <div class="handover-ai-note">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
                 <p>AI will organise only the material you select. It will flag missing evidence and unresolved questions instead of inventing answers.</p>
               </div>
-              <button class="handover-primary" id="handover-generate" type="button">Generate handover draft</button>
+              <p class="handover-stage-copy">Select Next to generate your draft and continue to review. Notebook evidence uses saved cells and outputs.</p>
             </section>
 
             <section class="handover-card handover-draft" data-handover-stage="3" hidden aria-labelledby="handover-draft-title">

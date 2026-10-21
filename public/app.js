@@ -180,6 +180,9 @@ const api = {
   async getSourceJob(id) {
     return readJsonResponse(await workspaceFetch(`/api/sources/jobs/${encodeURIComponent(id)}`), 'Wiki update');
   },
+  async getHandoverNotebooks() {
+    return readJsonResponse(await workspaceFetch('/api/notebooks'), 'Research notebooks');
+  },
   async generateHandover(payload) {
     return readJsonResponse(await workspaceFetch('/api/handover/generate', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
@@ -244,7 +247,7 @@ const state = {
   documentSession: 0,
   currentDocument: null,
   pdf: { lib: null, doc: null, page: 1, scale: 1, fitWidth: true, renderTask: null, renderId: 0, resizeTimer: null },
-  handover: { step: 1, loaded: false, generating: false, publishing: false, selectedPages: new Set(), selectedSources: new Set(), draft: '' },
+  handover: { step: 1, loaded: false, generating: false, publishing: false, selectedPages: new Set(), selectedSources: new Set(), selectedNotebooks: new Set(), generatedInput: '', draft: '' },
 };
 
 const $ = id => document.getElementById(id);
@@ -791,10 +794,10 @@ function handoverMaterialKind(file) {
   return 'Supporting';
 }
 
-function handoverOptionMarkup(type, name, detail, checked) {
+function handoverOptionMarkup(type, name, detail, checked, label = name) {
   return `<label class="handover-option">
     <input type="checkbox" data-handover-type="${type}" data-handover-name="${escHtml(name)}" ${checked ? 'checked' : ''}/>
-    <strong title="${escHtml(name)}">${escHtml(name)}</strong>
+    <strong title="${escHtml(label)}">${escHtml(label)}</strong>
     <small>${escHtml(detail)}</small>
   </label>`;
 }
@@ -805,7 +808,8 @@ function updateHandoverNavigation() {
   const hasDraft = !!$('handover-editor').value.trim();
   $('handover-back').disabled = step === 1 || busy;
   $('handover-next').hidden = step === 4;
-  $('handover-next').disabled = busy || (step === 2 && !hasDraft)
+  $('handover-next').textContent = generating ? 'Drafting...' : 'Next';
+  $('handover-next').disabled = busy
     || (step === 3 && (!hasDraft || !$('handover-reviewed').checked));
   $('handover-stage-count').textContent = `Step ${step} of 4`;
 }
@@ -821,10 +825,6 @@ function setHandoverStep(step) {
   document.querySelectorAll('[data-handover-stage]').forEach(stage => {
     stage.hidden = Number(stage.dataset.handoverStage) !== step;
   });
-  if (step === 2) {
-    const total = state.handover.selectedPages.size + state.handover.selectedSources.size;
-    $('handover-generation-summary').textContent = `${$('handover-project-name').value.trim()}: ${total} selected workspace items. Generate a draft, then continue to review it.`;
-  }
   updateHandoverNavigation();
   const heading = document.querySelector(`[data-handover-stage="${step}"] h3`);
   if (heading) {
@@ -834,7 +834,7 @@ function setHandoverStep(step) {
   $('panel-handover').scrollTop = 0;
 }
 
-function advanceHandover() {
+async function advanceHandover() {
   if (state.handover.generating || state.handover.publishing) return;
   const step = state.handover.step;
   if (step === 1) {
@@ -843,12 +843,23 @@ function advanceHandover() {
       $('handover-project-name').focus();
       return;
     }
-    if (!state.handover.selectedPages.size && !state.handover.selectedSources.size) {
-      setHandoverStatus('Select at least one workspace item.', true);
+    if (!$('handover-description').value.trim()) {
+      setHandoverStatus('Add a project description before continuing.', true);
+      $('handover-description').focus();
       return;
     }
   }
-  if (step === 2 && !$('handover-editor').value.trim()) return;
+  if (step === 2) {
+    if (!handoverSelectionCount()) {
+      setHandoverStatus('Select at least one wiki page, research material or notebook.', true);
+      return;
+    }
+    if (state.handover.generatedInput === JSON.stringify(handoverInput()) && $('handover-editor').value.trim()) {
+      setHandoverStatus();
+      setHandoverStep(3);
+    } else await generateHandover();
+    return;
+  }
   if (step === 3 && (!$('handover-editor').value.trim() || !$('handover-reviewed').checked)) return;
   if (step >= 4) return;
   setHandoverStatus();
@@ -861,13 +872,32 @@ function setHandoverStatus(message = '', error = false) {
   status.classList.toggle('error', error);
 }
 
+function handoverSelectionCount() {
+  return state.handover.selectedPages.size + state.handover.selectedSources.size + state.handover.selectedNotebooks.size;
+}
+
+function handoverSelectedSet(type) {
+  return type === 'wiki' ? state.handover.selectedPages : type === 'notebook' ? state.handover.selectedNotebooks : state.handover.selectedSources;
+}
+
+function handoverInput() {
+  return {
+    projectName: $('handover-project-name').value.trim(),
+    description: $('handover-description').value.trim(),
+    context: $('handover-context').value.trim(),
+    pages: [...state.handover.selectedPages].sort(),
+    sources: [...state.handover.selectedSources].sort(),
+    notebooks: [...state.handover.selectedNotebooks].sort(),
+  };
+}
+
 function updateHandoverSelection() {
-  const total = state.handover.selectedPages.size + state.handover.selectedSources.size;
+  const total = handoverSelectionCount();
   $('handover-selection-count').textContent = `${total} selected`;
-  $('handover-generate').disabled = !total || state.handover.generating || state.handover.publishing;
-  for (const type of ['wiki', 'raw']) {
+  updateHandoverNavigation();
+  for (const type of ['wiki', 'raw', 'notebook']) {
     const options = document.querySelectorAll(`[data-handover-type="${type}"]`);
-    const selected = type === 'wiki' ? state.handover.selectedPages : state.handover.selectedSources;
+    const selected = handoverSelectedSet(type);
     const toggle = document.querySelector(`[data-handover-toggle="${type}"]`);
     if (toggle) toggle.textContent = options.length && selected.size === options.length ? 'Clear all' : 'Select all';
   }
@@ -877,7 +907,10 @@ async function loadHandoverWorkspace(force = false) {
   if (state.handover.loaded && !force) return;
   state.handover.loaded = true;
   try {
-    const [pages, files] = await Promise.all([api.getWikiList(), api.getRawList()]);
+    const [pages, files, notebookData] = await Promise.all([api.getWikiList(), api.getRawList(), api.getHandoverNotebooks()]);
+    const notebooks = notebookData.notebooks.filter(book => book.available);
+    const availableNotebookIds = new Set(notebooks.map(book => book.id));
+    state.handover.selectedNotebooks = new Set([...state.handover.selectedNotebooks].filter(id => availableNotebookIds.has(id)));
     const selectablePages = pages.filter(page => !['log', 'project-handover'].includes(page.name));
     const availablePageNames = new Set(selectablePages.map(page => page.name));
     const availableSourceNames = new Set(files.map(file => file.name));
@@ -890,12 +923,16 @@ async function loadHandoverWorkspace(force = false) {
     $('handover-file-options').innerHTML = files.length
       ? files.sort((a, b) => a.name.localeCompare(b.name)).map(file => handoverOptionMarkup('raw', file.name, handoverMaterialKind(file), state.handover.selectedSources.has(file.name))).join('')
       : '<div class="handover-loading">No research materials are available.</div>';
+    $('handover-notebook-options').innerHTML = notebooks.length
+      ? notebooks.sort((a, b) => a.path.localeCompare(b.path)).map(book => handoverOptionMarkup('notebook', book.id, 'Notebook', state.handover.selectedNotebooks.has(book.id), book.path)).join('')
+      : '<div class="handover-loading">No saved research notebooks are available.</div>';
     $('handover-open-page').disabled = !pages.some(page => page.name === 'project-handover');
     updateHandoverSelection();
   } catch (error) {
     state.handover.loaded = false;
     $('handover-wiki-options').innerHTML = '<div class="handover-loading">Could not load wiki pages.</div>';
     $('handover-file-options').innerHTML = '<div class="handover-loading">Could not load research materials.</div>';
+    $('handover-notebook-options').innerHTML = '<div class="handover-loading">Could not load research notebooks.</div>';
     setHandoverStatus(error.message, true);
   }
 }
@@ -922,7 +959,7 @@ async function generateHandover() {
     $('handover-project-name').focus();
     return;
   }
-  if (!state.handover.selectedPages.size && !state.handover.selectedSources.size) {
+  if (!handoverSelectionCount()) {
     setHandoverStatus('Select at least one workspace item.', true);
     return;
   }
@@ -933,17 +970,13 @@ async function generateHandover() {
   }
 
   state.handover.generating = true;
-  $('handover-generate').textContent = 'Reading workspace and drafting...';
   updateHandoverSelection();
   setHandoverStep(2);
   setHandoverStatus('AI is tracing the selected evidence. This can take a minute.');
   try {
-    const result = await api.generateHandover({
-      projectName,
-      context: $('handover-context').value.trim(),
-      pages: [...state.handover.selectedPages],
-      sources: [...state.handover.selectedSources],
-    });
+    const input = handoverInput();
+    const result = await api.generateHandover(input);
+    state.handover.generatedInput = JSON.stringify(input);
     state.handover.draft = result.draft;
     $('handover-editor').value = result.draft;
     $('handover-empty').hidden = true;
@@ -952,12 +985,12 @@ async function generateHandover() {
     $('handover-reviewed').checked = false;
     $('handover-publish').disabled = true;
     setHandoverView('edit');
-    setHandoverStatus('Draft ready. Select Next to edit it and verify every claim and reference.');
+    setHandoverStep(3);
+    setHandoverStatus('Draft ready. Edit it and verify every claim and reference before continuing.');
   } catch (error) {
     setHandoverStatus(error.message, true);
   } finally {
     state.handover.generating = false;
-    $('handover-generate').textContent = state.handover.draft ? 'Regenerate from selection' : 'Generate handover draft';
     updateHandoverSelection();
     updateHandoverNavigation();
   }
@@ -994,11 +1027,11 @@ async function publishHandover() {
   }
 }
 
-for (const containerId of ['handover-wiki-options', 'handover-file-options']) {
+for (const containerId of ['handover-wiki-options', 'handover-file-options', 'handover-notebook-options']) {
   $(containerId).addEventListener('change', event => {
     const input = event.target.closest('[data-handover-type][data-handover-name]');
     if (!input) return;
-    const selected = input.dataset.handoverType === 'wiki' ? state.handover.selectedPages : state.handover.selectedSources;
+    const selected = handoverSelectedSet(input.dataset.handoverType);
     if (input.checked) selected.add(input.dataset.handoverName); else selected.delete(input.dataset.handoverName);
     updateHandoverSelection();
   });
@@ -1007,7 +1040,7 @@ for (const containerId of ['handover-wiki-options', 'handover-file-options']) {
 document.querySelectorAll('[data-handover-toggle]').forEach(button => button.addEventListener('click', () => {
   const type = button.dataset.handoverToggle;
   const options = [...document.querySelectorAll(`[data-handover-type="${type}"]`)];
-  const selected = type === 'wiki' ? state.handover.selectedPages : state.handover.selectedSources;
+  const selected = handoverSelectedSet(type);
   const shouldSelect = selected.size !== options.length;
   selected.clear();
   options.forEach(option => { option.checked = shouldSelect; if (shouldSelect) selected.add(option.dataset.handoverName); });
@@ -1021,7 +1054,6 @@ $('handover-back').addEventListener('click', () => {
     setHandoverStep(state.handover.step - 1);
   }
 });
-$('handover-generate').addEventListener('click', () => { void generateHandover(); });
 $('handover-edit-tab').addEventListener('click', () => setHandoverView('edit'));
 $('handover-preview-tab').addEventListener('click', () => setHandoverView('preview'));
 $('handover-editor').addEventListener('input', () => {

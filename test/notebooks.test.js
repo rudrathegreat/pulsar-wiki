@@ -168,3 +168,27 @@ test('notebook routes enforce read sessions, mutation origins, and revision conf
   const stale = await fetch(`${base}/${book.id}/checkpoints`, { method: 'POST', headers: { 'x-test-session': '1', origin: 'http://localhost', 'Content-Type': 'application/json' }, body: JSON.stringify({ revision: 0 }) }); assert.equal(stale.status, 409);
   assert.equal((await fetch(`${base}/${book.id}?revision=1`, { headers: { 'x-test-session': '1' } })).status, 200);
 });
+
+test('handover notebook evidence uses only selected saved cells with revision links and bounded excerpts', t => {
+  const f = fixture(t);
+  const selected = f.store.create('selected.ipynb', analysis());
+  f.store.create('unselected.ipynb', { ...blankNotebook(), cells: [{ id: 'private', cell_type: 'markdown', metadata: {}, source: 'Unselected notebook text' }] });
+  const original = fs.readFileSync(f.store.path(selected.path), 'utf8');
+  const evidence = f.service.handoverEvidence([selected.id]);
+  assert.match(evidence, /notebooks\/selected.ipynb, saved revision 1/);
+  assert.match(evidence, /Assumption: stable rotation/);
+  assert.match(evidence, /print\(2 \+ 2\)/);
+  assert.match(evidence, /4\n/);
+  assert.ok(evidence.includes(`/#notebook/${selected.id}?revision=1&cell=fit-code`));
+  assert.doesNotMatch(evidence, /Unselected notebook text/);
+  assert.equal(fs.readFileSync(f.store.path(selected.path), 'utf8'), original);
+  assert.equal(f.service.children.size, 0);
+  assert.equal(f.calls.length, 0);
+  const large = blankNotebook();
+  large.cells = Array.from({ length: 20 }, (_, i) => ({ id: `cell-${i}`, cell_type: 'markdown', metadata: {}, source: 'x'.repeat(6000) }));
+  const big = f.store.create('large.ipynb', large);
+  const bounded = f.service.handoverEvidence([big.id]);
+  assert.ok(bounded.length < 14000);
+  assert.match(bounded, /Cell truncated/);
+  assert.match(bounded, /Further cells omitted/);
+});
