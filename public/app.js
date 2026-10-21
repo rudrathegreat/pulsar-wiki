@@ -216,6 +216,8 @@ const state = {
   wikiPages: [],
   currentPage: null,
   rawFiles: [],
+  rawFilesLoaded: false,
+  rawFilesError: '',
   sourceView: 'add',
   sourceResults: [],
   selectedSourceIds: new Set(),
@@ -302,11 +304,15 @@ function showPanel(name) {
   document.body.classList.toggle('notebook-mode', name === 'notebooks');
   const navigationPanel = name === 'document' ? 'files' : name;
   $('sidebar').classList.toggle('chat-mode', name === 'chat');
+  $('sidebar').classList.toggle('sources-mode', navigationPanel === 'files');
   document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === `panel-${name}`));
   document.querySelectorAll('.tab-btn').forEach(button => button.classList.toggle('active', button.dataset.panel === navigationPanel));
   document.querySelectorAll('.icon-btn[data-panel]').forEach(button => button.classList.toggle('active', button.dataset.panel === navigationPanel));
   if (name === 'graph') showGraph();
-  if (name === 'files') loadFiles();
+  if (navigationPanel === 'files') {
+    renderSourceSidebar();
+    void loadFiles().catch(() => {});
+  }
   if (name === 'handover') loadHandoverWorkspace();
   if (name === 'notebooks') window.ResearchNotebooks?.show();
 }
@@ -712,9 +718,44 @@ function fmtSize(bytes) {
   return (bytes / 1024 / 1024).toFixed(1) + ' MB';
 }
 
+function renderSourceSidebar() {
+  $('source-sidebar-count').textContent = state.rawFiles.length;
+  $('source-sidebar-status').textContent = state.rawFilesError || (!state.rawFilesLoaded
+    ? 'Loading saved sources...'
+    : state.rawFiles.length ? '' : 'No saved sources yet. Add a source to start reading.');
+  $('source-sidebar-list').innerHTML = state.rawFiles.map(file => {
+    const active = state.currentDocument?.name === file.name;
+    return `<button class="nav-item${active ? ' active' : ''}" type="button" data-source-file="${escHtml(file.name)}" title="${escHtml(file.name)}" aria-label="Open ${escHtml(file.name)}"${active ? ' aria-current="true"' : ''}>
+      ${fileIcon(file.ext)}<span class="source-sidebar-name">${escHtml(file.name)}</span>
+    </button>`;
+  }).join('');
+}
+
+$('source-sidebar-list').addEventListener('click', event => {
+  const item = event.target.closest('[data-source-file]');
+  if (!item || !$('source-sidebar-list').contains(item)) return;
+  const file = state.rawFiles.find(source => source.name === item.dataset.sourceFile);
+  if (file) void openRawFile(file.name, file.ext, file);
+});
+
+$('source-sidebar-add').addEventListener('click', () => {
+  showPanel('files');
+  setSourceView('add');
+});
+
 async function loadFiles() {
-  const files = await api.getRawList();
+  let files;
+  try {
+    files = await api.getRawList();
+  } catch (error) {
+    state.rawFilesError = `Could not load saved sources: ${stripEmoji(error.message)}`;
+    renderSourceSidebar();
+    throw error;
+  }
   state.rawFiles = files;
+  state.rawFilesLoaded = true;
+  state.rawFilesError = '';
+  renderSourceSidebar();
   dom.filesCount.textContent = files.length;
 
   dom.filesGrid.innerHTML = files.map((f, index) => `
@@ -970,7 +1011,7 @@ function setSourceView(name) {
     view.classList.toggle('active', active);
     view.hidden = !active;
   });
-  if (state.sourceView === 'saved') loadFiles();
+  if (state.sourceView === 'saved') void loadFiles().catch(() => {});
 }
 
 function formatPaperDate(value) {

@@ -8,6 +8,8 @@ Notebook guide: [Research notebooks](../README.md#research-notebooks). New noteb
 
 AI-assisted reading workspace: white surfaces with borderless light grey (`#eee`) highlight cards in light mode; `#1c1c1c` surfaces with `#222` inputs and highlight cards in dark mode, with a transparent page number input and borderless sidebar inputs and Find in paper search bar. File title, size and type text use regular weight. The toolbar omits the Record lag button.
 
+Sources sidebar: opening Sources shows saved files from the current workspace. Select a file to open it in the reading space; PDFs open with AI-assisted reading tools. The source list stays visible while reading, with the current file marked and an Add sources action for finding or uploading more documents.
+
 Graph key: a borderless box with a light grey (`#eee`) background and black labels in light mode, or a dark grey (`#222`) background and white labels in dark mode.
 
 Chat sidebar: the saved chats panel uses a white background in light mode, and the chat list fills the remaining height below the header with scrolling for longer lists.

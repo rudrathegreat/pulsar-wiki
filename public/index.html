@@ -102,6 +102,18 @@
         <!-- Populated by JS -->
       </div>
     </div>
+    <section id="sidebar-sources" class="sidebar-pane" aria-label="Saved sources">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Sources</div>
+        <button class="sidebar-action" id="source-sidebar-add" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add sources
+        </button>
+      </div>
+      <div class="nav-section-title">Saved sources <span id="source-sidebar-count">0</span></div>
+      <p id="source-sidebar-status" role="status" aria-live="polite"></p>
+      <div id="source-sidebar-list" class="sidebar-body"></div>
+    </section>
     <aside id="sidebar-chat" class="chat-sidebar sidebar-pane" aria-label="Saved chats">
       <div class="chat-sidebar-header">
         <div class="sidebar-title">PulsarWiki</div>

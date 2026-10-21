@@ -273,6 +273,35 @@ body {
   display: flex;
 }
 
+#sidebar-sources {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#sidebar.sources-mode #sidebar-wiki {
+  display: none;
+}
+
+#sidebar.sources-mode #sidebar-sources {
+  display: flex;
+}
+
+#source-sidebar-status {
+  padding: 0 16px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.source-sidebar-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
 .sidebar-header {
   padding: 16px 16px 12px;
   border-bottom: 1px solid var(--border-sub);
