@@ -1029,7 +1029,7 @@ function sourceTopicTags(paper) {
 
 function sourceKeywordMarkup(paper) {
   const tags = sourceTopicTags(paper);
-  if (tags.length) return `<small class="source-keyword-label">AI keywords · abstract</small>${tags.map(tag => `<span>${escHtml(tag)}</span>`).join('')}`;
+  if (tags.length) return tags.map(tag => `<span>${escHtml(tag)}</span>`).join('');
   return `<small>${escHtml(paper.keywordError || (paper.abstract?.trim() ? 'Generating keywords…' : 'No abstract available'))}</small>`;
 }
 
@@ -1151,7 +1151,7 @@ async function showSourceDetail(id) {
         ${paper?.recordUrl ? `<a class="source-record-link" href="${escHtml(paper.recordUrl)}" target="_blank" rel="noreferrer">Open publication record</a>` : ''}
       </div>
       <section class="source-related">
-        <div class="source-related-heading"><p class="sources-eyebrow">Discover</p><h5>Related to this paper</h5></div>
+        <div class="source-related-heading"><h5>Related to this paper</h5></div>
         ${groups.map(group => `<div class="source-related-group"><h6>${escHtml(group.label)}</h6>${group.results?.length ? group.results.map(relatedPaperMarkup).join('') : '<p class="source-related-empty">No records available from this source.</p>'}</div>`).join('')}
       </section>`;
   } catch (error) {

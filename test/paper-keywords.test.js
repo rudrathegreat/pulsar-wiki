@@ -68,7 +68,7 @@ test('keyword updates escape text and preserve the rest of each result', async (
   assert.match(context.sourceKeywordMarkup(results[0]), /Generating keywords/);
   assert.match(context.sourceKeywordMarkup(results[1]), /No abstract/);
   await context.loadSourceKeywords(results);
-  assert.match(nodes.get('source-keywords-paper1').innerHTML, /AI keywords · abstract/);
+  assert.doesNotMatch(nodes.get('source-keywords-paper1').innerHTML, /AI keywords/);
   assert.match(nodes.get('source-keywords-paper1').innerHTML, /&lt;script&gt;/);
 });
 
