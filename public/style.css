@@ -2498,6 +2498,13 @@ button:disabled {
   font-size: 11px;
 }
 
+.source-result-tags small {
+  flex-basis: 100%;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .source-result-actions {
   display: grid;
   grid-template-columns: minmax(0, 1.65fr) repeat(2, minmax(140px, 1fr));

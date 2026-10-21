@@ -16,6 +16,8 @@ Sources sidebar: opening Sources shows saved files from the current workspace. S
 
 Source tabs: Search online contains the literature search without the numbered introductory cards. Upload a file has its own adjacent tab, followed by Saved sources.
 
+Paper search results automatically generate up to six AI topic keywords from each available abstract using the connected ChatGPT model. Keywords appear beneath the authors in place of category codes, with an abstract label, loading and unavailable states. Results remain usable during generation; repeated abstracts reuse keywords during the server session.
+
 Online search input: no search icon or intent tag; the Search button sits beside the input box at the same height, with filter shortcuts below. The input box has a #222 background and no visible border until it transitions to #fff while the input is focused. The Search button border transitions from #333 to #fff on hover.
 
 Graph key: a borderless box with a light grey (`#eee`) background and black labels in light mode, or a dark grey (`#222`) background and white labels in dark mode.

@@ -167,6 +167,11 @@ const api = {
   async getRelatedSources(id) {
     return readJsonResponse(await workspaceFetch(`/api/sources/${encodeURIComponent(id)}/related`), 'Related papers');
   },
+  async getSourceKeywords(id) {
+    return readJsonResponse(await workspaceFetch(`/api/sources/${encodeURIComponent(id)}/keywords`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    }), 'Paper keywords');
+  },
   async importSources(ids) {
     return readJsonResponse(await workspaceFetch('/api/sources/import', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
@@ -1018,11 +1023,32 @@ function sourceProviderMark(provider) {
 }
 
 function sourceTopicTags(paper) {
-  const categories = Array.isArray(paper.categories) ? paper.categories : [];
-  const tags = categories.map(stripEmoji).filter(Boolean);
-  return [...new Set(tags)].slice(0, 3).length
-    ? [...new Set(tags)].slice(0, 3)
-    : [sourceProviderMark(paper.provider)];
+  const tags = Array.isArray(paper.keywords) ? paper.keywords : [];
+  return [...new Set(tags.map(stripEmoji).filter(Boolean))].slice(0, 6);
+}
+
+function sourceKeywordMarkup(paper) {
+  const tags = sourceTopicTags(paper);
+  if (tags.length) return `<small class="source-keyword-label">AI keywords · abstract</small>${tags.map(tag => `<span>${escHtml(tag)}</span>`).join('')}`;
+  return `<small>${escHtml(paper.keywordError || (paper.abstract?.trim() ? 'Generating keywords…' : 'No abstract available'))}</small>`;
+}
+
+async function loadSourceKeywords(results) {
+  const searchWorkspace = workspaceId;
+  let next = 0;
+  const current = () => workspaceId === searchWorkspace && state.sourceResults === results;
+  async function worker() {
+    while (current() && next < results.length) {
+      const paper = results[next++];
+      if (!paper.abstract?.trim() || sourceTopicTags(paper).length) continue;
+      try { Object.assign(paper, await api.getSourceKeywords(paper.id)); }
+      catch (error) { paper.keywordError = `Keywords unavailable: ${stripEmoji(error.message)}`; }
+      if (!current()) return;
+      const tags = $(`source-keywords-${paper.id}`);
+      if (tags) tags.innerHTML = sourceKeywordMarkup(paper);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(3, results.length) }, worker));
 }
 
 function resultPaperMarkup(paper) {
@@ -1045,8 +1071,8 @@ function resultPaperMarkup(paper) {
         </header>
         <h4>${escHtml(paper.title)}</h4>
         <p class="source-result-authors">${escHtml(authorSummary(paper.authors))}</p>
-        <div class="source-result-tags" aria-label="Paper categories">
-          ${sourceTopicTags(paper).map(tag => `<span>${escHtml(tag)}</span>`).join('')}
+        <div class="source-result-tags" id="source-keywords-${escHtml(paper.id)}" aria-label="AI keywords from abstract" aria-live="polite">
+          ${sourceKeywordMarkup(paper)}
         </div>
         <div class="source-result-actions">
           ${identifier && identifierUrl
@@ -1149,6 +1175,7 @@ async function runSourceSearch() {
     const data = await api.searchSources(query);
     state.sourceFilters = data.filters || SOURCE_FILTERS;
     renderSourceResults(data.results);
+    void loadSourceKeywords(state.sourceResults);
     const warning = data.warnings?.length ? ` ${data.warnings.join(' ')}` : '';
     const intent = data.query?.intent === 'specific' ? 'Exact lookup' : data.query?.intent === 'research-question' ? 'Research question' : 'Keyword search';
     dom.sourceSearchStatus.className = `source-search-status visible${warning ? ' warning' : ''}`;

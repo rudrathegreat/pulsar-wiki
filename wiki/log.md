@@ -113,3 +113,5 @@ All major updates to the wiki are recorded here.
 
 | 2026-10-21 | NASA ADS saving diagnosis / application | Identified an older running server without the ADS settings endpoint. Added a clear restart instruction for missing or workspace-gated settings routes and a regression check. Updated the wiki index. |
 - 2026-10-21: Automatically added reading note to stac3719; operation: b2bafbb5-3718-4b26-b498-6b42986c53ad; sources: stac3719.pdf.
+
+| 2026-10-21 | Paper search keywords / application | Added automatic AI topic keywords from abstracts beneath paper authors in place of category codes. Uses the connected ChatGPT model, background requests with three workers, session caching and duplicate-request sharing, abstract labels and loading/unavailable states. Added regression coverage and updated the wiki index. |

@@ -18,6 +18,7 @@ const { WikiTools, WikiToolError } = require('./agent/wiki-tools');
 const { ProviderError } = require('./agent/providers');
 const { FILTERS: SOURCE_FILTERS, SourceDiscoveryService } = require('./agent/source-discovery');
 const { SourceSettings } = require('./agent/source-settings');
+const { PaperKeywords } = require('./agent/paper-keywords');
 const { ReadingStore } = require('./agent/reading-store');
 const { ReadingService } = require('./agent/reading-service');
 const { createReadingRouter } = require('./agent/reading-router');
@@ -57,6 +58,7 @@ function openWorkspace(folder) {
   workspace.wikiTools = new WikiTools({ rootDir, wikiDir, rawDir, dataDir });
   workspace.agentService = new AgentService({ threadStore: new ThreadStore({ dataDir: path.join(dataDir, 'chat') }), authService: chatgptAuth, wikiTools: workspace.wikiTools, instructions });
   workspace.sourceDiscovery = new SourceDiscoveryService({ rawDir, adsToken: sourceSettings.token });
+  workspace.paperKeywords = new PaperKeywords({ authService: chatgptAuth });
   workspace.readingService = new ReadingService({ store: new ReadingStore({ dataDir: path.join(dataDir, 'reading') }), wikiTools: workspace.wikiTools, authService: chatgptAuth, discovery: workspace.sourceDiscovery, instructions });
   workspace.ingestJobs = new Map();
   workspace.readingRouter = createReadingRouter({ service: workspace.readingService, requireLocalSession, requireLocalMutation, onImport: queueSourceIngest });
@@ -480,6 +482,13 @@ app.post('/api/sources/search', requireLocalSession, async (req, res) => {
   } catch (error) {
     return res.status(502).json({ error: error.message || 'The paper search could not be completed.' });
   }
+});
+
+app.post('/api/sources/:id/keywords', requireLocalMutation, async (req, res) => {
+  const paper = currentWorkspace().sourceDiscovery.cached(req.params.id);
+  if (!paper) return res.status(404).json({ error: 'This paper preview expired. Search for it again.' });
+  try { return res.json(await currentWorkspace().paperKeywords.generate(paper)); }
+  catch (error) { return res.status(502).json({ error: error.message || 'Paper keywords could not be generated.' }); }
 });
 
 app.get('/api/sources/:id/related', requireLocalSession, async (req, res) => {
