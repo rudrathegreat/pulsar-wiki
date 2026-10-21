@@ -159,7 +159,7 @@ function parseArxivFeed(xml) {
     const result = {
       provider: 'arXiv', arxivId, bibcode: null, doi: textOf(entry, 'arxiv:doi') || null,
       title: textOf(entry, 'title'), authors: textsOf(entry, 'name'), abstract: textOf(entry, 'summary'),
-      published: textOf(entry, 'published'), publication: categories[0] || 'arXiv preprint', categories,
+      published: textOf(entry, 'published'), publication: textOf(entry, 'arxiv:journal_ref') || 'arXiv preprint', categories,
       pdfUrl, recordUrl: hrefFor(attrs => /rel=["']alternate["']/i.test(attrs)) || idUrl,
       citationCount: null, referenceCount: null,
     };

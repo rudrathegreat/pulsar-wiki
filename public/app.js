@@ -1004,7 +1004,7 @@ function setSourceView(name) {
 function formatPaperDate(value) {
   if (!value) return 'Date unavailable';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? stripEmoji(value) : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
+  return Number.isNaN(date.getTime()) ? stripEmoji(value) : date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 function authorSummary(authors) {
@@ -1017,31 +1017,46 @@ function sourceProviderMark(provider) {
   return provider === 'NASA ADS' ? 'ADS' : 'arXiv';
 }
 
+function sourceTopicTags(paper) {
+  const categories = Array.isArray(paper.categories) ? paper.categories : [];
+  const tags = categories.map(stripEmoji).filter(Boolean);
+  return [...new Set(tags)].slice(0, 3).length
+    ? [...new Set(tags)].slice(0, 3)
+    : [sourceProviderMark(paper.provider)];
+}
+
 function resultPaperMarkup(paper) {
   const selected = state.selectedSourceIds.has(paper.id);
   const unavailable = !paper.canImport;
+  const identifier = paper.doi || paper.arxivId || paper.bibcode;
+  const identifierLabel = paper.doi ? `DOI: ${paper.doi}` : paper.arxivId ? `arXiv: ${paper.arxivId}` : paper.bibcode ? `ADS: ${paper.bibcode}` : 'Identifier unavailable';
+  const identifierUrl = paper.doi ? `https://doi.org/${encodeURIComponent(paper.doi)}` : paper.recordUrl;
   return `
     <article class="source-result${state.activeSourceId === paper.id ? ' expanded' : ''}" data-source-id="${escHtml(paper.id)}">
       <div class="source-result-main">
-        <label class="source-result-check${unavailable ? ' disabled' : ''}" title="${unavailable ? 'No open arXiv PDF is available for import' : 'Select paper for import'}">
-          <input type="checkbox" data-source-select="${escHtml(paper.id)}" ${selected ? 'checked' : ''} ${unavailable ? 'disabled' : ''}/>
-          <span></span>
-        </label>
-        <button class="source-result-preview" type="button" data-source-preview="${escHtml(paper.id)}" aria-expanded="${state.activeSourceId === paper.id}">
-          <div class="source-result-kicker">
-            <span class="source-provider">${escHtml(sourceProviderMark(paper.provider))}</span>
-            <span>${escHtml(formatPaperDate(paper.published))}</span>
-            <span>${escHtml(paper.publication || 'Publication unavailable')}</span>
-          </div>
-          <h4>${escHtml(paper.title)}</h4>
-          <p class="source-result-authors">${escHtml(authorSummary(paper.authors))}</p>
-          <p class="source-result-abstract">${escHtml(paper.abstract || 'No abstract is available for this record.')}</p>
-          <div class="source-result-footer">
-            <span>${paper.citationCount == null ? 'Citation data unavailable' : `${paper.citationCount} citations`}</span>
-            <span>${paper.canImport ? 'Open PDF available' : 'Preview only'}</span>
-            <strong>${state.activeSourceId === paper.id ? 'Close preview' : 'Preview and discover'}</strong>
-          </div>
-        </button>
+        <header class="source-result-kicker">
+          <span class="source-result-publication">${escHtml(paper.publication || sourceProviderMark(paper.provider))}</span>
+          <span class="source-result-date">${escHtml(formatPaperDate(paper.published))}</span>
+          <label class="source-result-check${unavailable ? ' disabled' : ''}" title="${unavailable ? 'No open arXiv PDF is available for import' : 'Select paper for import'}">
+            <input type="checkbox" data-source-select="${escHtml(paper.id)}" ${selected ? 'checked' : ''} ${unavailable ? 'disabled' : ''}/>
+            <span aria-hidden="true"></span>
+            <small>${selected ? 'Selected' : 'Select'}</small>
+          </label>
+        </header>
+        <h4>${escHtml(paper.title)}</h4>
+        <p class="source-result-authors">${escHtml(authorSummary(paper.authors))}</p>
+        <div class="source-result-tags" aria-label="Paper categories">
+          ${sourceTopicTags(paper).map(tag => `<span>${escHtml(tag)}</span>`).join('')}
+        </div>
+        <div class="source-result-actions">
+          ${identifier && identifierUrl
+            ? `<a href="${escHtml(identifierUrl)}" target="_blank" rel="noreferrer">${escHtml(identifierLabel)}</a>`
+            : `<span class="disabled" aria-disabled="true">${escHtml(identifierLabel)}</span>`}
+          ${paper.recordUrl
+            ? `<a href="${escHtml(paper.recordUrl)}" target="_blank" rel="noreferrer">Cite Article</a>`
+            : '<span class="disabled" aria-disabled="true">Cite Article</span>'}
+          <button class="source-result-preview" type="button" data-source-preview="${escHtml(paper.id)}" aria-expanded="${state.activeSourceId === paper.id}">${state.activeSourceId === paper.id ? 'Show Less' : 'Show More'}</button>
+        </div>
       </div>
       <div class="source-result-detail" id="source-detail-${escHtml(paper.id)}" ${state.activeSourceId === paper.id ? '' : 'hidden'}></div>
     </article>`;
@@ -1086,6 +1101,7 @@ async function showSourceDetail(id) {
   const paper = state.sourceResults.find(item => item.id === id);
   detail.innerHTML = `
     <div class="source-preview-panel">
+      <p class="source-preview-abstract">${escHtml(paper?.abstract || 'No abstract is available for this record.')}</p>
       <div class="source-preview-meta">
         ${paper?.doi ? `<span><strong>DOI</strong>${escHtml(paper.doi)}</span>` : ''}
         ${paper?.arxivId ? `<span><strong>arXiv</strong>${escHtml(paper.arxivId)}</span>` : ''}
@@ -1100,6 +1116,7 @@ async function showSourceDetail(id) {
     const groups = data.groups || [];
     detail.innerHTML = `
       <div class="source-preview-panel">
+        <p class="source-preview-abstract">${escHtml(paper?.abstract || 'No abstract is available for this record.')}</p>
         <div class="source-preview-meta">
           ${paper?.doi ? `<span><strong>DOI</strong>${escHtml(paper.doi)}</span>` : ''}
           ${paper?.arxivId ? `<span><strong>arXiv</strong>${escHtml(paper.arxivId)}</span>` : ''}

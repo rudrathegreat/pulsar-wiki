@@ -26,6 +26,7 @@ const ARXIV_FEED = `<?xml version="1.0" encoding="UTF-8"?>
     <author><name>Ada Pulsar</name></author>
     <author><name>Sam Timing</name></author>
     <arxiv:doi>10.1234/example.1</arxiv:doi>
+    <arxiv:journal_ref>Monthly Notices of the Royal Astronomical Society</arxiv:journal_ref>
     <link title="pdf" href="https://arxiv.org/pdf/2401.01234v2" rel="related" type="application/pdf"/>
     <link href="https://arxiv.org/abs/2401.01234v2" rel="alternate" type="text/html"/>
     <category term="astro-ph.HE"/>
@@ -64,6 +65,7 @@ test('arXiv and ADS records normalize to preview and import metadata', () => {
   assert.equal(arxiv.title, 'Precision & pulsar timing');
   assert.deepEqual(arxiv.authors, ['Ada Pulsar', 'Sam Timing']);
   assert.equal(arxiv.canImport, true);
+  assert.equal(arxiv.publication, 'Monthly Notices of the Royal Astronomical Society');
   assert.equal(arxiv.categories[0], 'astro-ph.HE');
 
   const [ads] = parseAdsResponse({ response: { docs: [{
