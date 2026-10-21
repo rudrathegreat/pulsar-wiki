@@ -83,7 +83,7 @@ test('clicking a sidebar PDF opens the AI-assisted reader and keeps the source l
   assert.equal(c.opened[0].name, 'timing.pdf');
   assert.equal(c.context.hash, '#file/timing.pdf');
   assert.match(c.element('source-sidebar-list').innerHTML, /data-source-file="timing.pdf"[^>]*aria-current="true"/);
-  assert.match(c.element('document-download').href, /workspace=test-project/);
+  assert.match(c.state.currentDocument.url, /workspace=test-project/);
   c.element('source-sidebar-add').handlers.click();
   assert.equal(c.state.panel, 'files');
   assert.equal(c.state.sourceView, 'add');

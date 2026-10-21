@@ -1298,11 +1298,6 @@ async function openRawFile(name, ext, file = {}, updateHash = true) {
 
   showPanel('document');
   if (updateHash) history.replaceState(null, '', `#file/${encodeURIComponent(name)}`);
-  $('document-title').textContent = stripEmoji(name);
-  $('document-file-icon').innerHTML = fileIcon(normalizedExt);
-  $('document-meta').innerHTML = `<span>${normalizedExt || 'FILE'}</span>${file.size != null ? `<span>${fmtSize(file.size)}</span>` : ''}`;
-  $('document-download').href = url;
-  $('document-download').setAttribute('download', name);
   dom.pdfToolbar.hidden = normalizedExt !== 'pdf';
   setDocumentStatus(`Opening ${normalizedExt ? normalizedExt.toUpperCase() : 'document'}...`);
 
@@ -1432,10 +1427,6 @@ async function renderPdfPage(pageNumber, fitWidth = state.pdf.fitWidth) {
   }
 }
 
-$('document-back').addEventListener('click', () => {
-  history.replaceState(null, '', location.pathname);
-  showPanel('files');
-});
 $('pdf-prev').addEventListener('click', () => renderPdfPage(state.pdf.page - 1, state.pdf.fitWidth));
 $('pdf-next').addEventListener('click', () => renderPdfPage(state.pdf.page + 1, state.pdf.fitWidth));
 $('pdf-zoom-out').addEventListener('click', () => {

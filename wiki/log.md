@@ -98,3 +98,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-21 | Dark-mode reading input borders / public | Made the page number input transparent and removed borders from right-hand reading sidebar inputs and the Find in paper search bar, only in dark mode. Updated the wiki index. |
 
 | 2026-10-21 | Sources sidebar / public | Added a saved-source sidebar for Sources and document views, wired file selection to the existing AI-assisted PDF reader and text previews, marked the current document, and included loading, empty and failure messages plus an Add sources action. Saved files refresh after uploads and imports. Updated the wiki index. |
+
+| 2026-10-21 | Reading header / public | Removed the top document header containing the filename, file icon, size, type, back and download controls, along with its unused handlers and styles. Kept the reading toolbar and saved-source sidebar. Updated the wiki index. |

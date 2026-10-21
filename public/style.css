@@ -1831,17 +1831,6 @@ body {
   background: var(--bg);
 }
 
-.document-header {
-  min-height: 64px;
-  padding: 10px 18px;
-  border-bottom: 1px solid var(--border-sub);
-  background: var(--surface);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-}
-
 .document-icon-btn {
   width: 32px;
   height: 32px;
@@ -1867,80 +1856,9 @@ body {
   cursor: default;
 }
 
-.document-icon-btn svg,
-.document-action svg {
+.document-icon-btn svg {
   width: 15px;
   height: 15px;
-}
-
-.document-back {
-  margin-right: 2px;
-}
-
-.document-file-icon {
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.document-file-icon svg {
-  width: 18px;
-  height: 18px;
-}
-
-.document-title-wrap {
-  min-width: 0;
-}
-
-.document-title-wrap h2 {
-  max-width: min(48vw, 620px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.document-meta {
-  display: flex;
-  gap: 10px;
-  color: var(--text-3);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.document-header-spacer {
-  flex: 1;
-}
-
-.document-action {
-  height: 32px;
-  padding: 0 11px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-2);
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  transition: color var(--transition), background var(--transition), border-color var(--transition);
-}
-
-.document-action:hover {
-  color: var(--text-1);
-  background: var(--surface-2);
-  border-color: var(--text-3);
 }
 
 .document-toolbar {
@@ -2115,17 +2033,10 @@ body {
     padding: 32px 28px 44px;
   }
 
-  .document-action {
-    width: 32px;
-    padding: 0;
-    justify-content: center;
-    font-size: 0;
-  }
 }
 
 /* Shared control treatment: controls use outlines without filled backgrounds. */
-button,
-.document-action {
+button {
   background: transparent !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--radius-sm);
@@ -2135,8 +2046,7 @@ button,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  button,
-  .document-action {
+  button {
     transition: none !important;
   }
 }
@@ -2146,14 +2056,12 @@ button * {
   font-weight: 400 !important;
 }
 
-button:hover:not(:disabled),
-.document-action:hover {
+button:hover:not(:disabled) {
   border-color: var(--focus) !important;
   color: var(--button-text) !important;
 }
 
-button:focus-visible,
-.document-action:focus-visible {
+button:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }

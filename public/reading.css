@@ -53,7 +53,6 @@
 [data-theme="dark"] #panel-document #pdf-page-input { background:transparent; }
 [data-theme="dark"] #reading-notes :is(input, textarea, select),
 [data-theme="dark"] #reading-find { border:0; }
-#panel-document .document-title-wrap h2, #panel-document .document-meta { font-weight:400; }
 .reading-document-body { display:flex; flex:1; min-height:0; min-width:0; overflow:hidden; background:var(--surface); }
 .reading-document-body, #reading-dialog, #pdf-toolbar { --button-text:var(--text-1); }
 .reading-document-body .document-stage { padding:28px 24px 60px; position:relative; }
