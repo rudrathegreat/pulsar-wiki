@@ -211,7 +211,8 @@
           </header>
 
           <div class="source-tabs" role="tablist" aria-label="Source views">
-            <button class="source-tab active" id="source-tab-add" type="button" role="tab" aria-selected="true" aria-controls="source-view-add" data-source-view="add">Add sources</button>
+            <button class="source-tab active" id="source-tab-add" type="button" role="tab" aria-selected="true" aria-controls="source-view-add" data-source-view="add">Search online</button>
+            <button class="source-tab" id="source-tab-upload" type="button" role="tab" aria-selected="false" aria-controls="source-view-upload" data-source-view="upload">Upload a file</button>
             <button class="source-tab" id="source-tab-saved" type="button" role="tab" aria-selected="false" aria-controls="source-view-saved" data-source-view="saved">Saved sources <span class="badge" id="files-count">0</span></button>
           </div>
 
@@ -239,22 +240,6 @@
               </div>
             </form>
 
-            <div class="source-methods" aria-label="Ways to add a source">
-              <article class="source-method">
-                <span class="source-method-number">01</span>
-                <div><strong>Explore a question</strong><p>Use natural language or keywords to search astronomy literature.</p></div>
-              </article>
-              <article class="source-method">
-                <span class="source-method-number">02</span>
-                <div><strong>Find a known paper</strong><p>Paste a title, DOI, arXiv ID, or ADS link for a precise lookup.</p></div>
-              </article>
-              <button class="source-method source-upload-method" id="files-upload-btn" type="button">
-                <span class="source-method-number">03</span>
-                <div><strong>Upload a file</strong><p>Add PDF, text, or Markdown from your computer.</p></div>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-              </button>
-            </div>
-
             <div class="source-search-status" id="source-search-status" role="status" aria-live="polite"></div>
             <section class="source-results-section" id="source-results-section" hidden>
               <header class="source-results-header">
@@ -263,6 +248,17 @@
               </header>
               <div class="source-results" id="source-results"></div>
             </section>
+          </section>
+
+          <section class="source-view" id="source-view-upload" role="tabpanel" aria-labelledby="source-tab-upload" hidden>
+            <div class="source-intro">
+              <h3>Upload a file</h3>
+              <p>Add PDF, text, or Markdown from your computer.</p>
+            </div>
+            <button class="upload-btn" id="files-upload-btn" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+              Upload a file
+            </button>
           </section>
 
           <section class="source-view" id="source-view-saved" role="tabpanel" aria-labelledby="source-tab-saved" hidden>

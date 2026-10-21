@@ -1000,7 +1000,7 @@ function sourceIntent(value) {
 }
 
 function setSourceView(name) {
-  state.sourceView = name === 'saved' ? 'saved' : 'add';
+  state.sourceView = ['add', 'upload', 'saved'].includes(name) ? name : 'add';
   document.querySelectorAll('[data-source-view]').forEach(button => {
     const active = button.dataset.sourceView === state.sourceView;
     button.classList.toggle('active', active);
