@@ -298,14 +298,11 @@
             <button class="handover-link-button" id="handover-open-page" type="button">Open published guide</button>
           </header>
 
-          <ol class="handover-steps" aria-label="Handover workflow">
-            <li class="active" data-handover-step="1" aria-current="step"><span>1</span><div><strong>Project</strong><small>Describe the work</small></div></li>
-            <li data-handover-step="2"><span>2</span><div><strong>Materials</strong><small>Choose evidence</small></div></li>
-            <li data-handover-step="3"><span>3</span><div><strong>Review</strong><small>Edit and verify</small></div></li>
-            <li data-handover-step="4"><span>4</span><div><strong>Publish</strong><small>Update the wiki</small></div></li>
-          </ol>
-
-          <div class="handover-layout">
+          <div id="handover-drafting" class="handover-drafting" role="status" aria-live="polite" tabindex="-1" hidden>
+            <span class="handover-spinner" aria-hidden="true"></span>
+            <p>Drafting your handover...</p>
+          </div>
+          <div class="handover-layout" id="handover-form">
             <section class="handover-card" data-handover-stage="1" aria-labelledby="handover-project-title">
               <div class="handover-card-header">
                 <div><span class="handover-kicker">Project details</span><h3 id="handover-project-title">Introduce your project</h3></div>
@@ -330,32 +327,33 @@
               </div>
               <div class="handover-selector" id="handover-wiki-selector">
                 <div class="handover-selector-header">
-                  <div><strong>Wiki pages</strong><small>Methods, decisions, findings and context</small></div>
-                  <button type="button" data-handover-toggle="wiki">Select all</button>
+                  <label for="handover-wiki-input">Wiki pages</label>
+                  <button class="handover-primary" type="button" data-handover-toggle="wiki">Select all</button>
                 </div>
-                <div class="handover-options" id="handover-wiki-options"><div class="handover-loading">Loading wiki pages...</div></div>
+                <input class="handover-autocomplete" id="handover-wiki-input" type="text" list="handover-wiki-options" placeholder="Type a wiki page name" autocomplete="off" disabled/>
+                <datalist id="handover-wiki-options"></datalist>
+                <div class="handover-selected" id="handover-wiki-selected" aria-label="Selected wiki pages"></div>
               </div>
 
               <div class="handover-selector" id="handover-file-selector">
                 <div class="handover-selector-header">
-                  <div><strong>Research materials</strong><small>Papers, notebooks, annotations and supporting files</small></div>
-                  <button type="button" data-handover-toggle="raw">Select all</button>
+                  <label for="handover-file-input">Sources</label>
+                  <button class="handover-primary" type="button" data-handover-toggle="raw">Select all</button>
                 </div>
-                <div class="handover-options" id="handover-file-options"><div class="handover-loading">Loading research materials...</div></div>
+                <input class="handover-autocomplete" id="handover-file-input" type="text" list="handover-file-options" placeholder="Type a source filename" autocomplete="off" disabled/>
+                <datalist id="handover-file-options"></datalist>
+                <div class="handover-selected" id="handover-file-selected" aria-label="Selected sources"></div>
               </div>
 
               <div class="handover-selector" id="handover-notebook-selector">
                 <div class="handover-selector-header">
-                  <div><strong>Research notebooks</strong><small>Saved analysis, notes and outputs</small></div>
-                  <button type="button" data-handover-toggle="notebook">Select all</button>
+                  <label for="handover-notebook-input">Research notebooks</label>
+                  <button class="handover-primary" type="button" data-handover-toggle="notebook">Select all</button>
                 </div>
-                <div class="handover-options" id="handover-notebook-options"><div class="handover-loading">Loading research notebooks...</div></div>
+                <input class="handover-autocomplete" id="handover-notebook-input" type="text" list="handover-notebook-options" placeholder="Type a notebook name" autocomplete="off" disabled/>
+                <datalist id="handover-notebook-options"></datalist>
+                <div class="handover-selected" id="handover-notebook-selected" aria-label="Selected research notebooks"></div>
               </div>
-              <div class="handover-ai-note">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
-                <p>AI will organise only the material you select. It will flag missing evidence and unresolved questions instead of inventing answers.</p>
-              </div>
-              <p class="handover-stage-copy">Select Next to generate your draft and continue to review. Notebook evidence uses saved cells and outputs.</p>
             </section>
 
             <section class="handover-card handover-draft" data-handover-stage="3" hidden aria-labelledby="handover-draft-title">
@@ -395,7 +393,7 @@
             </section>
           </div>
           <div class="handover-status" id="handover-status" role="status" aria-live="polite"></div>
-          <nav class="handover-navigation" aria-label="Handover stages">
+          <nav class="handover-navigation" id="handover-navigation" aria-label="Handover stages">
             <button class="handover-secondary" id="handover-back" type="button" disabled>Back</button>
             <span id="handover-stage-count">Step 1 of 4</span>
             <button class="handover-primary" id="handover-next" type="button">Next</button>

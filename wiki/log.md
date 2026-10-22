@@ -121,3 +121,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-22 | Project handover / public | Split the handover into separate Select, Generate, Review and Publish stages with Back and Next navigation, retained form state, validation, and review-gated publication. Updated the wiki index. |
 
 | 2026-10-22 | Project handover stages / application | Separated project details from evidence selection, removed the standalone generation stage, and made Next generate the draft before opening review. Added selection and bounded saved-cell evidence for research notebooks, project descriptions, and reuse of unchanged drafts. Updated the wiki index. |
+
+| 2026-10-22 | Handover appearance and selection / application | Removed the top stage bar and helper copy, made cards transparent and inputs borderless with #1c1c1c backgrounds, enlarged errors in regular red text, replaced material lists with autocomplete inputs and removable selections, renamed research materials to Sources, styled Select all like Next, removed selection-count limits, and added a central drafting spinner. Updated the wiki index. |

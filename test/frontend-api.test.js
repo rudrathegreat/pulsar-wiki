@@ -198,7 +198,7 @@ test('LaTeX delimiters survive Markdown rendering and KaTeX assets are local', (
 });
 
 test('UI source uses only approved palettes and contains no built-in emojis', () => {
-  const allowed = new Set(['#111', '#1c1c1c', '#222', '#fff', '#eee', '#ccc']);
+  const allowed = new Set(['#111', '#1c1c1c', '#222', '#fff', '#eee', '#ccc', '#ef5350']);
   const colorSources = `${styleSource}\n${appSource}\n${readingSource}`;
   for (const color of colorSources.match(/#[0-9a-f]{3,8}\b/gi) || []) {
     assert.ok(allowed.has(color.toLowerCase()), `Unexpected color literal: ${color}`);
@@ -238,7 +238,7 @@ test('project handover is a selection-based, review-gated wiki workflow', () => 
     'handover-editor', 'handover-preview', 'handover-reviewed', 'handover-publish',
   ]) assert.match(indexSource, new RegExp(`id="${id}"`));
   assert.match(indexSource, /I have reviewed this handover/);
-  assert.match(indexSource, /Papers, notebooks, annotations and supporting files/);
+  assert.match(indexSource, /<label for="handover-file-input">Sources<\/label>/);
   assert.match(appSource, /if \(!state\.chatgpt\?\.ready\)/);
   assert.match(appSource, /handover-reviewed'[\s\S]*handover-publish/);
   assert.match(serverSource, /app\.post\('\/api\/handover\/generate', requireLocalMutation/);

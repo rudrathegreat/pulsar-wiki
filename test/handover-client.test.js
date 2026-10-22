@@ -21,18 +21,18 @@ function client() {
     });
     return nodes.get(id);
   }
-  const steps = [1, 2, 3, 4].map(n => ({ ...node('handover-stage-count'), dataset: { handoverStep: String(n) }, attributes: {} }));
+  const toggles = ['wiki', 'raw', 'notebook'].map(type => ({ ...node('handover-next'), dataset: { handoverToggle: type }, handlers: {} }));
   const stages = [1, 2, 3, 4].map(n => ({ dataset: { handoverStage: String(n) }, hidden: n !== 1 }));
   let generate = async () => ({ draft: '# Handover\nEvidence and next steps.' });
   let publish = async () => {};
-  const state = { handover: { step: 1, selectedPages: new Set(), selectedSources: new Set(), selectedNotebooks: new Set(), generatedInput: '', draft: '', generating: false, publishing: false }, chatgpt: { ready: true } };
+  const state = { handover: { materials: { wiki: [], raw: [], notebook: [] }, step: 1, selectedPages: new Set(), selectedSources: new Set(), selectedNotebooks: new Set(), generatedInput: '', draft: '', generating: false, publishing: false }, chatgpt: { ready: true } };
   const context = {
     $, state, document: {
       querySelectorAll(selector) {
-        if (selector === '[data-handover-step]') return steps;
+        if (selector === '[data-handover-toggle]') return toggles;
         if (selector === '[data-handover-stage]') return stages;
         return [];
-      }, querySelector() { return null; },
+      }, querySelector(selector) { return toggles.find(button => selector === `[data-handover-toggle="${button.dataset.handoverToggle}"]`) || null; },
     },
     api: { getHandoverNotebooks: async () => ({ notebooks: [{ id: 'book-1', path: 'timing.ipynb', available: true }, { id: 'missing', path: 'missing.ipynb', available: false }] }), getRawList: async () => [], generateHandover: data => generate(data), publishHandover: data => publish(data), getWikiList: async () => [] },
     stripEmoji: String, escHtml: String, renderMd: String, typesetMath() {}, buildSidebar() {},
@@ -40,7 +40,7 @@ function client() {
   function $(id) { return node(id); }
   vm.createContext(context);
   vm.runInContext(source.slice(source.indexOf('// Project handover'), source.indexOf('const SOURCE_FILTERS')), context);
-  return { ...context, node, stages, steps, setGenerate(fn) { generate = fn; }, setPublish(fn) { publish = fn; } };
+  return { ...context, node, stages, toggles, setGenerate(fn) { generate = fn; }, setPublish(fn) { publish = fn; } };
 }
 
 function select(c) {
@@ -62,7 +62,6 @@ test('handover validates selection and shows one stage at a time while retaining
   assert.match(c.node('handover-status').textContent, /project description/);
   select(c);
   assert.deepEqual(c.stages.map(s => s.hidden), [true, false, true, true]);
-  assert.equal(c.steps[1].attributes['aria-current'], 'step');
   assert.equal(c.node('handover-next').disabled, false);
   c.node('handover-back').handlers.click();
   assert.equal(c.state.handover.step, 1);
@@ -78,11 +77,15 @@ test('generation, review, editing and publication are separate, review-gated sta
   c.setGenerate(() => new Promise(resolve => { release = resolve; }));
   const pending = c.advanceHandover();
   assert.equal(c.node('handover-back').disabled, true);
+  assert.equal(c.node('handover-drafting').hidden, false);
+  assert.equal(c.node('handover-form').hidden, true);
   c.node('handover-back').handlers.click();
   assert.equal(c.state.handover.step, 2);
   release({ draft: '# Reviewed guide' });
   await pending;
   assert.equal(c.state.handover.step, 3);
+  assert.equal(c.node('handover-drafting').hidden, true);
+  assert.equal(c.node('handover-form').hidden, false);
   assert.deepEqual(c.stages.map(s => s.hidden), [true, true, false, true]);
   assert.equal(c.node('handover-next').disabled, true);
   c.node('handover-reviewed').checked = true;
@@ -117,6 +120,8 @@ test('generation failures retain selection and allow retry or Back', async () =>
   assert.equal(c.node('handover-back').disabled, false);
   assert.equal(c.node('handover-next').disabled, false);
   assert.match(c.node('handover-status').textContent, /Connection interrupted/);
+  assert.equal(c.node('handover-drafting').hidden, true);
+  assert.equal(c.node('handover-status').hidden, false);
   assert.ok(c.state.handover.selectedPages.has('pulsar-timing'));
 });
 
@@ -159,4 +164,44 @@ test('empty material selection stays on step 2', async () => {
   await c.advanceHandover();
   assert.equal(c.state.handover.step, 2);
   assert.match(c.node('handover-status').textContent, /at least one/);
+});
+
+
+test('autocomplete selects matching names, prevents unknown entries, removes selections and selects all beyond 30 pages', () => {
+  const c = client();
+  c.state.handover.materials.wiki = Array.from({ length: 65 }, (_, i) => ({ name: `page-${i}`, label: `page-${i}` }));
+  c.state.handover.materials.raw = [{ name: 'timing.pdf', label: 'timing.pdf' }];
+  c.updateHandoverSelection();
+  const input = c.node('handover-wiki-input');
+  input.value = 'PAGE-3';
+  input.handlers.keydown({ key: 'Enter', preventDefault() {} });
+  assert.ok(c.state.handover.selectedPages.has('page-3'));
+  assert.equal(input.value, '');
+  assert.match(c.node('handover-wiki-selected').innerHTML, /Remove page-3/);
+  assert.doesNotMatch(c.node('handover-wiki-options').innerHTML, /value="page-3"/);
+  input.value = 'unavailable-page';
+  c.addHandoverMaterial('wiki', true);
+  assert.equal(c.state.handover.selectedPages.size, 1);
+  assert.match(c.node('handover-status').textContent, /matching item/);
+  c.node('handover-wiki-selected').handlers.click({ target: { closest: () => ({ dataset: { handoverRemove: 'page-3' } }) } });
+  assert.equal(c.state.handover.selectedPages.size, 0);
+  c.toggles[0].handlers.click();
+  assert.equal(c.state.handover.selectedPages.size, 65);
+  assert.equal(c.toggles[0].textContent, 'Clear all');
+  c.toggles[0].handlers.click();
+  assert.equal(c.state.handover.selectedPages.size, 0);
+  c.node('handover-file-input').value = 'timing.pdf';
+  c.node('handover-file-input').handlers.change();
+  assert.ok(c.state.handover.selectedSources.has('timing.pdf'));
+});
+
+test('server accepts all available documents and rejects unavailable selections', () => {
+  const server = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+  const context = { AgentServiceError: Error };
+  vm.createContext(context);
+  vm.runInContext(server.slice(server.indexOf('function selectedWorkspaceItems('), server.indexOf('function cleanGeneratedMarkdown(')), context);
+  const names = Array.from({ length: 75 }, (_, i) => `page-${i}`);
+  assert.equal(context.selectedWorkspaceItems(names, new Set(names), 'wiki pages').length, 75);
+  assert.throws(() => context.selectedWorkspaceItems(['missing'], new Set(names), 'wiki pages'), /no longer/);
+  assert.equal(context.selectedWorkspaceItems(['page-1', 'page-1'], new Set(names), 'wiki pages').length, 1);
 });

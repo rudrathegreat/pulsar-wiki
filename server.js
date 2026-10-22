@@ -216,10 +216,9 @@ function safeBase(name) {
   return path.basename(name).replace(/\.\./g, '');
 }
 
-function selectedWorkspaceItems(values, available, maximum, label) {
+function selectedWorkspaceItems(values, available, label) {
   if (!Array.isArray(values)) return [];
   const unique = [...new Set(values.map(value => String(value || '').trim()).filter(Boolean))];
-  if (unique.length > maximum) throw new AgentServiceError(`Select no more than ${maximum} ${label}.`, 'handover-selection-too-large');
   if (unique.some(value => !available.has(value))) throw new AgentServiceError(`One or more selected ${label} are no longer in this workspace.`, 'handover-selection-stale');
   return unique;
 }
@@ -523,12 +522,12 @@ app.post('/api/handover/generate', requireLocalMutation, async (req, res) => {
   try {
     const availablePages = new Set(currentWorkspace().wikiTools.listWikiPages().filter(name => !['log', 'project-handover'].includes(name)));
     const availableSources = new Set(currentWorkspace().wikiTools.listSources().map(source => source.name));
-    const pages = selectedWorkspaceItems(req.body?.pages, availablePages, 30, 'wiki pages');
-    const sources = selectedWorkspaceItems(req.body?.sources, availableSources, 20, 'research materials');
+    const pages = selectedWorkspaceItems(req.body?.pages, availablePages, 'wiki pages');
+    const sources = selectedWorkspaceItems(req.body?.sources, availableSources, 'sources');
     const store = currentWorkspace().notebookService.store;
     const availableNotebooks = new Set(store.sync().filter(book => book.available).map(book => book.id));
-    const notebooks = selectedWorkspaceItems(req.body?.notebooks, availableNotebooks, 5, 'research notebooks');
-    if (!pages.length && !sources.length && !notebooks.length) return res.status(400).json({ error: 'Select at least one wiki page, research material or notebook.' });
+    const notebooks = selectedWorkspaceItems(req.body?.notebooks, availableNotebooks, 'research notebooks');
+    if (!pages.length && !sources.length && !notebooks.length) return res.status(400).json({ error: 'Select at least one wiki page, source or notebook.' });
     const notebookEvidence = currentWorkspace().notebookService.handoverEvidence(notebooks);
 
     const projectName = String(req.body?.projectName || 'Research project').replace(/[\r\n]+/g, ' ').trim().slice(0, 120) || 'Research project';

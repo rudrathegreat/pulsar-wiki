@@ -247,7 +247,7 @@ const state = {
   documentSession: 0,
   currentDocument: null,
   pdf: { lib: null, doc: null, page: 1, scale: 1, fitWidth: true, renderTask: null, renderId: 0, resizeTimer: null },
-  handover: { step: 1, loaded: false, generating: false, publishing: false, selectedPages: new Set(), selectedSources: new Set(), selectedNotebooks: new Set(), generatedInput: '', draft: '' },
+  handover: { materials: { wiki: [], raw: [], notebook: [] }, step: 1, loaded: false, generating: false, publishing: false, selectedPages: new Set(), selectedSources: new Set(), selectedNotebooks: new Set(), generatedInput: '', draft: '' },
 };
 
 const $ = id => document.getElementById(id);
@@ -784,22 +784,38 @@ async function loadFiles() {
 }
 
 // Project handover
-function handoverMaterialKind(file) {
-  const ext = String(file.ext || '').toLowerCase();
-  if (ext === 'pdf') return 'Paper';
-  if (ext === 'ipynb') return 'Notebook';
-  if (['py', 'r'].includes(ext)) return 'Analysis';
-  if (['csv', 'tsv', 'json'].includes(ext)) return 'Data';
-  if (/annot|note|comment/i.test(file.name)) return 'Annotation';
-  return 'Supporting';
+const HANDOVER_SELECTORS = { wiki: 'wiki', raw: 'file', notebook: 'notebook' };
+
+function renderHandoverSelector(type) {
+  const prefix = `handover-${HANDOVER_SELECTORS[type]}`;
+  const items = state.handover.materials[type];
+  const selected = handoverSelectedSet(type);
+  $(prefix + '-options').innerHTML = items.filter(item => !selected.has(item.name))
+    .map(item => `<option value="${escHtml(item.label)}"></option>`).join('');
+  $(prefix + '-selected').innerHTML = items.filter(item => selected.has(item.name))
+    .map(item => `<button class="handover-chip" type="button" data-handover-remove="${escHtml(item.name)}" aria-label="Remove ${escHtml(item.label)}">${escHtml(item.label)}<span aria-hidden="true"> &times;</span></button>`).join('');
+  const toggle = document.querySelector(`[data-handover-toggle="${type}"]`);
+  if (toggle) {
+    toggle.textContent = items.length && selected.size === items.length ? 'Clear all' : 'Select all';
+    toggle.disabled = !items.length || state.handover.generating;
+  }
 }
 
-function handoverOptionMarkup(type, name, detail, checked, label = name) {
-  return `<label class="handover-option">
-    <input type="checkbox" data-handover-type="${type}" data-handover-name="${escHtml(name)}" ${checked ? 'checked' : ''}/>
-    <strong title="${escHtml(label)}">${escHtml(label)}</strong>
-    <small>${escHtml(detail)}</small>
-  </label>`;
+function addHandoverMaterial(type, showError = false) {
+  const input = $(`handover-${HANDOVER_SELECTORS[type]}-input`);
+  const query = input.value.trim();
+  if (!query || state.handover.generating) return;
+  const items = state.handover.materials[type];
+  const item = items.find(item => item.label === query)
+    || items.find(item => item.label.toLowerCase() === query.toLowerCase());
+  if (!item) {
+    if (showError) setHandoverStatus('Choose a matching item from the suggestions.', true);
+    return;
+  }
+  handoverSelectedSet(type).add(item.name);
+  input.value = '';
+  setHandoverStatus();
+  updateHandoverSelection();
 }
 
 function updateHandoverNavigation() {
@@ -812,16 +828,15 @@ function updateHandoverNavigation() {
   $('handover-next').disabled = busy
     || (step === 3 && (!hasDraft || !$('handover-reviewed').checked));
   $('handover-stage-count').textContent = `Step ${step} of 4`;
+  $('handover-drafting').hidden = !generating;
+  $('handover-form').hidden = generating;
+  $('handover-navigation').hidden = generating;
+  $('handover-status').hidden = generating;
+  $('handover-form').setAttribute('aria-busy', String(generating));
 }
 
 function setHandoverStep(step) {
   state.handover.step = step;
-  document.querySelectorAll('[data-handover-step]').forEach(item => {
-    const current = Number(item.dataset.handoverStep) === step;
-    item.classList.toggle('active', current);
-    if (current) item.setAttribute('aria-current', 'step');
-    else item.removeAttribute('aria-current');
-  });
   document.querySelectorAll('[data-handover-stage]').forEach(stage => {
     stage.hidden = Number(stage.dataset.handoverStage) !== step;
   });
@@ -851,7 +866,7 @@ async function advanceHandover() {
   }
   if (step === 2) {
     if (!handoverSelectionCount()) {
-      setHandoverStatus('Select at least one wiki page, research material or notebook.', true);
+      setHandoverStatus('Select at least one wiki page, source or notebook.', true);
       return;
     }
     if (state.handover.generatedInput === JSON.stringify(handoverInput()) && $('handover-editor').value.trim()) {
@@ -895,12 +910,7 @@ function updateHandoverSelection() {
   const total = handoverSelectionCount();
   $('handover-selection-count').textContent = `${total} selected`;
   updateHandoverNavigation();
-  for (const type of ['wiki', 'raw', 'notebook']) {
-    const options = document.querySelectorAll(`[data-handover-type="${type}"]`);
-    const selected = handoverSelectedSet(type);
-    const toggle = document.querySelector(`[data-handover-toggle="${type}"]`);
-    if (toggle) toggle.textContent = options.length && selected.size === options.length ? 'Clear all' : 'Select all';
-  }
+  for (const type of Object.keys(HANDOVER_SELECTORS)) renderHandoverSelector(type);
 }
 
 async function loadHandoverWorkspace(force = false) {
@@ -917,22 +927,19 @@ async function loadHandoverWorkspace(force = false) {
     state.handover.selectedPages = new Set([...state.handover.selectedPages].filter(name => availablePageNames.has(name)));
     state.handover.selectedSources = new Set([...state.handover.selectedSources].filter(name => availableSourceNames.has(name)));
 
-    $('handover-wiki-options').innerHTML = selectablePages.length
-      ? selectablePages.sort((a, b) => a.name.localeCompare(b.name)).map(page => handoverOptionMarkup('wiki', page.name, 'Wiki', state.handover.selectedPages.has(page.name))).join('')
-      : '<div class="handover-loading">No wiki pages are available.</div>';
-    $('handover-file-options').innerHTML = files.length
-      ? files.sort((a, b) => a.name.localeCompare(b.name)).map(file => handoverOptionMarkup('raw', file.name, handoverMaterialKind(file), state.handover.selectedSources.has(file.name))).join('')
-      : '<div class="handover-loading">No research materials are available.</div>';
-    $('handover-notebook-options').innerHTML = notebooks.length
-      ? notebooks.sort((a, b) => a.path.localeCompare(b.path)).map(book => handoverOptionMarkup('notebook', book.id, 'Notebook', state.handover.selectedNotebooks.has(book.id), book.path)).join('')
-      : '<div class="handover-loading">No saved research notebooks are available.</div>';
+    state.handover.materials = {
+      wiki: selectablePages.map(page => ({ name: page.name, label: page.name })),
+      raw: files.map(file => ({ name: file.name, label: file.name })),
+      notebook: notebooks.map(book => ({ name: book.id, label: book.path })),
+    };
+    for (const [type, short] of Object.entries(HANDOVER_SELECTORS)) {
+      state.handover.materials[type].sort((a, b) => a.label.localeCompare(b.label));
+      $(`handover-${short}-input`).disabled = false;
+    }
     $('handover-open-page').disabled = !pages.some(page => page.name === 'project-handover');
     updateHandoverSelection();
   } catch (error) {
     state.handover.loaded = false;
-    $('handover-wiki-options').innerHTML = '<div class="handover-loading">Could not load wiki pages.</div>';
-    $('handover-file-options').innerHTML = '<div class="handover-loading">Could not load research materials.</div>';
-    $('handover-notebook-options').innerHTML = '<div class="handover-loading">Could not load research notebooks.</div>';
     setHandoverStatus(error.message, true);
   }
 }
@@ -972,7 +979,8 @@ async function generateHandover() {
   state.handover.generating = true;
   updateHandoverSelection();
   setHandoverStep(2);
-  setHandoverStatus('AI is tracing the selected evidence. This can take a minute.');
+  setHandoverStatus();
+  $('handover-drafting').focus({ preventScroll: true });
   try {
     const input = handoverInput();
     const result = await api.generateHandover(input);
@@ -992,7 +1000,7 @@ async function generateHandover() {
   } finally {
     state.handover.generating = false;
     updateHandoverSelection();
-    updateHandoverNavigation();
+    setHandoverStep(state.handover.step);
   }
 }
 
@@ -1027,23 +1035,32 @@ async function publishHandover() {
   }
 }
 
-for (const containerId of ['handover-wiki-options', 'handover-file-options', 'handover-notebook-options']) {
-  $(containerId).addEventListener('change', event => {
-    const input = event.target.closest('[data-handover-type][data-handover-name]');
-    if (!input) return;
-    const selected = handoverSelectedSet(input.dataset.handoverType);
-    if (input.checked) selected.add(input.dataset.handoverName); else selected.delete(input.dataset.handoverName);
+for (const [type, short] of Object.entries(HANDOVER_SELECTORS)) {
+  const input = $(`handover-${short}-input`);
+  input.addEventListener('change', () => addHandoverMaterial(type));
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      addHandoverMaterial(type, true);
+    }
+  });
+  $(`handover-${short}-selected`).addEventListener('click', event => {
+    const button = event.target.closest('[data-handover-remove]');
+    if (!button || state.handover.generating) return;
+    handoverSelectedSet(type).delete(button.dataset.handoverRemove);
     updateHandoverSelection();
+    input.focus();
   });
 }
 
 document.querySelectorAll('[data-handover-toggle]').forEach(button => button.addEventListener('click', () => {
+  if (state.handover.generating) return;
   const type = button.dataset.handoverToggle;
-  const options = [...document.querySelectorAll(`[data-handover-type="${type}"]`)];
+  const items = state.handover.materials[type];
   const selected = handoverSelectedSet(type);
-  const shouldSelect = selected.size !== options.length;
+  const shouldSelect = selected.size !== items.length;
   selected.clear();
-  options.forEach(option => { option.checked = shouldSelect; if (shouldSelect) selected.add(option.dataset.handoverName); });
+  if (shouldSelect) items.forEach(item => selected.add(item.name));
   updateHandoverSelection();
 }));
 
