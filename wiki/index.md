@@ -2,6 +2,8 @@
 
 Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pulsar science, observational tools, and relativistic physics.
 
+Application branding: the PulsarWiki logo appears at the top of the iconbar and adapts to dark and light themes.
+
 Application workspace guide: [Research workspaces](../README.md#research-workspaces). Choose a project folder with the system folder dialog or plain path field; a loading animation appears while the project opens and its initial data loads. The full selected path stays visible in the title bar, and each workspace keeps its own sources, pages, chats and reading notes, and the folder stays selected for the session.
 
 Notebook guide: [Research notebooks](../README.md#research-notebooks). New notebooks start with editable Title, Objective, Live notes, and Preliminary analysis sections.

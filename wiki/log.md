@@ -132,3 +132,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-22 | Project handover spacing and controls / public | Aligned form cards with the header and navigation, enlarged field labels and review text, padded the guide and draft-view buttons, removed the draft-tab wrapper border, increased preview padding, hid Back on step 1, and removed review helper and draft-ready copy. Updated the wiki index. |
 
 | 2026-10-22 | Handover publication labels / public | Removed Ready to share and the Publishes as filename label from the publication step. Updated the wiki index. |
+
+| 2026-10-22 | Iconbar branding / public | Added the supplied PulsarWiki SVG logo above the iconbar controls, preserving its proportions and inverting it for light mode. Updated the wiki index. |

@@ -189,6 +189,19 @@ body {
   z-index: 10;
 }
 
+.iconbar-logo {
+  display: block;
+  width: 26px;
+  height: 38px;
+  object-fit: contain;
+  flex-shrink: 0;
+  margin-bottom: 8px;
+}
+
+[data-theme="light"] .iconbar-logo {
+  filter: invert(1);
+}
+
 .icon-btn {
   width: 36px;
   height: 36px;
