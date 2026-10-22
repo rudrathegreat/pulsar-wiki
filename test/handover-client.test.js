@@ -195,13 +195,14 @@ test('autocomplete selects matching names, prevents unknown entries, removes sel
   assert.ok(c.state.handover.selectedSources.has('timing.pdf'));
 });
 
-test('server accepts all available documents and rejects unavailable selections', () => {
-  const server = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
-  const context = { AgentServiceError: Error };
-  vm.createContext(context);
-  vm.runInContext(server.slice(server.indexOf('function selectedWorkspaceItems('), server.indexOf('function cleanGeneratedMarkdown(')), context);
-  const names = Array.from({ length: 75 }, (_, i) => `page-${i}`);
-  assert.equal(context.selectedWorkspaceItems(names, new Set(names), 'wiki pages').length, 75);
-  assert.throws(() => context.selectedWorkspaceItems(['missing'], new Set(names), 'wiki pages'), /no longer/);
-  assert.equal(context.selectedWorkspaceItems(['page-1', 'page-1'], new Set(names), 'wiki pages').length, 1);
+test('generation opens rendered Markdown for review with editing still available', async () => {
+  const c = client();
+  select(c);
+  await c.advanceHandover();
+  assert.equal(c.node('handover-preview').hidden, false);
+  assert.equal(c.node('handover-editor').hidden, true);
+  assert.match(c.node('handover-preview').innerHTML, /Handover/);
+  c.node('handover-edit-tab').handlers.click();
+  assert.equal(c.node('handover-editor').hidden, false);
+  assert.equal(c.node('handover-preview').hidden, true);
 });

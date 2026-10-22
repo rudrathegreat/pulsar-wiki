@@ -72,10 +72,10 @@ Project handover: project details, searchable autocomplete selection of wiki pag
 
 ## Project Continuity
 - [[research-notebooks]]: Embedded JupyterLab for free-form local Python analyses, cited paper and wiki transfers, automatic local history, clean reruns, and on-request recall linked to historical cells; automatic local Python startup with a loading animation until the editor is ready, in a workspace without the extra file sidebar or action bar.
-- [[project-handover]]: A researcher-reviewed guide to project context, evidence, methods, decisions, open questions, and next steps.
+- [[project-handover]]: A project handover drafted from complete selected file text using backend instructions, displayed as Markdown for researcher review before publication.
 - [[active-reading]]: PDF reading without a separate Reading Library, with scroll-aware scheduling, bounded nearby-page caching, cancellable text extraction, software-canvas settings and local lag diagnostics, theme-aware highlight helpers that close when leaving the reader, notes and AI requests, wiki-first reference discovery, and automatic agent-written wiki notes with the paper page selected by default and created on Add when missing.
 
 ---
-*Last updated: 2026-10-21*
+*Last updated: 2026-10-22*
 
 - [[stac3719]]: Selected reading notes for stac3719.pdf, with quoted highlights and links to the original passages.

@@ -992,7 +992,7 @@ async function generateHandover() {
     $('handover-review').hidden = false;
     $('handover-reviewed').checked = false;
     $('handover-publish').disabled = true;
-    setHandoverView('edit');
+    setHandoverView('preview');
     setHandoverStep(3);
     setHandoverStatus('Draft ready. Edit it and verify every claim and reference before continuing.');
   } catch (error) {

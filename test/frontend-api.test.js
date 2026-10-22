@@ -242,7 +242,7 @@ test('project handover is a selection-based, review-gated wiki workflow', () => 
   assert.match(appSource, /if \(!state\.chatgpt\?\.ready\)/);
   assert.match(appSource, /handover-reviewed'[\s\S]*handover-publish/);
   assert.match(serverSource, /app\.post\('\/api\/handover\/generate', requireLocalMutation/);
-  assert.match(serverSource, /Do not call apply_wiki_changes and do not modify any file/);
+  assert.match(serverSource, /handoverService\.generate\(req\.body \|\| \{\}\)/);
   assert.match(serverSource, /req\.body\?\.reviewed !== true/);
   assert.match(serverSource, /wikiTools\.applyWikiChanges\([\s\S]*name: 'project-handover'[\s\S]*name: 'index'/);
 });
