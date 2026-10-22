@@ -126,3 +126,5 @@ All major updates to the wiki are recorded here.
 
 | 2026-10-22 | Project handover backend / application | Rebuilt generation as a dedicated service that reads complete selected source, wiki and saved notebook text before inference, uses backend-owned drafting instructions with no model tools, rejects unreadable and oversized evidence, and opens Markdown preview for review. Added service and review regression coverage and updated the handover page and wiki index. |
 - 2026-10-22: Published the researcher-reviewed Project Handover guide and updated the wiki index.
+
+| 2026-10-22 | Project handover labels / public | Removed the Research continuity, Project details, Source set and Review workspace labels from the handover interface. Updated the wiki index. |
