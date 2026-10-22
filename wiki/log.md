@@ -136,3 +136,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-22 | Iconbar branding / public | Added the supplied PulsarWiki SVG logo above the iconbar controls, preserving its proportions and inverting it for light mode. Updated the wiki index. |
 
 | 2026-10-22 | Handover light-mode inputs / public | Set step 1 and 2 input backgrounds and the step 3 draft editor to #eee in light mode, with theme-aware text for readability. Updated the wiki index. |
+
+| 2026-10-22 | Paper search light-mode styling / public | Set paper card action borders and transparent keyword tag borders to #ccc in light mode. Set the search input background to #eee with readable text and a black focus border, and the Search button border to #ccc transitioning to #000 on hover. Updated the wiki index. |
