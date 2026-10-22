@@ -128,3 +128,5 @@ All major updates to the wiki are recorded here.
 - 2026-10-22: Published the researcher-reviewed Project Handover guide and updated the wiki index.
 
 | 2026-10-22 | Project handover labels / public | Removed the Research continuity, Project details, Source set and Review workspace labels from the handover interface. Updated the wiki index. |
+
+| 2026-10-22 | Project handover spacing and controls / public | Aligned form cards with the header and navigation, enlarged field labels and review text, padded the guide and draft-view buttons, removed the draft-tab wrapper border, increased preview padding, hid Back on step 1, and removed review helper and draft-ready copy. Updated the wiki index. |

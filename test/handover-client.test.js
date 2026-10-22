@@ -62,10 +62,12 @@ test('handover validates selection and shows one stage at a time while retaining
   assert.match(c.node('handover-status').textContent, /project description/);
   select(c);
   assert.deepEqual(c.stages.map(s => s.hidden), [true, false, true, true]);
+  assert.equal(c.node('handover-back').hidden, false);
   assert.equal(c.node('handover-next').disabled, false);
   c.node('handover-back').handlers.click();
   assert.equal(c.state.handover.step, 1);
   assert.equal(c.node('handover-back').disabled, true);
+  assert.equal(c.node('handover-back').hidden, true);
   assert.equal(c.node('handover-context').value, 'Finish the analysis');
   assert.ok(c.state.handover.selectedPages.has('pulsar-timing'));
 });
@@ -202,6 +204,7 @@ test('generation opens rendered Markdown for review with editing still available
   assert.equal(c.node('handover-preview').hidden, false);
   assert.equal(c.node('handover-editor').hidden, true);
   assert.match(c.node('handover-preview').innerHTML, /Handover/);
+  assert.equal(c.node('handover-status').textContent, '');
   c.node('handover-edit-tab').handlers.click();
   assert.equal(c.node('handover-editor').hidden, false);
   assert.equal(c.node('handover-preview').hidden, true);

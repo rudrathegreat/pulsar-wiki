@@ -822,6 +822,7 @@ function updateHandoverNavigation() {
   const { step, generating, publishing } = state.handover;
   const busy = generating || publishing;
   const hasDraft = !!$('handover-editor').value.trim();
+  $('handover-back').hidden = step === 1;
   $('handover-back').disabled = step === 1 || busy;
   $('handover-next').hidden = step === 4;
   $('handover-next').textContent = generating ? 'Drafting...' : 'Next';
@@ -994,7 +995,7 @@ async function generateHandover() {
     $('handover-publish').disabled = true;
     setHandoverView('preview');
     setHandoverStep(3);
-    setHandoverStatus('Draft ready. Edit it and verify every claim and reference before continuing.');
+    setHandoverStatus();
   } catch (error) {
     setHandoverStatus(error.message, true);
   } finally {
