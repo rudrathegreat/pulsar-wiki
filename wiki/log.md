@@ -134,3 +134,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-22 | Handover publication labels / public | Removed Ready to share and the Publishes as filename label from the publication step. Updated the wiki index. |
 
 | 2026-10-22 | Iconbar branding / public | Added the supplied PulsarWiki SVG logo above the iconbar controls, preserving its proportions and inverting it for light mode. Updated the wiki index. |
+
+| 2026-10-22 | Handover light-mode inputs / public | Set step 1 and 2 input backgrounds and the step 3 draft editor to #eee in light mode, with theme-aware text for readability. Updated the wiki index. |

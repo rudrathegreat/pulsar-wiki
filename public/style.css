@@ -2887,6 +2887,13 @@ button:disabled {
 
 .handover-field input,
 .handover-autocomplete { height: 44px; padding: 0 12px; }
+[data-theme="light"] .handover-field input,
+[data-theme="light"] .handover-field textarea,
+[data-theme="light"] .handover-autocomplete,
+[data-theme="light"] .handover-editor {
+  background: #eee;
+  color: var(--text-1);
+}
 .handover-field textarea { min-height: 100px; padding: 12px; resize: vertical; }
 .handover-field input:focus-visible,
 .handover-field textarea:focus-visible,
