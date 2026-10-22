@@ -230,6 +230,9 @@ const state = {
   sourceResults: [],
   selectedSourceIds: new Set(),
   activeSourceId: null,
+  sourcePaperHistory: [],
+  sourcePapers: new Map(),
+  sourceDetailRequest: 0,
   sourceFilters: [],
   sourceJobTimer: null,
   graphData: null,
@@ -1144,10 +1147,10 @@ function sourceKeywordMarkup(paper) {
   return `<small>${escHtml(paper.keywordError || (paper.abstract?.trim() ? 'Generating keywords…' : 'No abstract available'))}</small>`;
 }
 
-async function loadSourceKeywords(results) {
+async function loadSourceKeywords(results, isCurrent) {
   const searchWorkspace = workspaceId;
   let next = 0;
-  const current = () => workspaceId === searchWorkspace && state.sourceResults === results;
+  const current = () => workspaceId === searchWorkspace && (isCurrent ? isCurrent() : state.sourceResults === results);
   async function worker() {
     while (current() && next < results.length) {
       const paper = results[next++];
@@ -1155,21 +1158,23 @@ async function loadSourceKeywords(results) {
       try { Object.assign(paper, await api.getSourceKeywords(paper.id)); }
       catch (error) { paper.keywordError = `Keywords unavailable: ${stripEmoji(error.message)}`; }
       if (!current()) return;
-      const tags = $(`source-keywords-${paper.id}`);
-      if (tags) tags.innerHTML = sourceKeywordMarkup(paper);
+      for (const prefix of ['source-keywords', 'paper-keywords', 'references-keywords', 'citations-keywords']) {
+        const tags = $(`${prefix}-${paper.id}`);
+        if (tags) tags.innerHTML = sourceKeywordMarkup(paper);
+      }
     }
   }
   await Promise.all(Array.from({ length: Math.min(3, results.length) }, worker));
 }
 
-function resultPaperMarkup(paper) {
+function resultPaperMarkup(paper, keywordPrefix = 'source-keywords') {
   const selected = state.selectedSourceIds.has(paper.id);
   const unavailable = !paper.canImport;
   const identifier = paper.doi || paper.arxivId || paper.bibcode;
   const identifierLabel = paper.doi ? `DOI: ${paper.doi}` : paper.arxivId ? `arXiv: ${paper.arxivId}` : paper.bibcode ? `ADS: ${paper.bibcode}` : 'Identifier unavailable';
   const identifierUrl = paper.doi ? `https://doi.org/${encodeURIComponent(paper.doi)}` : paper.recordUrl;
   return `
-    <article class="source-result${state.activeSourceId === paper.id ? ' expanded' : ''}" data-source-id="${escHtml(paper.id)}">
+    <article class="source-result" data-source-id="${escHtml(paper.id)}">
       <div class="source-result-main">
         <header class="source-result-kicker">
           <span class="source-result-publication">${escHtml(paper.publication || sourceProviderMark(paper.provider))}</span>
@@ -1182,7 +1187,7 @@ function resultPaperMarkup(paper) {
         </header>
         <h4>${escHtml(paper.title)}</h4>
         <p class="source-result-authors">${escHtml(authorSummary(paper.authors))}</p>
-        <div class="source-result-tags" id="source-keywords-${escHtml(paper.id)}" aria-label="AI keywords from abstract" aria-live="polite">
+        <div class="source-result-tags" id="${keywordPrefix}-${escHtml(paper.id)}" aria-label="AI keywords from abstract" aria-live="polite">
           ${sourceKeywordMarkup(paper)}
         </div>
         <div class="source-result-actions">
@@ -1192,19 +1197,19 @@ function resultPaperMarkup(paper) {
           ${paper.recordUrl
             ? `<a href="${escHtml(paper.recordUrl)}" target="_blank" rel="noreferrer">Cite Article</a>`
             : '<span class="disabled" aria-disabled="true">Cite Article</span>'}
-          <button class="source-result-preview" type="button" data-source-preview="${escHtml(paper.id)}" aria-expanded="${state.activeSourceId === paper.id}">${state.activeSourceId === paper.id ? 'Show Less' : 'Show More'}</button>
+          <button class="source-result-preview" type="button" data-source-preview="${escHtml(paper.id)}">Show More</button>
         </div>
       </div>
-      <div class="source-result-detail" id="source-detail-${escHtml(paper.id)}" ${state.activeSourceId === paper.id ? '' : 'hidden'}></div>
     </article>`;
 }
 
 function renderSourceResults(results) {
   state.sourceResults = Array.isArray(results) ? results : [];
+  for (const paper of state.sourceResults) state.sourcePapers.set(paper.id, paper);
   dom.sourceResultsSection.hidden = false;
   $('source-results-title').textContent = `${state.sourceResults.length} paper${state.sourceResults.length === 1 ? '' : 's'} found`;
   dom.sourceResults.innerHTML = state.sourceResults.length
-    ? state.sourceResults.map(resultPaperMarkup).join('')
+    ? state.sourceResults.map(paper => resultPaperMarkup(paper)).join('')
     : '<div class="source-empty"><strong>No matching papers found</strong><p>Try fewer terms, a broader date range, or remove a filter.</p></div>';
   updateSourceSelection();
 }
@@ -1214,59 +1219,66 @@ function updateSourceSelection() {
   dom.sourceSelectedCount.textContent = count;
   dom.sourceImportSelected.disabled = count === 0;
   dom.sourceImportSelected.classList.toggle('active', count > 0);
+  $('source-paper-import').disabled = count === 0;
+  $('source-paper-import').textContent = `Import selected (${count})`;
 }
 
-function relatedPaperMarkup(paper) {
-  const disabled = !paper.canImport;
-  return `<label class="related-paper${disabled ? ' disabled' : ''}">
-    <input type="checkbox" data-related-select="${escHtml(paper.id)}" ${state.selectedSourceIds.has(paper.id) ? 'checked' : ''} ${disabled ? 'disabled' : ''}/>
-    <span class="related-paper-copy"><strong>${escHtml(paper.title)}</strong><small>${escHtml(sourceProviderMark(paper.provider))} · ${escHtml(formatPaperDate(paper.published))} · ${escHtml(authorSummary(paper.authors))}</small></span>
-    <span class="related-paper-action">${disabled ? 'Preview only' : 'Add'}</span>
-  </label>`;
-}
-
-async function showSourceDetail(id) {
-  if (state.activeSourceId === id) {
-    state.activeSourceId = null;
-    renderSourceResults(state.sourceResults);
-    return;
-  }
-  state.activeSourceId = id;
+function closeSourceDetail() {
+  state.activeSourceId = null;
+  state.sourceDetailRequest++;
+  state.sourcePaperHistory = [];
+  $('source-paper-page').hidden = true;
+  $('source-search-page').hidden = false;
   renderSourceResults(state.sourceResults);
-  const detail = $(`source-detail-${id}`);
-  if (!detail) return;
-  const paper = state.sourceResults.find(item => item.id === id);
-  detail.innerHTML = `
-    <div class="source-preview-panel">
-      <p class="source-preview-abstract">${escHtml(paper?.abstract || 'No abstract is available for this record.')}</p>
-      <div class="source-preview-meta">
-        ${paper?.doi ? `<span><strong>DOI</strong>${escHtml(paper.doi)}</span>` : ''}
-        ${paper?.arxivId ? `<span><strong>arXiv</strong>${escHtml(paper.arxivId)}</span>` : ''}
-        ${paper?.bibcode ? `<span><strong>ADS bibcode</strong>${escHtml(paper.bibcode)}</span>` : ''}
-      </div>
-      ${paper?.recordUrl ? `<a class="source-record-link" href="${escHtml(paper.recordUrl)}" target="_blank" rel="noreferrer">Open publication record</a>` : ''}
-    </div>
-    <div class="source-related-loading"><span class="document-spinner"></span> Discovering citations, references, and shared topics...</div>`;
+}
+
+async function showSourceDetail(id, remember = true) {
+  const paper = state.sourcePapers.get(id);
+  if (!paper) return;
+  if (remember && state.activeSourceId) state.sourcePaperHistory.push(state.activeSourceId);
+  state.activeSourceId = id;
+  const request = ++state.sourceDetailRequest;
+  const detailWorkspace = workspaceId;
+  const current = () => workspaceId === detailWorkspace && state.sourceDetailRequest === request && state.activeSourceId === id;
+  $('source-search-page').hidden = true;
+  $('source-paper-page').hidden = false;
+  $('source-paper-back').textContent = state.sourcePaperHistory.length ? 'Back to previous paper' : 'Back to results';
+  $('source-paper-metadata').innerHTML = `
+    <header class="source-paper-header">
+      <h2 id="source-paper-title" tabindex="-1">${escHtml(paper.title)}</h2>
+      <p class="source-result-authors">${escHtml(paper.authors?.length ? paper.authors.map(stripEmoji).join(', ') : 'Authors unavailable')}</p>
+      <p class="source-paper-journal"><strong>Journal</strong> ${escHtml(paper.publication || 'Journal unavailable')} &middot; ${escHtml(formatPaperDate(paper.published))}</p>
+    </header>
+    <section class="source-paper-abstract"><h3>Abstract</h3><p>${escHtml(paper.abstract || 'No abstract is available for this record.')}</p></section>
+    <section class="source-paper-keywords"><h3>Keywords</h3><div class="source-result-tags" id="paper-keywords-${escHtml(id)}" aria-label="AI keywords from abstract" aria-live="polite">${sourceKeywordMarkup(paper)}</div></section>
+    ${paper.recordUrl ? `<a class="source-record-link" href="${escHtml(paper.recordUrl)}" target="_blank" rel="noreferrer">Open publication record</a>` : ''}`;
+  $('source-paper-title').focus({ preventScroll: true });
+  $('panel-files').scrollTop = 0;
+  updateSourceSelection();
+  const relations = $('source-paper-relations');
+  relations.innerHTML = '<p class="source-related-loading"><span class="document-spinner"></span>Loading references and citations...</p>';
+  void loadSourceKeywords([paper], current);
   try {
     const data = await api.getRelatedSources(id);
-    if (state.activeSourceId !== id) return;
-    const groups = data.groups || [];
-    detail.innerHTML = `
-      <div class="source-preview-panel">
-        <p class="source-preview-abstract">${escHtml(paper?.abstract || 'No abstract is available for this record.')}</p>
-        <div class="source-preview-meta">
-          ${paper?.doi ? `<span><strong>DOI</strong>${escHtml(paper.doi)}</span>` : ''}
-          ${paper?.arxivId ? `<span><strong>arXiv</strong>${escHtml(paper.arxivId)}</span>` : ''}
-          ${paper?.bibcode ? `<span><strong>ADS bibcode</strong>${escHtml(paper.bibcode)}</span>` : ''}
-        </div>
-        ${paper?.recordUrl ? `<a class="source-record-link" href="${escHtml(paper.recordUrl)}" target="_blank" rel="noreferrer">Open publication record</a>` : ''}
-      </div>
-      <section class="source-related">
-        <div class="source-related-heading"><h5>Related to this paper</h5></div>
-        ${groups.map(group => `<div class="source-related-group"><h6>${escHtml(group.label)}</h6>${group.results?.length ? group.results.map(relatedPaperMarkup).join('') : '<p class="source-related-empty">No records available from this source.</p>'}</div>`).join('')}
-      </section>`;
+    if (!current()) return;
+    const related = [];
+    relations.innerHTML = ['references', 'citations'].map(key => {
+      const group = (data.groups || []).find(item => item.key === key);
+      const papers = group?.results || [];
+      for (const item of papers) {
+        const existing = state.sourcePapers.get(item.id);
+        if (existing?.keywords) item.keywords = existing.keywords;
+        state.sourcePapers.set(item.id, item);
+        related.push(item);
+      }
+      return `<section class="source-paper-group"><h3>${key === 'references' ? 'References' : 'Cited in'}</h3>
+        ${group?.error ? `<p class="source-related-empty">${escHtml(group.error)}</p>` : ''}
+        ${papers.length ? `<div class="source-results">${papers.map(item => resultPaperMarkup(item, `${key}-keywords`)).join('')}</div>` : !group?.error ? '<p class="source-related-empty">No records available.</p>' : ''}
+        ${group?.limit && papers.length >= group.limit ? `<p class="source-related-empty">Showing the ${group.limit} most recent records.</p>` : ''}</section>`;
+    }).join('');
+    void loadSourceKeywords(related, current);
   } catch (error) {
-    detail.querySelector('.source-related-loading').textContent = stripEmoji(error.message);
+    if (current()) relations.innerHTML = `<p class="source-related-empty">${escHtml(stripEmoji(error.message))}</p><button class="btn" type="button" data-source-preview="${escHtml(id)}">Retry</button>`;
   }
 }
 
@@ -1281,7 +1293,8 @@ async function runSourceSearch() {
   dom.sourceSearchStatus.innerHTML = '<span class="document-spinner"></span><span>Searching arXiv and NASA ADS...</span>';
   $('source-search-submit').disabled = true;
   state.selectedSourceIds.clear();
-  state.activeSourceId = null;
+  closeSourceDetail();
+  state.sourcePapers.clear();
   try {
     const data = await api.searchSources(query);
     state.sourceFilters = data.filters || SOURCE_FILTERS;
@@ -1332,7 +1345,8 @@ function insertSourceFilter(value) {
 
 async function importSelectedSources() {
   const ids = [...state.selectedSourceIds];
-  if (!ids.length) return;
+  if (!ids.length || dom.sourceImportSelected.disabled) return;
+  $('source-paper-import').disabled = true;
   dom.sourceImportSelected.disabled = true;
   dom.sourceImportSelected.textContent = `Importing ${ids.length}...`;
   dom.sourceJobStatus.className = 'source-job-status visible running';
@@ -1402,17 +1416,24 @@ document.querySelectorAll('[data-filter-example]').forEach(button => button.addE
 document.addEventListener('click', event => {
   if (!event.target.closest('#source-search-box')) dom.sourceFilterSuggestions.classList.remove('visible');
 });
-dom.sourceResults.addEventListener('change', event => {
+$('panel-files').addEventListener('change', event => {
   const checkbox = event.target.closest('[data-source-select], [data-related-select]');
   if (!checkbox) return;
   if (checkbox.checked) state.selectedSourceIds.add(checkbox.dataset.sourceSelect || checkbox.dataset.relatedSelect);
   else state.selectedSourceIds.delete(checkbox.dataset.sourceSelect || checkbox.dataset.relatedSelect);
   updateSourceSelection();
 });
-dom.sourceResults.addEventListener('click', event => {
+$('panel-files').addEventListener('click', event => {
   const preview = event.target.closest('[data-source-preview]');
-  if (preview) void showSourceDetail(preview.dataset.sourcePreview);
+  if (preview) void showSourceDetail(preview.dataset.sourcePreview, preview.dataset.sourcePreview !== state.activeSourceId);
 });
+$('source-paper-back').addEventListener('click', () => {
+  const previous = state.sourcePaperHistory.pop();
+  if (previous) void showSourceDetail(previous, false);
+  else closeSourceDetail();
+});
+$('source-paper-import').addEventListener('click', () => { void importSelectedSources(); });
+
 dom.sourceImportSelected.addEventListener('click', () => { void importSelectedSources(); });
 
 function setDocumentStatus(message, detail = '', isError = false) {

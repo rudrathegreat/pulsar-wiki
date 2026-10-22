@@ -217,6 +217,7 @@
           </div>
 
           <section class="source-view active" id="source-view-add" role="tabpanel" aria-labelledby="source-tab-add">
+            <div id="source-search-page">
             <div class="source-intro">
               <h3>Find the research you need</h3>
               <p>Ask a research question, enter keywords, or paste a paper title, DOI, arXiv ID, or ADS link. Searches use arXiv and NASA ADS.</p>
@@ -245,6 +246,15 @@
                 <button class="source-import-button" id="source-import-selected" type="button" disabled>Import selected <span id="source-selected-count">0</span></button>
               </header>
               <div class="source-results" id="source-results"></div>
+            </section>
+            </div>
+            <section id="source-paper-page" class="source-paper-page" aria-label="Paper details" hidden>
+              <nav class="source-paper-navigation" aria-label="Paper navigation">
+                <button class="btn" id="source-paper-back" type="button">Back to results</button>
+                <button class="source-import-button" id="source-paper-import" type="button" disabled>Import selected</button>
+              </nav>
+              <article id="source-paper-metadata"></article>
+              <div id="source-paper-relations" aria-live="polite"></div>
             </section>
           </section>
 

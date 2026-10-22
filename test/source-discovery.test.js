@@ -111,3 +111,44 @@ test('import filenames are portable and bounded', () => {
   assert.equal(name, '10.1234-a-b-c-d-e.pdf');
   assert.ok(name.length <= 144);
 });
+
+test('related resolves arXiv records in ADS and keeps real citation groups cached', async () => {
+  const queries = [];
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', fetchImpl: async url => {
+    const params = new URL(String(url)).searchParams;
+    const query = params.get('q');
+    queries.push(query);
+    const doc = query.startsWith('doi:') ? { bibcode: 'main' }
+      : { bibcode: query.startsWith('references(') ? 'reference' : 'citing', title: ['Related paper'], abstract: 'Full abstract', author: ['Author'], pub: 'Journal', identifier: ['arXiv:2401.09999'] };
+    return Response.json({ response: { docs: [doc] } });
+  } });
+  const [paper] = parseArxivFeed(ARXIV_FEED);
+  service.remember([paper]);
+  const data = await service.related(paper.id);
+  assert.equal(queries[0], 'doi:"10.1234/example.1"');
+  assert.ok(queries.includes('references(bibcode:"main")'));
+  assert.ok(queries.includes('citations(bibcode:"main")'));
+  assert.deepEqual(data.groups.map(group => group.key), ['references', 'citations']);
+  for (const group of data.groups) {
+    assert.equal(group.results[0].abstract, 'Full abstract');
+    assert.equal(service.cached(group.results[0].id).publication, 'Journal');
+    assert.equal(group.limit, 25);
+  }
+});
+
+test('related distinguishes unavailable, unmatched and failed ADS data from empty groups', async () => {
+  const [paper] = parseArxivFeed(ARXIV_FEED);
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: '', fetchImpl: async () => { throw new Error('Should not fetch'); } });
+  service.remember([paper]);
+  assert.match((await service.related(paper.id)).groups[0].error, /token in Settings/);
+  service.adsToken = 'test';
+  service.fetch = async () => Response.json({ response: { docs: [] } });
+  assert.match((await service.related(paper.id)).groups[0].error, /no matching/);
+  service.remember([{ ...paper, bibcode: 'known' }]);
+  service.fetch = async url => new URL(String(url)).searchParams.get('q').startsWith('references(')
+    ? new Response('', { status: 503 }) : Response.json({ response: { docs: [] } });
+  const { groups } = await service.related(paper.id);
+  assert.match(groups[0].error, /503/);
+  assert.equal(groups[1].error, undefined);
+  assert.deepEqual(groups[1].results, []);
+});

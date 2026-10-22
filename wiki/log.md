@@ -138,3 +138,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-22 | Handover light-mode inputs / public | Set step 1 and 2 input backgrounds and the step 3 draft editor to #eee in light mode, with theme-aware text for readability. Updated the wiki index. |
 
 | 2026-10-22 | Paper search light-mode styling / public | Set paper card action borders and transparent keyword tag borders to #ccc in light mode. Set the search input background to #eee with readable text and a black focus border, and the Search button border to #ccc transitioning to #000 on hover. Updated the wiki index. |
+
+| 2026-10-22 | Paper detail pages / application | Replaced inline previews with a dedicated metadata view and matching paper cards under References and Cited in. Added nested navigation, related-paper selection and keyword generation, ADS identifier lookup, unavailable/error states and stale-response protection. Updated the wiki index. |

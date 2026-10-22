@@ -265,30 +265,39 @@ class SourceDiscoveryService {
   async related(id) {
     const source = this.cached(id);
     if (!source) throw new Error('This paper preview expired. Search for it again.');
-    const terms = usefulTerms(`${source.title} ${source.abstract}`, 6);
-    const searches = [{ key: 'topics', label: 'Shared research topics', query: terms.join(' ') }];
-    if (source.bibcode && this.adsToken) {
-      searches.unshift(
-        { key: 'citations', label: 'Cited by', adsQuery: `citations(bibcode:"${escapeQueryValue(source.bibcode)}")` },
-        { key: 'references', label: 'References', adsQuery: `references(bibcode:"${escapeQueryValue(source.bibcode)}")` },
-      );
+    const fields = 'bibcode,title,author,year,pub,pubdate,abstract,doi,identifier,citation_count,reference_count';
+    const limit = 25;
+    const unavailable = error => ({ sourceId: source.id, groups: [
+      { key: 'references', label: 'References', results: [], error },
+      { key: 'citations', label: 'Cited in', results: [], error },
+    ] });
+    if (!this.adsToken) return unavailable('Add a NASA ADS API token in Settings to load citation links.');
+    let bibcode = source.bibcode;
+    if (!bibcode) {
+      const query = source.doi ? `doi:"${escapeQueryValue(source.doi)}"`
+        : source.arxivId ? `identifier:"arXiv:${escapeQueryValue(source.arxivId)}"` : null;
+      if (!query) return unavailable('No ADS identifier is available for this paper.');
+      try {
+        const params = new URLSearchParams({ q: query, fl: fields, rows: '1' });
+        const payload = JSON.parse(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` } }, 'NASA ADS'));
+        bibcode = parseAdsResponse(payload)[0]?.bibcode;
+      } catch (error) { return unavailable(`Citation links could not be loaded: ${error.message}`); }
+      if (!bibcode) return unavailable('This paper has no matching NASA ADS record.');
     }
-    const groups = [];
-    for (const search of searches) {
-      let results = [];
-      if (search.adsQuery) {
-        const params = new URLSearchParams({ q: search.adsQuery, fl: 'bibcode,title,author,year,pub,pubdate,abstract,doi,identifier,citation_count,reference_count', rows: '6', sort: 'date desc' });
-        try {
-          const payload = JSON.parse(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` } }, 'NASA ADS'));
-          results = parseAdsResponse(payload);
-        } catch { results = []; }
-      } else if (search.query) {
-        try { results = (await this.search(`${search.query} source:arxiv`, { limit: 6 })).results; } catch { results = []; }
+    const groups = await Promise.all([
+      { key: 'references', label: 'References', operator: 'references' },
+      { key: 'citations', label: 'Cited in', operator: 'citations' },
+    ].map(async search => {
+      const params = new URLSearchParams({ q: `${search.operator}(bibcode:"${escapeQueryValue(bibcode)}")`, fl: fields, rows: String(limit), sort: 'date desc' });
+      try {
+        const payload = JSON.parse(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` } }, 'NASA ADS'));
+        const results = parseAdsResponse(payload).filter(result => result.bibcode !== bibcode);
+        this.remember(results);
+        return { key: search.key, label: search.label, results, limit };
+      } catch (error) {
+        return { key: search.key, label: search.label, results: [], error: `Could not load ${search.label.toLowerCase()}: ${error.message}` };
       }
-      results = results.filter(result => result.id !== source.id).slice(0, 5);
-      this.remember(results);
-      groups.push({ key: search.key, label: search.label, results });
-    }
+    }));
     return { sourceId: source.id, groups };
   }
 
