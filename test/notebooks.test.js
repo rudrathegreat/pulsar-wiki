@@ -36,7 +36,7 @@ test('new notebooks receive editable observation sections once, while imports an
   const f = fixture(t);
   const entry = f.service.create({ name: 'observations.ipynb' });
   const notebook = f.store.read(entry.id).notebook;
-  assert.deepEqual(notebook.cells.map(cell => [cell.cell_type, cell.source.trim()]), [
+  assert.deepEqual(notebook.cells.map(cell => [cell.cell_type, cell.source.split('\n')[0]]), [
     ['markdown', '# Title'], ['markdown', '## Objective'],
     ['markdown', '## Live notes'], ['markdown', '## Preliminary analysis'],
   ]);

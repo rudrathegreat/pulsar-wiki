@@ -1,6 +1,6 @@
 [
-  "# Title\n\n",
-  "## Objective\n\n",
-  "## Live notes\n\n",
-  "## Preliminary analysis\n\n"
+  "# Title\n\nGive this notebook a descriptive title that identifies the research topic, target or dataset, and the analysis being explored. Record the researcher names, date, and relevant project or observing run so the work can be placed in context later. Add links to related notebooks, source papers, or wiki pages where useful.\n\n",
+  "## Objective\n\nState the research question or hypothesis and explain why it matters. Identify the data, observations, or simulations you plan to use, the method you intend to try, and what result would help answer the question. Note the scope, key assumptions, and any known limitations before starting the analysis.\n\n",
+  "## Live notes\n\nKeep a dated record of the work as it happens: steps taken, parameter choices, changes to the method, unexpected behaviour, and decisions with their reasons. Link to the relevant code cells, plots, data files, or paper passages, recording units and data versions where needed. Separate observations from interpretations, and capture open questions and follow-up tasks while they are fresh.\n\n",
+  "## Preliminary analysis\n\nExplore the data with code, summary statistics, and diagnostic plots, explaining what each step checks. Record processing choices, selection criteria, units, uncertainties, and checks on data quality or model assumptions so the analysis can be reproduced. Describe the patterns and tentative findings supported by the outputs, distinguish them from speculation, and list the further checks needed before drawing conclusions.\n\n"
 ]

@@ -36,7 +36,7 @@ test('live Jupyter embeds securely, saves versioned notebooks, executes Python o
   // The launcher uses POST without content; initialise before its first save.
   const created = await api('/api/contents', 'POST', { type: 'notebook' });
   const initial = await api(`/api/contents/${created.path}`);
-  assert.deepEqual(initial.content.cells.map(cell => [cell.cell_type, cell.source.trim()]), [
+  assert.deepEqual(initial.content.cells.map(cell => [cell.cell_type, cell.source.split('\n')[0]]), [
     ['markdown', '# Title'], ['markdown', '## Objective'],
     ['markdown', '## Live notes'], ['markdown', '## Preliminary analysis'],
   ]);

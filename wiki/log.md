@@ -141,3 +141,5 @@ All major updates to the wiki are recorded here.
 
 | 2026-10-22 | Paper detail pages / application | Replaced inline previews with a dedicated metadata view and matching paper cards under References and Cited in. Added nested navigation, related-paper selection and keyword generation, ADS identifier lookup, unavailable/error states and stale-response protection. Updated the wiki index. |
 `n| 2026-10-23 | Direct paper import / application | Added Import this paper beside Import selected in paper details, using the open paper independently of checkbox selections. Shared import progress, prevented concurrent imports, and disabled direct import when no open PDF is available. Updated the wiki index. |
+
+| 2026-10-23 | Research notebook guidance / application | Expanded the descriptions beneath Title, Objective, Live notes, and Preliminary analysis in the shared Jupyter notebook template. Updated documentation and existing template checks; existing notebooks retain their contents. |
