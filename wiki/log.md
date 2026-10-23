@@ -153,3 +153,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-23 | Expired paper citation lookup / application | Fixed related-paper requests returning 400 after the search cache expires. Paper details now supply citation identifiers, checked against the paper ID, so References and Cited in can recover without repeating the search. Added expiry, lost-cache and client request regression coverage; updated the wiki index. |
 
 | 2026-10-23 | Workspace bibliography / application | Added a References tab with an editable workspace-root references.bib file. Uploads and search/reading imports append BibTeX citations, with metadata where available and filename placeholders otherwise. Existing sources are included on opening References; duplicate files, citation key collisions, unsaved edits and concurrent saves are handled. Added bibliography, editor and workspace API checks; updated the wiki index. |
+
+| 2026-10-23 | References interface copy / public | Removed the introductory helper text, successful-load message and BibTeX file label from the References editor, retaining an accessible editor name. Updated the wiki index. |

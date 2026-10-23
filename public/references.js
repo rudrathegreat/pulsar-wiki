@@ -22,7 +22,7 @@
     try {
       const data = await request();
       saved = data.content; revision = data.revision; editor.value = saved;
-      status.textContent = 'Loaded references.bib';
+      status.textContent = '';
     } catch (error) { status.textContent = error.message; }
     finally { busy = false; render(); }
   }

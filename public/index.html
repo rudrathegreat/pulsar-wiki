@@ -317,15 +317,14 @@
 
           <section class="source-view" id="source-view-references" role="tabpanel" aria-labelledby="source-tab-references" hidden>
             <header class="saved-sources-header">
-              <div><h3>references.bib</h3><p>Sources are added automatically. Edit bibliographic details and citation keys below.</p></div>
+              <div><h3>references.bib</h3></div>
               <div class="references-actions">
                 <button class="btn" id="references-reload" type="button">Reload file</button>
                 <button class="btn" id="references-save" type="button" disabled>Save changes</button>
               </div>
             </header>
             <p id="references-status" role="status" aria-live="polite"></p>
-            <label class="references-label" for="references-editor">BibTeX file</label>
-            <textarea id="references-editor" spellcheck="false" autocomplete="off" aria-describedby="references-status" disabled></textarea>
+            <textarea id="references-editor" spellcheck="false" autocomplete="off" aria-label="References editor" aria-describedby="references-status" disabled></textarea>
           </section>
         </div>
       </div>
