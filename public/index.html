@@ -251,7 +251,10 @@
             <section id="source-paper-page" class="source-paper-page" aria-label="Paper details" hidden>
               <nav class="source-paper-navigation" aria-label="Paper navigation">
                 <button class="btn" id="source-paper-back" type="button">Back to results</button>
-                <button class="source-import-button" id="source-paper-import" type="button" disabled>Import selected</button>
+                <div class="source-paper-import-actions">
+                  <button class="source-import-button" id="source-paper-import-current" type="button" disabled>Import this paper</button>
+                  <button class="source-import-button" id="source-paper-import" type="button" disabled>Import selected</button>
+                </div>
               </nav>
               <article id="source-paper-metadata"></article>
               <div id="source-paper-relations" aria-live="polite"></div>

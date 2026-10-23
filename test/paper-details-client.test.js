@@ -19,8 +19,49 @@ function client(getRelatedSources = async () => ({ groups: [] })) {
   };
   vm.createContext(context);
   vm.runInContext(app.slice(app.indexOf('function formatPaperDate('), app.indexOf('async function runSourceSearch(')), context);
+  vm.runInContext(app.slice(app.indexOf('async function importSelectedSources('), app.indexOf('function monitorSourceJob(')), context);
+  context.dom.sourceJobStatus = element('job-status');
+  context.loadFiles = async () => {};
+  context.setSourceView = () => {};
   return { context, element };
 }
+test('direct import uses only the open paper and preserves other selections', async () => {
+  const c = client();
+  c.context.state.selectedSourceIds.add('other');
+  await c.context.showSourceDetail('one');
+  let importedIds;
+  let finish;
+  c.context.api.importSources = ids => {
+    importedIds = [...ids];
+    return new Promise(resolve => { finish = resolve; });
+  };
+  assert.equal(c.element('source-paper-import-current').disabled, false);
+  const importing = c.context.importCurrentSource();
+  assert.deepEqual(importedIds, ['one']);
+  assert.equal(c.element('source-paper-import-current').disabled, true);
+  assert.equal(c.element('source-paper-import').disabled, true);
+  await c.context.importSelectedSources();
+  assert.deepEqual(importedIds, ['one']);
+  finish({ imported: [paper] });
+  await importing;
+  assert.equal(c.context.state.selectedSourceIds.has('other'), true);
+  assert.equal(c.element('source-paper-import-current').disabled, false);
+});
+test('direct import follows nested navigation and rejects unavailable papers', async () => {
+  const c = client();
+  c.context.state.sourcePapers.set('two', { ...paper, id: 'two', canImport: false });
+  await c.context.showSourceDetail('two');
+  assert.equal(c.element('source-paper-import-current').disabled, true);
+  c.context.api.importSources = () => { assert.fail('Unavailable paper must not import'); };
+  await c.context.importCurrentSource();
+  await c.context.showSourceDetail('one');
+  let importedIds;
+  c.context.api.importSources = async ids => { importedIds = [...ids]; throw new Error('Download failed'); };
+  await c.context.importCurrentSource();
+  assert.deepEqual(importedIds, ['one']);
+  assert.equal(c.element('source-paper-import-current').disabled, false);
+  assert.equal(c.element('job-status').textContent, 'Download failed');
+});
 test('paper details show full metadata and the same cards in references and cited in', async () => {
   const related = { ...paper, id: 'two', title: 'Referenced paper' };
   const c = client(async () => ({ groups: [{ key: 'references', results: [related] }, { key: 'citations', results: [] }] }));

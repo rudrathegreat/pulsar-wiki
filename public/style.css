@@ -3072,7 +3072,8 @@ button:disabled {
 
 /* Dedicated literature detail page, sharing search-result card styling. */
 .source-paper-page[hidden], #source-search-page[hidden] { display: none; }
-.source-paper-navigation { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 32px; }
+.source-paper-navigation { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; margin-bottom: 32px; }
+.source-paper-import-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .source-paper-header h2 { color: var(--text-1); font-size: clamp(22px, 3vw, 30px); font-weight: 400; line-height: 1.35; overflow-wrap: anywhere; }
 .source-paper-header .source-result-authors { line-height: 1.7; }
 .source-paper-journal { margin-top: 18px; color: var(--text-2); font-size: 13px; line-height: 1.6; }

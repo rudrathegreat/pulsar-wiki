@@ -229,6 +229,7 @@ const state = {
   sourceView: 'add',
   sourceResults: [],
   selectedSourceIds: new Set(),
+  sourceImportRunning: false,
   activeSourceId: null,
   sourcePaperHistory: [],
   sourcePapers: new Map(),
@@ -1217,10 +1218,14 @@ function renderSourceResults(results) {
 function updateSourceSelection() {
   const count = state.selectedSourceIds.size;
   dom.sourceSelectedCount.textContent = count;
-  dom.sourceImportSelected.disabled = count === 0;
+  dom.sourceImportSelected.disabled = state.sourceImportRunning || count === 0;
   dom.sourceImportSelected.classList.toggle('active', count > 0);
-  $('source-paper-import').disabled = count === 0;
+  $('source-paper-import').disabled = state.sourceImportRunning || count === 0;
   $('source-paper-import').textContent = `Import selected (${count})`;
+  const paper = state.sourcePapers.get(state.activeSourceId);
+  const currentImport = $('source-paper-import-current');
+  currentImport.disabled = Boolean(state.sourceImportRunning || !paper?.canImport);
+  currentImport.title = paper && !paper.canImport ? 'No open arXiv PDF is available for import' : '';
 }
 
 function closeSourceDetail() {
@@ -1344,10 +1349,19 @@ function insertSourceFilter(value) {
 }
 
 async function importSelectedSources() {
-  const ids = [...state.selectedSourceIds];
-  if (!ids.length || dom.sourceImportSelected.disabled) return;
-  $('source-paper-import').disabled = true;
-  dom.sourceImportSelected.disabled = true;
+  await importSourcePapers([...state.selectedSourceIds]);
+}
+
+async function importCurrentSource() {
+  const paper = state.sourcePapers.get(state.activeSourceId);
+  if (!paper?.canImport) return;
+  await importSourcePapers([paper.id]);
+}
+
+async function importSourcePapers(ids) {
+  if (!ids.length || state.sourceImportRunning) return;
+  state.sourceImportRunning = true;
+  updateSourceSelection();
   dom.sourceImportSelected.textContent = `Importing ${ids.length}...`;
   dom.sourceJobStatus.className = 'source-job-status visible running';
   dom.sourceJobStatus.textContent = 'Downloading selected PDFs to the workspace...';
@@ -1355,7 +1369,7 @@ async function importSelectedSources() {
     const result = await api.importSources(ids);
     const imported = result.imported?.length || 0;
     const failed = result.failed?.length || 0;
-    state.selectedSourceIds.clear();
+    for (const id of ids) state.selectedSourceIds.delete(id);
     renderSourceResults(state.sourceResults);
     await loadFiles();
     setSourceView('saved');
@@ -1366,6 +1380,7 @@ async function importSelectedSources() {
     dom.sourceJobStatus.className = 'source-job-status visible error';
     dom.sourceJobStatus.textContent = stripEmoji(error.message);
   } finally {
+    state.sourceImportRunning = false;
     dom.sourceImportSelected.innerHTML = 'Import selected <span id="source-selected-count">0</span>';
     updateSourceSelection();
   }
@@ -1433,6 +1448,7 @@ $('source-paper-back').addEventListener('click', () => {
   else closeSourceDetail();
 });
 $('source-paper-import').addEventListener('click', () => { void importSelectedSources(); });
+$('source-paper-import-current').addEventListener('click', () => { void importCurrentSource(); });
 
 dom.sourceImportSelected.addEventListener('click', () => { void importSelectedSources(); });
 
