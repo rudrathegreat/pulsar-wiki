@@ -480,7 +480,7 @@ app.post('/api/sources/:id/keywords', requireLocalMutation, async (req, res) => 
 });
 
 app.get('/api/sources/:id/related', requireLocalSession, async (req, res) => {
-  try { return res.json(await currentWorkspace().sourceDiscovery.related(req.params.id)); }
+  try { return res.json(await currentWorkspace().sourceDiscovery.related(req.params.id, req.query)); }
   catch (error) { return res.status(400).json({ error: error.message || 'Related papers could not be loaded.' }); }
 });
 

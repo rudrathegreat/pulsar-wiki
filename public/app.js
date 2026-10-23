@@ -164,8 +164,12 @@ const api = {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, limit, ...options }),
     }), 'Paper search');
   },
-  async getRelatedSources(id) {
-    return readJsonResponse(await workspaceFetch(`/api/sources/${encodeURIComponent(id)}/related`), 'Related papers');
+  async getRelatedSources(id, paper = {}) {
+    const identity = new URLSearchParams();
+    for (const key of ['provider', 'bibcode', 'doi', 'arxivId']) {
+      if (paper[key]) identity.set(key, paper[key]);
+    }
+    return readJsonResponse(await workspaceFetch(`/api/sources/${encodeURIComponent(id)}/related?${identity}`), 'Related papers');
   },
   async getSourceKeywords(id) {
     return readJsonResponse(await workspaceFetch(`/api/sources/${encodeURIComponent(id)}/keywords`, {
@@ -1269,7 +1273,7 @@ async function showSourceDetail(id, remember = true) {
   relations.innerHTML = '<p class="source-related-loading"><span class="document-spinner"></span>Loading references and citations...</p>';
   void loadSourceKeywords([paper], current);
   try {
-    const data = await api.getRelatedSources(id);
+    const data = await api.getRelatedSources(id, paper);
     if (!current()) return;
     const related = [];
     relations.innerHTML = ['references', 'citations'].map(key => {

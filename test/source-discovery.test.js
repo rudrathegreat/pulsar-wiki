@@ -246,3 +246,31 @@ test('related distinguishes unavailable, unmatched and failed ADS data from empt
   assert.equal(groups[1].error, undefined);
   assert.deepEqual(groups[1].results, []);
 });
+
+test('related recovers expired and lost search entries from matching citation identifiers', async () => {
+  let now = 0;
+  const queries = [];
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', now: () => now, fetchImpl: async url => {
+    const query = new URL(String(url)).searchParams.get('q');
+    queries.push(query);
+    return Response.json({ response: { docs: query.startsWith('doi:') ? [{ bibcode: 'resolved' }] : [{ bibcode: 'related', title: ['Related paper'] }] } });
+  } });
+  const [arxiv] = parseArxivFeed(ARXIV_FEED);
+  const [ads] = parseAdsResponse({ response: { docs: [{ bibcode: 'known', doi: ['10.1234/test'] }] } });
+  for (const paper of [arxiv, ads]) {
+    service.remember([paper]);
+    now += 31 * 60 * 1000;
+    assert.equal(service.cached(paper.id), null);
+    for (const reset of [false, true]) {
+      if (reset) service.cache.clear();
+      const data = await service.related(paper.id, paper);
+      assert.equal(data.sourceId, paper.id);
+      assert.deepEqual(data.groups.map(group => group.results[0].bibcode), ['related', 'related']);
+      assert.equal(service.cached(data.groups[0].results[0].id).title, 'Related paper');
+    }
+  }
+  assert.ok(queries.includes('doi:"10.1234/example.1"'));
+  assert.ok(queries.includes('references(bibcode:"known")'));
+  await assert.rejects(service.related(arxiv.id, { ...arxiv, doi: '10.1234/different' }), /preview expired/);
+  await assert.rejects(service.related(arxiv.id), /preview expired/);
+});

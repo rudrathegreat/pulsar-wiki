@@ -277,8 +277,17 @@ class SourceDiscoveryService {
     return { query: { intent: query.intent, terms: query.terms, filters: query.filters }, results, warnings, filters: FILTERS };
   }
 
-  async related(id) {
-    const source = this.cached(id);
+  async related(id, identity = {}) {
+    let source = this.cached(id);
+    // Browser cards can outlive the short-lived search cache. Recover only
+    // citation identifiers, never client-supplied import URLs or file metadata.
+    if (!source && ['NASA ADS', 'arXiv'].includes(identity.provider)) {
+      const candidate = { provider: identity.provider };
+      for (const key of ['bibcode', 'doi', 'arxivId']) {
+        if (typeof identity[key] === 'string' && identity[key].trim().length <= 512) candidate[key] = identity[key].trim();
+      }
+      if ((candidate.bibcode || candidate.doi || candidate.arxivId) && resultId(candidate) === id) source = { ...candidate, id };
+    }
     if (!source) throw new Error('This paper preview expired. Search for it again.');
     const fields = 'bibcode,title,author,year,pub,pubdate,abstract,doi,identifier,citation_count,reference_count';
     const limit = 25;

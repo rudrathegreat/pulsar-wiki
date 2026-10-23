@@ -19,6 +19,7 @@ function loadApi(fetch) {
   const apiSource = appSource.slice(0, appSource.indexOf('const state ='));
   const context = {
     fetch,
+    URLSearchParams,
     XMLHttpRequest: class {},
     marked: { setOptions() {}, parse() { return ''; } },
   };
@@ -34,6 +35,17 @@ function response(status, payload = {}) {
     async text() { return status === 204 ? '' : JSON.stringify(payload); },
   };
 }
+
+test('related requests send encoded citation identifiers so expired cards can recover', async () => {
+  let requested;
+  const api = loadApi(async url => { requested = new URL(url, 'http://localhost'); return response(200, { groups: [] }); });
+  await api.getRelatedSources('paper-id', { provider: 'NASA ADS', bibcode: '2024A&A...123..456A', doi: '10.1234/a+b', arxivId: '2401.01234', pdfUrl: 'https://example.com/private' });
+  assert.equal(requested.pathname, '/api/sources/paper-id/related');
+  assert.equal(requested.searchParams.get('bibcode'), '2024A&A...123..456A');
+  assert.equal(requested.searchParams.get('doi'), '10.1234/a+b');
+  assert.equal(requested.searchParams.get('provider'), 'NASA ADS');
+  assert.equal(requested.searchParams.has('pdfUrl'), false);
+});
 
 function loadClientHelpers() {
   const helperSource = appSource.slice(0, appSource.indexOf('const state ='));

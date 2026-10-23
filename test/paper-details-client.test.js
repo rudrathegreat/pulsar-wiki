@@ -99,6 +99,14 @@ test('paper details show full metadata and the same cards in references and cite
   assert.equal(c.context.state.selectedSourceIds.has('two'), true);
   assert.equal(c.context.state.sourceResults[0].id, 'one');
 });
+test('paper details provide the displayed paper identifiers to citation lookup', async () => {
+  const c = client(async (id, identity) => {
+    assert.equal(id, paper.id);
+    assert.equal(identity, paper);
+    return { groups: [] };
+  });
+  await c.context.showSourceDetail(paper.id);
+});
 test('late relation success and failure cannot overwrite a newer paper or workspace', async () => {
   const pending = [];
   const c = client(() => new Promise((resolve, reject) => pending.push({ resolve, reject })));

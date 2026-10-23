@@ -149,3 +149,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-23 | Citation counts in paper results / application | Displayed citation counts beneath authors on search and related-paper cards, including zero citations and an explicit unavailable label for records without citation data. Updated the wiki index and checked card rendering. |
 
 | 2026-10-23 | Paper search filters and sorting / application | Added controls at the top of search results for citation count, recency, first author and default relevance sorting, plus refereed status, collection, publication year and minimum citations. Defaulted to refereed publications, applied ADS options before limiting results, explained unsupported arXiv fallbacks, and prevented stale search responses. Updated the wiki index and search guide. |
+
+| 2026-10-23 | Expired paper citation lookup / application | Fixed related-paper requests returning 400 after the search cache expires. Paper details now supply citation identifiers, checked against the paper ID, so References and Cited in can recover without repeating the search. Added expiry, lost-cache and client request regression coverage; updated the wiki index. |
