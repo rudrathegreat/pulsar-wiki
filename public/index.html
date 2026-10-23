@@ -320,7 +320,7 @@
               <div><h3>references.bib</h3></div>
               <div class="references-actions">
                 <div class="references-view-switch" role="group" aria-label="References view">
-                  <button class="btn" id="references-library-toggle" type="button" aria-pressed="true">Library</button>
+                  <button class="btn" id="references-preview-toggle" type="button" aria-pressed="true">Preview</button>
                   <button class="btn" id="references-source-toggle" type="button" aria-pressed="false">BibTeX</button>
                 </div>
                 <button class="btn" id="references-reload" type="button">Reload file</button>
@@ -328,14 +328,18 @@
               </div>
             </header>
             <p id="references-status" role="status" aria-live="polite"></p>
-            <div id="references-library">
+            <div id="references-preview">
               <div class="references-tools">
                 <input id="references-search" type="search" placeholder="Search titles, authors, keywords…" aria-label="Search references"/>
                 <select id="references-type" aria-label="Filter by reference type"><option value="">All types</option></select>
                 <span id="references-count" role="status" aria-live="polite"></span>
               </div>
+              <div class="references-tree-tools" role="group" aria-label="Expand or collapse reference properties">
+                <button class="btn" id="references-expand" type="button">Expand all</button>
+                <button class="btn" id="references-collapse" type="button">Collapse all</button>
+              </div>
               <p id="references-warning" role="status" hidden></p>
-              <div id="references-cards"></div>
+              <div id="references-tree" aria-label="BibTeX structure"></div>
             </div>
             <textarea id="references-editor" spellcheck="false" autocomplete="off" aria-label="References editor" aria-describedby="references-status" disabled hidden></textarea>
           </section>

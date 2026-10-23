@@ -127,18 +127,23 @@ test('editor keeps changes available after save conflicts', async () => {
   assert.match(c.node('references-status').textContent, /Copy edits/);
 });
 
-test('library groups and filters papers and previews unsaved edits without rewriting BibTeX', async () => {
+test('preview preserves entry and property order, nested authors and unsaved BibTeX', async () => {
   const c = editorClient(); await c.context.window.ReferencesEditor.open();
-  const source = '@article{new, title={A {Pulsar} study}, author={A and B and C and D}, year={2024}, keywords={timing; gravity}, doi={10.1/example}, url={javascript:alert(1)}, custom={keep me}}\n@misc{old, title={Undated source}}';
+  const source = '@misc{old, title={Earlier source}, year={2020}}\n@article{new, title={A {Pulsar} study}, author={A and B and C and D}, year={2024}, keywords={timing; gravity}, doi={10.1/example}, url={javascript:alert(1)}, custom={keep me}}';
   c.node('references-source-toggle').handlers.click();
   assert.equal(c.node('references-editor').hidden, false);
   c.node('references-editor').value = source;
   c.node('references-editor').handlers.input();
-  c.node('references-library-toggle').handlers.click();
-  const markup = c.node('references-cards').innerHTML;
+  c.node('references-preview-toggle').handlers.click();
+  const markup = c.node('references-tree').innerHTML;
   assert.match(markup, /A Pulsar study/);
-  assert.match(markup, /\+1 authors/);
-  assert.ok(markup.indexOf('2024') < markup.indexOf('Undated'));
+  assert.match(markup, /4 authors/);
+  assert.match(markup, /<ol class="reference-values"><li>A<\/li><li>B<\/li><li>C<\/li><li>D<\/li><\/ol>/);
+  assert.ok(markup.indexOf('2020') < markup.indexOf('2024'), 'source order survives rendering');
+  assert.ok(markup.indexOf('<dt>title</dt>') < markup.indexOf('<dt>year</dt>'));
+  assert.match(markup, /class="reference-entry" data-path="1" open/);
+  assert.match(markup, /<dt>custom<\/dt><dd>keep me<\/dd>/);
+  assert.doesNotMatch(markup, /reference-card|reference-year|All properties/);
   assert.match(markup, /gravity/);
   assert.match(markup, /keep me/);
   assert.match(markup, /https:\/\/doi.org\/10.1\/example/);
@@ -148,18 +153,36 @@ test('library groups and filters papers and previews unsaved edits without rewri
   c.node('references-search').value = 'gravity';
   c.node('references-search').handlers.input();
   assert.equal(c.node('references-count').textContent, '1 of 2 references');
-  assert.doesNotMatch(c.node('references-cards').innerHTML, /Undated source/);
+  assert.doesNotMatch(c.node('references-tree').innerHTML, /Earlier source/);
   c.node('references-type').value = 'misc';
   c.node('references-type').handlers.change();
-  assert.match(c.node('references-cards').innerHTML, /No matching references/);
+  assert.match(c.node('references-tree').innerHTML, /No matching references/);
 });
 
-test('library escapes imported metadata and warns about incomplete drafts', async () => {
+test('preview escapes imported metadata and warns about incomplete drafts', async () => {
   const c = editorClient(); await c.context.window.ReferencesEditor.open();
   c.node('references-editor').value = '@misc{x, title={<img src=x onerror=alert(1)>}, note={A & B}}\n@article{unfinished, title={';
-  c.node('references-library-toggle').handlers.click();
-  assert.match(c.node('references-cards').innerHTML, /&lt;img/);
-  assert.doesNotMatch(c.node('references-cards').innerHTML, /<img/);
+  c.node('references-preview-toggle').handlers.click();
+  assert.match(c.node('references-tree').innerHTML, /&lt;img/);
+  assert.doesNotMatch(c.node('references-tree').innerHTML, /<img/);
   assert.equal(c.node('references-warning').hidden, false);
   assert.match(c.node('references-warning').textContent, /source is preserved/);
+});
+
+test('entry and author branches fold independently and keep their state through filtering', async () => {
+  const c = editorClient(); await c.context.window.ReferencesEditor.open();
+  c.node('references-editor').value = '@article{paper, title={Pulsars}, author={First and Second}}';
+  c.node('references-preview-toggle').handlers.click();
+  const tree = c.node('references-tree');
+  tree.handlers.toggle({ target: { dataset: { path: '0/author' }, open: false } });
+  c.node('references-search').value = 'Pulsars';
+  c.node('references-search').handlers.input();
+  assert.match(tree.innerHTML, /reference-entry" data-path="0" open/);
+  assert.match(tree.innerHTML, /<details data-path="0\/author">/);
+  c.node('references-collapse').handlers.click();
+  assert.doesNotMatch(tree.innerHTML, / open/);
+  c.node('references-expand').handlers.click();
+  assert.match(tree.innerHTML, /reference-entry" data-path="0" open/);
+  assert.match(tree.innerHTML, /<details data-path="0\/author" open>/);
+  assert.equal(c.node('references-editor').value, '@article{paper, title={Pulsars}, author={First and Second}}');
 });
