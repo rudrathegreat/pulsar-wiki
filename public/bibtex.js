@@ -1,8 +1,9 @@
 (function (root) {
   'use strict';
   // Read-only parser: rendering never serializes or changes the original bibliography.
-  function parse(source) {
+  function parse(source, { locations = false } = {}) {
     let i = 0;
+    let valueEnd = 0;
     const entries = [], warnings = [];
     const macros = Object.assign(Object.create(null), { jan: 'January', feb: 'February', mar: 'March', apr: 'April', may: 'May', jun: 'June', jul: 'July', aug: 'August', sep: 'September', oct: 'October', nov: 'November', dec: 'December' });
     const skip = () => {
@@ -49,6 +50,7 @@
           if (!token) throw new Error('Missing field value');
           result += macros[token.toLowerCase()] ?? token;
         }
+        valueEnd = i;
         skip();
         if (source[i] !== '#') break;
         i++;
@@ -70,6 +72,7 @@
         i++; skip();
         if (kind === 'preamble') { value(close); skip(); if (source[i++] !== close) throw new Error('Unclosed preamble'); continue; }
         const entry = { type: kind, key: '', fields: Object.create(null) };
+        if (locations) { entry.start = start; entry.fieldLocations = Object.create(null); }
         if (kind !== 'string') {
           const keyStart = i;
           while (i < source.length && ![',', close].includes(source[i])) i++;
@@ -80,16 +83,19 @@
         while (i < source.length) {
           skip();
           if (source[i] === close) break;
+          const fieldStart = i;
           const name = /^[\w:-]+/.exec(source.slice(i));
           if (!name) throw new Error('Expected a field name');
           i += name[0].length; skip();
           if (source[i++] !== '=') throw new Error('Expected =');
           entry.fields[name[0].toLowerCase()] = value(close);
+          if (locations) entry.fieldLocations[name[0].toLowerCase()] = { start: fieldStart, end: valueEnd };
           skip();
           if (source[i] === ',') i++;
           else if (source[i] !== close) throw new Error('Expected a comma');
         }
         if (source[i++] !== close) throw new Error('Unclosed entry');
+        if (locations) entry.end = i;
         if (kind === 'string') Object.assign(macros, entry.fields);
         else entries.push(entry);
       } catch (error) {

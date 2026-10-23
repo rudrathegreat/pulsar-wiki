@@ -12,6 +12,8 @@ Settings: add, replace or remove a NASA ADS API token for literature searches. T
 
 After updating the application, restart its server and refresh the browser to load new settings endpoints. NASA ADS settings show a restart instruction if the running server does not support token saving.
 
+Bibliography recovery: when source metadata is incomplete, uploads, paper imports and opening References ask the connected AI to extract bibliographic fields from the original PDF (or supported text document). Available fields are saved even when extraction is partial, without overwriting existing metadata, citation keys or comments. The completion note remains only if extraction fails or returns no usable fields. Opening References retries earlier failures; successful extraction is reused during the server session. Sources in `raw/` stay unchanged.
+
 AI-assisted reading workspace: white surfaces with borderless light grey (`#eee`) highlight cards in light mode; `#1c1c1c` surfaces with `#222` inputs and highlight cards in dark mode, with a transparent page number input and borderless sidebar inputs and Find in paper search bar. The filename, file details, back and download header is removed; the reading toolbar remains above the document. The toolbar omits the Record lag button.
 
 Sources sidebar: opening Sources shows saved files from the current workspace. Select a file to open it in the reading space; PDFs open with AI-assisted reading tools. The source list stays visible while reading, with the current file marked and an Add sources action for finding or uploading more documents. Paper result cards show sciX citation counts beneath the authors; records without citation data show “Citations unavailable”.
@@ -82,6 +84,6 @@ Project handover: project details, searchable autocomplete selection of wiki pag
 - [[active-reading]]: PDF reading without a separate Reading Library, with scroll-aware scheduling, bounded nearby-page caching, cancellable text extraction, software-canvas settings and local lag diagnostics, theme-aware highlight helpers that close when leaving the reader, notes and AI requests, wiki-first reference discovery, and automatic agent-written wiki notes with the paper page selected by default and created on Add when missing.
 
 ---
-*Last updated: 2026-10-22*
+*Last updated: 2026-10-23*
 
 - [[stac3719]]: Selected reading notes for stac3719.pdf, with quoted highlights and links to the original passages.

@@ -1,174 +1,160 @@
 # Project Handover
 
-**Summary**: Project `test` contains introductory pulsar-astronomy reference material and one notebook with a single saved markdown cell. The supplied materials do not document a defined research question, analysis workflow, results, ownership structure, or continuation plan.
+**Summary**: This project concerns MeerKAT pulsar timing. This guide records the supplied project context and related background on binary and millisecond pulsars for continuation of the work.
 
 **Sources**:
-- `binary-pulsar`
-- `pulsar`
-- `pulsar-basics.txt`
-- `notebooks/test.ipynb`
+- `binary-pulsar` — wiki page
+- `millisecond-pulsar` — wiki page
 
-**Last updated**: 2026-10-22
+**Last updated**: 2026-10-23
 
 ---
 
 ## Project overview and current state
 
-The project metadata identifies the project as `test`, with both its description and context recorded as `test`. No more specific project objective or scientific question is supplied.
+The project is named **Pulsar timing** and is described as **MeerKAT pulsar timing**. No further project-specific context, target list, observing programme, analysis status, or scientific objective was supplied.
 
-The available subject matter is pulsar astronomy. The materials cover pulsars, pulsar timing, binary-pulsar systems, timing observables, and general astrophysical motivation. Pulsars are described as rapidly rotating neutron stars whose beams can be detected when directed toward Earth (source: `pulsar-basics.txt`; [[pulsar]]). Binary pulsars are described as pulsars orbiting companion stars and as systems useful for studying orbital dynamics, stellar evolution, and relativistic physics ([[binary-pulsar]]).
+The supplied material provides background relevant to the project:
 
-### Current state
+- Binary pulsars are used to study orbital dynamics, stellar evolution, and relativistic physics. [[binary-pulsar]]
+- Pulsar orbital motion produces periodic shifts in pulse arrival times. [[binary-pulsar]]
+- Millisecond pulsars (MSPs) are rapidly rotating pulsars with periods below 50 ms and are commonly associated with recycling in binary systems. [[millisecond-pulsar]]
+- MSPs are used in pulsar timing arrays because of their rotational stability. [[millisecond-pulsar]]
 
-- Reference material has been collected in two wiki pages and one text source.
-- `notebooks/test.ipynb` is present at revision 2.
-- The notebook contains one saved markdown cell and no supplied computational cells, outputs, figures, or analysis results ([saved cell](/#notebook/6a9452e7-08c0-4abb-87c9-d5ab719ad5c1?revision=2&cell=b0093b9b-24a1-43a9-8ec5-61cc840467e5)).
-- No dataset, source observations, parameter tables, analysis scripts, environment specification, or documented conclusions are supplied.
-- The project’s intended scope and next scientific task need verification.
+The current project state is therefore **not established from the supplied evidence**. In particular, there is no documented indication of whether MeerKAT observations have been obtained, reduced, timed, or interpreted. These items need verification.
 
 ## Material inventory
 
-| Material | Type | Contents | Handover relevance |
-|---|---|---|---|
-| `binary-pulsar` | Wiki page | Companion types, Keplerian and post-Keplerian parameters, recycling, and related pulsar pages | Provides background for binary-pulsar research; not an analysis record |
-| `pulsar` | Wiki page | Pulsar definition, spin-down, classification, observables, and timing | Provides general background and terminology |
-| `pulsar-basics.txt` | Raw text source | Educational material covering pulsar properties, observations, timing, coordinates, flux density, signal-to-noise, and scientific motivation | Potential introductory reference; provenance, version, and intended use are not documented |
-| `notebooks/test.ipynb` | Notebook, revision 2 | One saved markdown cell; no supplied analysis output | Indicates a project workspace exists, but does not establish completed analysis |
+### Supplied wiki pages
 
-The wiki pages list additional referenced sources, including `pulsars.md`, `stac3719.pdf`, `s41550-019-0880-2 (1).pdf`, `pulsar-info.txt`, and `tempo2_manual.pdf`, but those materials were not supplied in the evidence bundle. Their contents should therefore be treated as unavailable pending verification.
+- **`binary-pulsar`**: Background on binary-pulsar companion types, Keplerian and post-Keplerian timing parameters, and recycling. It references `pulsars.md`, `stac3719.pdf`, and `s41550-019-0880-2 (1).pdf`, but those referenced materials were not supplied in this bundle. [[binary-pulsar]]
+- **`millisecond-pulsar`**: Background on MSP formation, precision timing, pulsar timing arrays, mass constraints, and selected catalogue entries. It references `pulsars.md`, `pulsar-info.txt`, `s41550-019-0880-2 (1).pdf`, and `stac3719.pdf`, none of which were supplied in this bundle. [[millisecond-pulsar]]
 
-## Methods, environment, and reproducibility
+### Not supplied
 
-### Documented methods
+No raw MeerKAT data, observation logs, timing files, pulsar ephemerides, scripts, notebooks, figures, tables, reduction products, or project reports were supplied.
 
-The supplied references describe pulsar timing conceptually:
+Visual notebook outputs are not supplied; there are also no notebook materials or saved-cell links in the evidence bundle.
 
-- Pulse arrival times (TOAs) are used to infer rotational, positional, and orbital behaviour (source: `pulsar-basics.txt`; [[pulsar]]).
-- Dedispersion corrects for frequency-dependent propagation delays through the interstellar medium (source: `pulsar-basics.txt`).
-- Binary-pulsar timing can use Keplerian parameters such as orbital period, eccentricity, projected semi-major axis, longitude of periastron, and time of periastron passage ([[binary-pulsar]]).
-- Post-Keplerian parameters, including Shapiro delay, periastron advance, and orbital-period decay, are described as relativistic timing corrections ([[binary-pulsar]]).
+## Methods, environment and reproducibility
 
-These are background descriptions, not evidence that the project implemented any of these methods.
+### Documented scientific methods
+
+The wiki material documents the general timing concepts relevant to the project:
+
+- Keplerian binary parameters include orbital period \(P_b\), eccentricity \(e\), projected semi-major axis \(x\), longitude of periastron \(\omega\), and time of periastron passage \(T_0\). [[binary-pulsar]]
+- Post-Keplerian parameters may include Shapiro delay, periastron advance \(\dot{\omega}\), and orbital-period derivative \(\dot{P}_b\). [[binary-pulsar]]
+- MSP timing can support studies of correlated timing residuals in pulsar timing arrays and measurements such as Shapiro delay. [[millisecond-pulsar]]
+
+These are background descriptions rather than evidence that the project has used any particular timing model or measured any of these parameters.
 
 ### Environment and dependencies
 
-No programming language, package list, operating-system information, notebook kernel, data format, instrument configuration, repository location, or environment lockfile is supplied.
+No software environment, package versions, operating system, telescope archive system, timing package, calibration tools, scripts, configuration files, or data formats were supplied.
 
-No executable commands are recorded. No analysis scripts or pipelines are supplied. Reproducibility is therefore currently not established.
+No commands were recorded in the supplied materials.
 
-### Notebook status
+Reproducibility is therefore **not currently established**. The following need verification:
 
-The notebook is recorded at revision 2 and contains only one saved markdown cell. The visual notebook output is not supplied, so any rendered appearance or additional notebook state cannot be assessed. There are no supplied saved computational outputs to independently verify ([saved cell](/#notebook/6a9452e7-08c0-4abb-87c9-d5ab719ad5c1?revision=2&cell=b0093b9b-24a1-43a9-8ec5-61cc840467e5)).
+- Which MeerKAT observations and data products are in scope.
+- Which calibration and reduction workflow was used.
+- Which timing software and model were used.
+- Package and software versions.
+- Input and output file locations.
+- Any selection, flagging, folding, template-building, or time-standard conventions.
+- Whether clock corrections, dispersion-measure variations, solar-system ephemerides, and instrument-specific corrections were applied.
 
 ## Results and interpretation
 
-No project-specific scientific results are documented.
+No project-specific measurements, fitted parameters, residuals, uncertainties, plots, tables, or statistical assessments were supplied.
 
-The reference material records the following background observations:
+The following are recorded background observations from the wiki pages, not independently verified project results:
 
-- Pulsars produce periodic signals when their emission beams cross the observer’s line of sight (source: `pulsar-basics.txt`; [[pulsar]]).
-- Period, period derivative, signal-to-noise ratio, flux density, eccentricity, dispersion measure, and TOA are identified as important pulsar observables or concepts (source: `pulsar-basics.txt`).
-- Binary companions may include white dwarfs, neutron stars, and main-sequence stars, with different orbital and evolutionary contexts ([[binary-pulsar]]).
-- Pulsar timing is described as enabling studies of rotation, orbital motion, relativistic effects, and potentially gravitational-wave phenomena (source: `pulsar-basics.txt`; [[pulsar]]).
+- Binary orbital motion affects pulse arrival times. [[binary-pulsar]]
+- MSPs are generally associated with low magnetic fields of \(10^8\)–\(10^9\) G in the described recycling scenario. [[millisecond-pulsar]]
+- The wiki identifies PSR J0740+6620 as a \(2.14\,M_{\odot}\) MSP and describes its relevance to dense-matter and equation-of-state studies. [[millisecond-pulsar]]
+- The wiki lists J0024-7204aa with a 1.84 ms period and J0023+0923 with a 3.05 ms period. [[millisecond-pulsar]]
 
-These statements are background content from the supplied references. They are not results generated by this project and have not been independently validated here. No measurements, plots, fitted parameters, uncertainty estimates, model comparisons, or scientific conclusions are available.
+These statements are contextual and are not measurements made by the MeerKAT project. The supplied evidence does not support conclusions about the target pulsar population, timing precision, orbital parameters, mass measurements, gravitational-wave sensitivity, or scientific significance of this project.
 
 ## Decisions and rationale
 
-No project decisions or rationale are recorded.
+No project decisions or rationale were documented.
 
-In particular, the evidence does not establish:
-
-- Which pulsar or binary-pulsar system is being studied.
-- Whether the project is intended as a literature review, data analysis, educational exercise, or software task.
-- Which observations or catalogue entries should be used.
-- Which timing model or inference method should be applied.
-- Whether the project will focus on spin-down, dispersion, orbital dynamics, relativistic timing, or another topic.
-- What constitutes a successful project outcome.
-
-These items need verification before substantive continuation work begins.
+The supplied background supports considering binary orbital parameters, post-Keplerian effects, and MSP stability when defining a timing analysis, but it does not show that any such choices were made for this project. Any adopted target selection, timing model, observing cadence, data-quality criterion, or interpretation should be recorded and marked as needing verification until supporting project records are located.
 
 ## People and ownership
 
-No researchers, supervisors, maintainers, contributors, reviewers, or owners are identified in the supplied materials.
+No researchers, maintainers, supervisors, data owners, analysis owners, or contacts were identified.
 
-Ownership of the notebook, reference pages, data acquisition, analysis, and review process is missing and needs verification.
+Ownership of the following remains unknown and needs verification:
+
+- MeerKAT data access and archive permissions.
+- Observation and calibration products.
+- Timing-analysis scripts and configuration.
+- Pulsar ephemerides and timing solutions.
+- Scientific interpretation and publication outputs.
+- Project documentation and final approval.
 
 ## Assumptions and limitations
 
-### Evidence-based assumptions
-
-- The project is related to pulsar astronomy because all supplied substantive materials concern pulsars or binary pulsars (source: `pulsar-basics.txt`; [[binary-pulsar]]; [[pulsar]]).
-- The notebook revision and saved-cell link identify the available notebook artifact ([saved cell](/#notebook/6a9452e7-08c0-4abb-87c9-d5ab719ad5c1?revision=2&cell=b0093b9b-24a1-43a9-8ec5-61cc840467e5)).
-
-### Limitations and needs for verification
-
-- The project metadata is too generic to define scientific scope.
-- The supplied notebook has no documented analysis content beyond one markdown cell.
-- Visual notebook outputs are not supplied.
-- The listed wiki source references were not included as separate materials.
-- The provenance, date, version, and intended role of `pulsar-basics.txt` are not documented.
-- No raw data, processed data, scripts, commands, dependencies, or configuration files are available.
-- No claims about project-specific results can be made from the background material.
-- The wiki content and text source contain educational and scientific statements, but their citations and source versions have not been independently checked.
-- The project date is supplied as 2026-10-22, while the two wiki pages state that they were last updated on 2026-04-27. The relationship between these dates is not explained and needs verification.
+- The project title and description are taken from the supplied project metadata; no additional project context was provided.
+- The two wiki pages are background documentation, not a project log or analysis record.
+- Claims attributed to the wiki pages are treated as documented statements from those pages, not independently checked results. [[binary-pulsar]] [[millisecond-pulsar]]
+- References listed by the wiki pages were not supplied and cannot be assessed here. [[binary-pulsar]] [[millisecond-pulsar]]
+- No raw data or visual outputs were supplied, so data quality, processing choices, plots, and residual behaviour cannot be evaluated.
+- No dates, milestones, owners, commands, dependencies, or file paths for the project were documented.
+- The relationship between the general binary/MSP background and the specific MeerKAT target or targets is not documented.
 
 ## Unresolved questions and risks
 
-1. What is the actual research or educational objective of project `test`?
-2. Is the project expected to analyse real pulsar timing data, summarise literature, or develop an instructional example?
-3. Which pulsar, binary system, catalogue, telescope, or observation set is in scope?
-4. Where are the raw and processed data?
-5. What analysis software and timing model are intended?
-6. Are the un supplied references listed in the wiki pages required for the project?
-7. Who owns the project and who will review subsequent work?
-8. What deliverable is expected: notebook, report, figures, parameter estimates, or another artifact?
-9. Are there any undocumented notebook cells, attachments, outputs, or visualisations not represented in the supplied export?
-10. Could the generic project metadata indicate an incomplete test project rather than a scientific project? This needs verification before assuming the reference material represents the intended scope.
-
-Primary risks are scope ambiguity, absence of data and executable analysis, loss of provenance for reference materials, and inability to reproduce or evaluate any scientific result.
+1. **Project scope**: Which pulsar or pulsars are being timed, and is the focus binary systems, MSPs, or another population?
+2. **Observations**: Which MeerKAT observation dates, receivers, frequency ranges, integration times, and observing modes are relevant?
+3. **Data availability**: Where are the raw, calibrated, folded, and extracted timing data?
+4. **Processing history**: What calibration, radio-frequency-interference excision, folding, and profile-processing steps have already been performed?
+5. **Timing model**: Which timing model and parameter set are being used? It is unknown whether binary or post-Keplerian parameters are included.
+6. **Time and reference standards**: Which clock corrections, solar-system ephemeris, time standard, and dispersion treatment were applied?
+7. **Validation**: Are there residual plots, goodness-of-fit statistics, parameter covariances, or independent checks?
+8. **Reproducibility**: Are scripts, environments, dependency versions, and execution records available?
+9. **Scientific objective**: Is the intended outcome a timing solution, orbital characterisation, precision timing campaign, mass constraint, or another result?
+10. **Ownership and continuity**: Who can provide the data, analysis products, and scientific decisions?
+11. **Source verification**: The wiki cites additional documents that are absent from this bundle, so their claims and applicability to the project remain unverified. [[binary-pulsar]] [[millisecond-pulsar]]
 
 ## Prioritised next steps
 
 ### Priority 1 — Establish scope and ownership
 
-- Confirm the intended project objective and expected deliverable.
-- Identify the researcher or team responsible for continuation.
-- Identify a reviewer or supervisor, if applicable.
-- Confirm whether the pulsar-astronomy materials are the intended project content or only test data.
+- Identify the target pulsar(s), project objective, current milestone, and intended deliverable.
+- Identify the researcher responsible for the data, analysis, and scientific decisions.
+- Locate the project repository, data archive location, observing records, and existing documentation.
+- Record which materials are authoritative when project records conflict with the background wiki pages.
 
-### Priority 2 — Inventory missing project inputs
+### Priority 2 — Recover the analysis chain
 
-- Locate the raw and processed datasets, if any.
-- Locate any omitted notebook cells, attachments, plots, or exported outputs.
-- Confirm whether the wiki-linked references are required and obtain the relevant versions.
-- Record provenance, dates, and licences for all inputs.
+- Collect the relevant MeerKAT observation and calibration products.
+- Locate scripts, notebooks, timing files, ephemerides, configuration files, and generated products.
+- Record the commands used, software packages, versions, operating environment, and data-processing sequence.
+- Determine whether any saved results or visual outputs exist; none are present in the supplied bundle.
 
-### Priority 3 — Define the analysis plan
+### Priority 3 — Verify the timing methodology
 
-If the project is intended to be a pulsar-timing study, document the target system, observables, timing model, units, fitting procedure, uncertainty treatment, and validation criteria. The supplied material supports these as possible topics but does not select among them (source: `pulsar-basics.txt`; [[binary-pulsar]]; [[pulsar]]).
+- Document the timing model and fitted parameters.
+- Confirm treatment of binary motion, dispersion, clock corrections, solar-system ephemeris, and instrumental effects.
+- Record units, reference epochs, parameter uncertainties, and any fixed versus fitted quantities.
+- Check whether the documented analysis is appropriate to the target pulsar class and stated science objective.
 
-### Priority 4 — Make the environment reproducible
+### Priority 4 — Validate and document results
 
-- Record the notebook kernel and software versions.
-- Add dependency and environment specifications.
-- Record executable commands and configuration.
-- Store analysis scripts and data-processing steps alongside the notebook.
-- Ensure generated figures and tables are saved with identifiable provenance.
-
-### Priority 5 — Produce and review project outputs
-
-- Populate the notebook or report with the documented analysis.
-- Separate reference background from project-generated results.
-- Record uncertainties and limitations for every reported measurement or inference.
-- Check that figures, tables, and notebook outputs are available for review.
-- Update this handover after scope, ownership, data, and methods have been confirmed.
+- Recover residuals, fit statistics, parameter tables, and figures.
+- Compare results with independent observations or prior timing solutions where available.
+- Separate measured project results from contextual claims in the wiki pages.
+- Record limitations, unresolved anomalies, and the criteria for accepting the timing solution.
 
 ## Review record
 
-- [ ] Handover reviewed by the incoming researcher
+- [ ] Handover draft reviewed by the incoming researcher
 
 ## Related pages
 
 - [[binary-pulsar]]
-- [[pulsar]]
+- [[millisecond-pulsar]]

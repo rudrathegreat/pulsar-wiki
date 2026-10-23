@@ -28,6 +28,7 @@ const { NotebookService } = require('./agent/notebook-service');
 const { createNotebookRouter } = require('./agent/notebook-router');
 const { HandoverService } = require('./agent/handover-service');
 const { References } = require('./agent/references');
+const { PaperMetadata } = require('./agent/paper-metadata');
 
 const app = express();
 const server = http.createServer(app);
@@ -57,10 +58,10 @@ function openWorkspace(folder) {
   if (cached) return cached;
   const workspace = initializeWorkspace(folder);
   const { rootDir, wikiDir, rawDir, dataDir, instructions } = workspace;
-  workspace.references = new References({ rootDir, rawDir });
+  workspace.references = new References({ rootDir, rawDir, metadata: new PaperMetadata({ rawDir, authService: chatgptAuth }) });
   workspace.wikiTools = new WikiTools({ rootDir, wikiDir, rawDir, dataDir });
   workspace.agentService = new AgentService({ threadStore: new ThreadStore({ dataDir: path.join(dataDir, 'chat') }), authService: chatgptAuth, wikiTools: workspace.wikiTools, instructions });
-  workspace.sourceDiscovery = new SourceDiscoveryService({ rawDir, adsToken: sourceSettings.token, onImport: item => workspace.references.add([{ ...item.source, name: item.name }]) });
+  workspace.sourceDiscovery = new SourceDiscoveryService({ rawDir, adsToken: sourceSettings.token, onImport: item => workspace.references.enrich([{ ...item.source, name: item.name }]) });
   workspace.paperKeywords = new PaperKeywords({ authService: chatgptAuth });
   workspace.readingService = new ReadingService({ store: new ReadingStore({ dataDir: path.join(dataDir, 'reading') }), wikiTools: workspace.wikiTools, authService: chatgptAuth, discovery: workspace.sourceDiscovery, instructions });
   workspace.ingestJobs = new Map();
@@ -130,8 +131,8 @@ async function runIngestJob(job) {
   job.updatedAt = new Date().toISOString();
 }
 
-function queueSourceIngest(files) {
-  currentWorkspace().references.add(files || []);
+async function queueSourceIngest(files) {
+  await currentWorkspace().references.enrich(files || []);
   const normalized = (files || []).filter(file => file?.name).map(file => ({
     name: safeBase(file.name),
     title: typeof file.title === 'string' ? file.title.slice(0, 500) : null,
@@ -449,7 +450,7 @@ app.post('/api/upload', requireLocalMutation, async (req, res) => {
     await pipeline(req, fs.createWriteStream(temporary, { flags: 'wx' }));
     // Publish a completed upload exclusively; interruption cannot leave a partial immutable source.
     fs.linkSync(temporary, filePath);
-    return res.json({ ok: true, name, ingestJob: queueSourceIngest([{ name }]) });
+    return res.json({ ok: true, name, ingestJob: await queueSourceIngest([{ name }]) });
   } catch (error) {
     if (!res.headersSent && !res.destroyed) res.status(error.code === 'EEXIST' ? 409 : 500).json({ error: 'The source could not be saved without overwriting an existing file.' });
   } finally {
@@ -461,9 +462,9 @@ app.use('/api/reading', (req, res, next) => currentWorkspace().readingRouter(req
 app.use('/api/notebooks', (req, res, next) => currentWorkspace().notebookRouter(req, res, next));
 
 // --- Research source discovery and import ---
-app.get('/api/references', requireLocalSession, (_req, res) => {
+app.get('/api/references', requireLocalSession, async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  try { return res.json(currentWorkspace().references.sync()); }
+  try { return res.json(await currentWorkspace().references.syncEnriched()); }
   catch (error) { return res.status(500).json({ error: error.message }); }
 });
 
@@ -508,7 +509,7 @@ app.post('/api/sources/import', requireLocalMutation, async (req, res) => {
       doi: item.source.doi,
       arxivId: item.source.arxivId,
     }));
-    const ingestJob = files.length ? queueSourceIngest(files) : null;
+    const ingestJob = files.length ? await queueSourceIngest(files) : null;
     return res.status(result.imported.length ? 201 : 422).json({ ...result, ingestJob });
   } catch (error) {
     return res.status(400).json({ error: error.message || 'The selected papers could not be imported.' });

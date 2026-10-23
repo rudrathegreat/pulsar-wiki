@@ -3,6 +3,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { parse, text } = require('../public/bibtex');
+const COMPLETION_NOTE = 'Bibliographic metadata needs completion';
 
 // Treat metadata as text, never as BibTeX syntax supplied by a source.
 function bibText(value) {
@@ -11,9 +13,11 @@ function bibText(value) {
 }
 
 class References {
-  constructor({ rootDir, rawDir }) {
+  constructor({ rootDir, rawDir, metadata = null }) {
     this.file = path.join(rootDir, 'references.bib');
     this.rawDir = rawDir;
+    this.metadata = metadata;
+    this.extracted = new Set();
   }
 
   read() {
@@ -64,6 +68,63 @@ class References {
 
   sync() {
     return this.add(fs.readdirSync(this.rawDir).filter(name => fs.lstatSync(path.join(this.rawDir, name)).isFile()).map(name => ({ name })));
+  }
+
+  entryFor(name, content = this.read().content) {
+    return parse(content, { locations: true }).entries.find(entry => entry.fields.file === bibText(`raw/${name}`) || text(entry.fields.file) === `raw/${name}`);
+  }
+
+  async enrich(files) {
+    for (const source of files) {
+      // Do not publish a new placeholder until extraction has been attempted.
+      const existing = this.entryFor(source.name);
+      const complete = existing ? ['title', 'author', 'year'].every(field => existing.fields[field]?.trim()) && text(existing.fields.title) !== source.name && existing.fields.note !== COMPLETION_NOTE : source.title && source.authors?.length && /^\d{4}/.test(String(source.year || source.published || ''));
+      if (!this.metadata || complete || this.extracted.has(source.name)) { this.add([source]); continue; }
+      let fields = {};
+      try { fields = await this.metadata.extract(source.name); } catch { /* Keep the editable fallback if extraction fails. */ }
+      this.add([source]);
+      if (!Object.keys(fields).length) continue;
+      this.extracted.add(source.name);
+      // Re-read after inference so edits and concurrent imports are retained.
+      const { content } = this.read();
+      const entry = this.entryFor(source.name, content);
+      if (!entry) continue;
+      const replacements = [];
+      const additions = [];
+      for (const [field, value] of Object.entries(fields)) {
+        const placeholder = field === 'title' && text(entry.fields.title) === source.name;
+        if (entry.fields[field]?.trim() && !placeholder) continue;
+        const encoded = field === 'author' ? value.map(bibText).join(' and ') : bibText(value);
+        const replacement = `${field} = {${encoded}}`;
+        const location = entry.fieldLocations[field];
+        if (location) replacements.push({ ...location, value: replacement });
+        else additions.push(replacement);
+      }
+      if (additions.length) {
+        const lastValueEnd = Math.max(...Object.values(entry.fieldLocations).map(location => location.end));
+        const tail = content.slice(lastValueEnd, entry.end - 1).replace(/%[^\n]*/g, '').trim();
+        replacements.push({ start: entry.end - 1, end: entry.end - 1, value: `${tail === ',' ? '' : ','}\n  ${additions.join(',\n  ')}\n` });
+      }
+      let updated = content;
+      for (const change of replacements.sort((a, b) => b.start - a.start)) updated = updated.slice(0, change.start) + change.value + updated.slice(change.end);
+      if (entry.fields.note === COMPLETION_NOTE) {
+        const location = this.entryFor(source.name, updated).fieldLocations.note;
+        const separator = /^(?:\s|%[^\n]*(?:\n|$))*,/.exec(updated.slice(location.end));
+        if (separator) {
+          const comma = location.end + separator[0].length - 1;
+          updated = updated.slice(0, comma) + updated.slice(comma + 1);
+        }
+        updated = updated.slice(0, location.start) + updated.slice(location.end);
+      }
+      if (updated !== content) this.write(updated);
+    }
+    return this.read();
+  }
+
+  async syncEnriched() {
+    const files = fs.readdirSync(this.rawDir).filter(name => fs.lstatSync(path.join(this.rawDir, name)).isFile()).map(name => ({ name }));
+    await this.enrich(files);
+    return this.sync();
   }
 
   save(content, revision) {

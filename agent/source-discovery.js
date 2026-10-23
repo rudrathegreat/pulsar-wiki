@@ -364,7 +364,7 @@ class SourceDiscoveryService {
     for (const result of results) {
       try {
         const item = await this.downloadPdf(result);
-        this.onImport(item);
+        await this.onImport(item);
         imported.push(item);
       }
       catch (error) { failed.push({ id: result.id, title: result.title, error: error.message }); }
