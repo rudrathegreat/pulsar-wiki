@@ -243,22 +243,21 @@ class SourceDiscoveryService {
     const query = classifyQuery(input);
     const rows = Math.min(MAX_RESULTS, Math.max(1, Number(limit) || 20));
     const sourceFilter = query.filters.source?.[0]?.toLowerCase();
-    const tasks = [];
-    if (!sourceFilter || sourceFilter === 'arxiv') {
-      const url = `${ARXIV_API}?search_query=${encodeURIComponent(buildArxivQuery(query))}&start=0&max_results=${rows}&sortBy=relevance&sortOrder=descending`;
-      tasks.push(this.fetchText(url, { headers: { 'User-Agent': 'PulsarWiki/1.0 source discovery' } }, 'arXiv')
-        .then(parseArxivFeed).then(results => ({ source: 'arXiv', results })).catch(error => ({ source: 'arXiv', results: [], error: error.message })));
-    }
-    if ((!sourceFilter || ['ads', 'nasa-ads'].includes(sourceFilter)) && this.adsToken) {
+    const settled = [];
+    if ((!sourceFilter || ['scix', 'ads', 'nasa-ads'].includes(sourceFilter)) && this.adsToken) {
       const params = new URLSearchParams({ q: buildAdsQuery(query), fl: 'bibcode,title,author,year,pub,pubdate,abstract,doi,identifier,citation_count,reference_count', rows: String(rows), sort: 'score desc' });
-      tasks.push(this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` } }, 'NASA ADS')
+      settled.push(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` } }, 'NASA ADS')
         .then(JSON.parse).then(parseAdsResponse).then(results => ({ source: 'NASA ADS', results })).catch(error => ({ source: 'NASA ADS', results: [], error: error.message })));
     }
-    const settled = await Promise.all(tasks);
+    if (sourceFilter === 'arxiv' || (!sourceFilter && !settled.some(item => item.results.length))) {
+      const url = `${ARXIV_API}?search_query=${encodeURIComponent(buildArxivQuery(query))}&start=0&max_results=${rows}&sortBy=relevance&sortOrder=descending`;
+      settled.push(await this.fetchText(url, { headers: { 'User-Agent': 'PulsarWiki/1.0 source discovery' } }, 'arXiv')
+        .then(parseArxivFeed).then(results => ({ source: 'arXiv', results })).catch(error => ({ source: 'arXiv', results: [], error: error.message })));
+    }
     const results = deduplicate(settled.flatMap(item => item.results)).slice(0, rows);
     this.remember(results);
     const warnings = settled.filter(item => item.error).map(item => `${item.source}: ${item.error}`);
-    if (!this.adsToken && sourceFilter !== 'arxiv') warnings.push('NASA ADS is unavailable until a NASA ADS API token is added in Settings; arXiv results are shown.');
+    if (!this.adsToken && sourceFilter !== 'arxiv') warnings.push(`NASA ADS is unavailable until a NASA ADS API token is added in Settings; ${sourceFilter ? 'no results are shown for this provider filter' : 'arXiv results are shown'}.`);
     return { query: { intent: query.intent, terms: query.terms, filters: query.filters }, results, warnings, filters: FILTERS };
   }
 

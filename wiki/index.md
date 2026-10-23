@@ -8,7 +8,7 @@ Application workspace guide: [Research workspaces](../README.md#research-workspa
 
 Notebook guide: [Research notebooks](../README.md#research-notebooks). New notebooks start with editable Title, Objective, Live notes, and Preliminary analysis sections, each with detailed guidance on research context, questions and methods, ongoing observations and decisions, or reproducible analysis and tentative findings.
 
-Settings: add, replace or remove a NASA ADS API token for literature searches. Tokens are saved locally across workspaces and applied immediately; an existing server environment token remains the fallback.
+Settings: add, replace or remove a NASA ADS API token for literature searches. Tokens are saved locally across workspaces and applied immediately; an existing server environment token remains the fallback. Paper searches default to sciX (formerly NASA ADS), with arXiv as the backup when sciX has no token, fails, or returns no matches. Explicit source filters search only the selected provider.
 
 After updating the application, restart its server and refresh the browser to load new settings endpoints. NASA ADS settings show a restart instruction if the running server does not support token saving.
 

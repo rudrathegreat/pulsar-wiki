@@ -1295,7 +1295,7 @@ async function runSourceSearch() {
   }
   dom.sourceFilterSuggestions.classList.remove('visible');
   dom.sourceSearchStatus.className = 'source-search-status visible loading';
-  dom.sourceSearchStatus.innerHTML = '<span class="document-spinner"></span><span>Searching arXiv and NASA ADS...</span>';
+  dom.sourceSearchStatus.innerHTML = '<span class="document-spinner"></span><span>Searching for papers...</span>';
   $('source-search-submit').disabled = true;
   state.selectedSourceIds.clear();
   closeSourceDetail();

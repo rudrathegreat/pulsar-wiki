@@ -85,6 +85,8 @@ All agent writes use one validated local operation:
 - `wiki/log.md` is appended automatically; and
 - failed operations roll back their local file changes.
 
+Paper searches use **sciX (formerly NASA ADS)** as the default results provider, using the NASA ADS token configured in Settings. **arXiv** is the backup when no token is configured, sciX fails, or sciX returns no matches. An explicit `source:scix` (also `source:ads` or `source:nasa-ads`) or `source:arxiv` filter searches only that provider.
+
 ## Research notebooks
 
 Open **Notebooks** in the activity bar to work in JupyterLab inside PulsarWiki. Local Python starts automatically when this space opens, using the workspace's saved interpreter (or `python` by default). A loading animation remains visible until JupyterLab has restored and connected its editor. The notebook space fills the available area without a separate PulsarWiki file sidebar or filename/action bar. Use JupyterLab's own file browser, launcher, and upload controls to create or open standard `.ipynb` notebooks. New notebooks automatically start with four editable Markdown cells: **Title**, **Objective**, **Live notes**, and **Preliminary analysis**, with detailed guidance below each heading covering research context, objectives and assumptions, dated working notes, and reproducible preliminary analysis. Add code cells wherever needed, or edit or remove any section. The template is applied only at creation; existing notebooks, uploads, copies, and later saves keep their contents. Write and run Python manually, interleave Markdown and LaTeX, and retain plots and visualisations with the notebook. JupyterLab supplies optional headings, table of contents, and collapsible cells.
