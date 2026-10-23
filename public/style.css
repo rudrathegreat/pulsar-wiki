@@ -3128,3 +3128,9 @@ button:disabled {
 .source-paper-abstract p { margin-top: 14px; color: var(--text-2); font-size: 14px; line-height: 1.8; white-space: pre-line; }
 .source-paper-group { margin-top: 40px; padding-top: 26px; border-top: 1px solid var(--border); }
 .source-paper-page .source-related-empty { margin-top: 16px; }
+/* Workspace bibliography */
+.references-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.references-label { display: block; margin: 16px 0 8px; font-size: 13px; color: var(--text-2); }
+#references-status { min-height: 20px; margin-top: 16px; font-size: 13px; color: var(--text-2); }
+#references-editor { display: block; width: 100%; min-height: 55vh; padding: 16px; resize: vertical; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-1); font: 13px/1.7 var(--mono); tab-size: 2; }
+#references-editor:focus { outline: 1px solid var(--text-1); outline-offset: 2px; }

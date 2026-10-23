@@ -50,7 +50,7 @@ function createReadingRouter({ service, requireLocalSession, requireLocalMutatio
   router.post('/discover/import', route(async (req, res) => {
     const ids = service.restoreDiscoveries(req.body?.ids);
     const result = await service.discovery.import(ids);
-    const ingestJob = onImport(result.imported.map(i => ({ name: i.name, title: i.source.title, doi: i.source.doi, arxivId: i.source.arxivId })));
+    const ingestJob = onImport(result.imported.map(i => ({ ...i.source, name: i.name })));
     res.json({ ...result, ingestJob });
   }));
   router.post('/tasks', route(async (req, res) => res.status(202).json(await service.createTask(req.body))));

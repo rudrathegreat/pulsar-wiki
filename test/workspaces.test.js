@@ -106,6 +106,14 @@ test('server remembers selections and isolates simultaneous projects across APIs
   assert.equal(uploaded.status, 200);
   const upload = await uploaded.json();
   assert.equal(fs.readFileSync(path.join(firstPath, 'raw', 'evidence.txt'), 'utf8'), 'immutable evidence');
+  assert.match(fs.readFileSync(path.join(firstPath, 'references.bib'), 'utf8'), /file = \{raw\/evidence.txt\}/);
+  const references = await (await request('/api/references', { id: first.id })).json();
+  const editedReferences = `${references.content}\n% Edited from the References tab\n`;
+  assert.equal((await request('/api/references', { id: first.id, method: 'PUT', body: { content: editedReferences, revision: references.revision } })).status, 200);
+  assert.equal(fs.readFileSync(path.join(firstPath, 'references.bib'), 'utf8'), editedReferences);
+  assert.equal((await request('/api/references', { id: first.id, method: 'PUT', body: { content: 'stale', revision: references.revision } })).status, 409);
+  assert.equal((await (await request('/api/references', { id: second.id })).json()).content, '');
+  assert.equal((await request('/api/references', { id: first.id, method: 'PUT', origin: 'http://example.com', body: { content: 'blocked', revision: references.revision } })).status, 403);
   assert.equal((await (await request('/api/raw', { id: second.id })).json()).length, 0);
   assert.equal((await request(`/api/sources/jobs/${upload.ingestJob.id}`, { id: second.id })).status, 404);
   assert.equal(await (await request(`/api/raw/evidence.txt?workspace=${first.id}`)).text(), 'immutable evidence');

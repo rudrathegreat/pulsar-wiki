@@ -27,6 +27,7 @@ const { NotebookRuntime } = require('./agent/notebook-runtime');
 const { NotebookService } = require('./agent/notebook-service');
 const { createNotebookRouter } = require('./agent/notebook-router');
 const { HandoverService } = require('./agent/handover-service');
+const { References } = require('./agent/references');
 
 const app = express();
 const server = http.createServer(app);
@@ -56,9 +57,10 @@ function openWorkspace(folder) {
   if (cached) return cached;
   const workspace = initializeWorkspace(folder);
   const { rootDir, wikiDir, rawDir, dataDir, instructions } = workspace;
+  workspace.references = new References({ rootDir, rawDir });
   workspace.wikiTools = new WikiTools({ rootDir, wikiDir, rawDir, dataDir });
   workspace.agentService = new AgentService({ threadStore: new ThreadStore({ dataDir: path.join(dataDir, 'chat') }), authService: chatgptAuth, wikiTools: workspace.wikiTools, instructions });
-  workspace.sourceDiscovery = new SourceDiscoveryService({ rawDir, adsToken: sourceSettings.token });
+  workspace.sourceDiscovery = new SourceDiscoveryService({ rawDir, adsToken: sourceSettings.token, onImport: item => workspace.references.add([{ ...item.source, name: item.name }]) });
   workspace.paperKeywords = new PaperKeywords({ authService: chatgptAuth });
   workspace.readingService = new ReadingService({ store: new ReadingStore({ dataDir: path.join(dataDir, 'reading') }), wikiTools: workspace.wikiTools, authService: chatgptAuth, discovery: workspace.sourceDiscovery, instructions });
   workspace.ingestJobs = new Map();
@@ -129,6 +131,7 @@ async function runIngestJob(job) {
 }
 
 function queueSourceIngest(files) {
+  currentWorkspace().references.add(files || []);
   const normalized = (files || []).filter(file => file?.name).map(file => ({
     name: safeBase(file.name),
     title: typeof file.title === 'string' ? file.title.slice(0, 500) : null,
@@ -458,6 +461,17 @@ app.use('/api/reading', (req, res, next) => currentWorkspace().readingRouter(req
 app.use('/api/notebooks', (req, res, next) => currentWorkspace().notebookRouter(req, res, next));
 
 // --- Research source discovery and import ---
+app.get('/api/references', requireLocalSession, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try { return res.json(currentWorkspace().references.sync()); }
+  catch (error) { return res.status(500).json({ error: error.message }); }
+});
+
+app.put('/api/references', requireLocalMutation, (req, res) => {
+  try { return res.json(currentWorkspace().references.save(req.body?.content, req.body?.revision)); }
+  catch (error) { return res.status(error.status || 500).json({ error: error.message }); }
+});
+
 app.get('/api/sources/filters', requireLocalSession, (_req, res) => {
   res.json({ filters: SOURCE_FILTERS, adsConfigured: Boolean(currentWorkspace().sourceDiscovery.adsToken) });
 });
@@ -488,6 +502,7 @@ app.post('/api/sources/import', requireLocalMutation, async (req, res) => {
   try {
     const result = await currentWorkspace().sourceDiscovery.import(req.body?.ids);
     const files = result.imported.map(item => ({
+      ...item.source,
       name: item.name,
       title: item.source.title,
       doi: item.source.doi,

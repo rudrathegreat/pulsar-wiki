@@ -206,7 +206,7 @@ function safeFileName(result) {
 }
 
 class SourceDiscoveryService {
-  constructor({ rawDir, fetchImpl = globalThis.fetch, adsToken = process.env.NASA_ADS_API_TOKEN, now = Date.now } = {}) {
+  constructor({ rawDir, fetchImpl = globalThis.fetch, adsToken = process.env.NASA_ADS_API_TOKEN, now = Date.now, onImport = () => {} } = {}) {
     if (!rawDir) throw new Error('rawDir is required');
     if (typeof fetchImpl !== 'function') throw new Error('fetch implementation is required');
     this.rawDir = rawDir;
@@ -214,6 +214,7 @@ class SourceDiscoveryService {
     this.adsToken = adsToken || '';
     this.now = now;
     this.cache = new Map();
+    this.onImport = onImport;
   }
 
   remember(results) {
@@ -361,7 +362,11 @@ class SourceDiscoveryService {
     const imported = [];
     const failed = [];
     for (const result of results) {
-      try { imported.push(await this.downloadPdf(result)); }
+      try {
+        const item = await this.downloadPdf(result);
+        this.onImport(item);
+        imported.push(item);
+      }
       catch (error) { failed.push({ id: result.id, title: result.title, error: error.message }); }
     }
     return { imported, failed };

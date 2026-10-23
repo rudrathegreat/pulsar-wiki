@@ -214,6 +214,7 @@
             <button class="source-tab active" id="source-tab-add" type="button" role="tab" aria-selected="true" aria-controls="source-view-add" data-source-view="add">Search online</button>
             <button class="source-tab" id="source-tab-upload" type="button" role="tab" aria-selected="false" aria-controls="source-view-upload" data-source-view="upload">Upload a file</button>
             <button class="source-tab" id="source-tab-saved" type="button" role="tab" aria-selected="false" aria-controls="source-view-saved" data-source-view="saved">Saved sources <span class="badge" id="files-count">0</span></button>
+            <button class="source-tab" id="source-tab-references" type="button" role="tab" aria-selected="false" aria-controls="source-view-references" data-source-view="references">References</button>
           </div>
 
           <section class="source-view active" id="source-view-add" role="tabpanel" aria-labelledby="source-tab-add">
@@ -312,6 +313,19 @@
               </button>
             </header>
             <div class="files-grid" id="files-grid"><!-- populated by JS --></div>
+          </section>
+
+          <section class="source-view" id="source-view-references" role="tabpanel" aria-labelledby="source-tab-references" hidden>
+            <header class="saved-sources-header">
+              <div><h3>references.bib</h3><p>Sources are added automatically. Edit bibliographic details and citation keys below.</p></div>
+              <div class="references-actions">
+                <button class="btn" id="references-reload" type="button">Reload file</button>
+                <button class="btn" id="references-save" type="button" disabled>Save changes</button>
+              </div>
+            </header>
+            <p id="references-status" role="status" aria-live="polite"></p>
+            <label class="references-label" for="references-editor">BibTeX file</label>
+            <textarea id="references-editor" spellcheck="false" autocomplete="off" aria-describedby="references-status" disabled></textarea>
           </section>
         </div>
       </div>
@@ -594,6 +608,7 @@
 <script src="/workspaces.js"></script>
 <dialog id="notebook-dialog" aria-labelledby="notebook-dialog-title"><form id="notebook-dialog-form"><header><h2 id="notebook-dialog-title"></h2><button class="btn" id="notebook-dialog-close" type="button">Close</button></header><div id="notebook-dialog-body"></div><p id="notebook-dialog-error" role="alert"></p><button class="btn" id="notebook-dialog-submit" type="submit">Save</button></form></dialog>
 <script src="/notebooks.js"></script>
+<script src="/references.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

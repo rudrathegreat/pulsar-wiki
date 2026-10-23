@@ -1111,7 +1111,7 @@ const SOURCE_FILTERS = [
 ];
 
 function setSourceView(name) {
-  state.sourceView = ['add', 'upload', 'saved'].includes(name) ? name : 'add';
+  state.sourceView = ['add', 'upload', 'saved', 'references'].includes(name) ? name : 'add';
   document.querySelectorAll('[data-source-view]').forEach(button => {
     const active = button.dataset.sourceView === state.sourceView;
     button.classList.toggle('active', active);
@@ -1123,6 +1123,7 @@ function setSourceView(name) {
     view.hidden = !active;
   });
   if (state.sourceView === 'saved') void loadFiles().catch(() => {});
+  if (state.sourceView === 'references') void window.ReferencesEditor?.open();
 }
 
 function formatPaperDate(value) {
@@ -2330,9 +2331,9 @@ dom.chatAbort.addEventListener('click', () => {
     const hash = location.hash;
     if (!routedToWiki && await window.ResearchNotebooks?.route(hash)) return;
     if (!routedToWiki && await window.ActiveReading?.route(hash)) return;
-    if (!routedToWiki && (hash === '#sources' || hash === '#sources/saved')) {
+    if (!routedToWiki && ['#sources', '#sources/saved', '#sources/references'].includes(hash)) {
       showPanel('files');
-      setSourceView(hash.endsWith('/saved') ? 'saved' : 'add');
+      setSourceView(hash.endsWith('/references') ? 'references' : hash.endsWith('/saved') ? 'saved' : 'add');
       return;
     }
     if (!routedToWiki && hash.startsWith('#file/')) {
