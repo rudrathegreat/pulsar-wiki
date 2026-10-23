@@ -159,9 +159,9 @@ const api = {
     }), 'Wiki page');
   },
   async getRawList() { return readJsonResponse(await workspaceFetch('/api/raw'), 'Source files'); },
-  async searchSources(query, limit = 20) {
+  async searchSources(query, limit = 20, options = {}) {
     return readJsonResponse(await workspaceFetch('/api/sources/search', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, limit }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, limit, ...options }),
     }), 'Paper search');
   },
   async getRelatedSources(id) {
@@ -1212,6 +1212,7 @@ function renderSourceResults(results) {
   state.sourceResults = Array.isArray(results) ? results : [];
   for (const paper of state.sourceResults) state.sourcePapers.set(paper.id, paper);
   dom.sourceResultsSection.hidden = false;
+  $('source-results-header').hidden = false;
   $('source-results-title').textContent = `${state.sourceResults.length} paper${state.sourceResults.length === 1 ? '' : 's'} found`;
   dom.sourceResults.innerHTML = state.sourceResults.length
     ? state.sourceResults.map(paper => resultPaperMarkup(paper)).join('')
@@ -1297,6 +1298,20 @@ async function runSourceSearch() {
     dom.sourceSearchInput.focus();
     return;
   }
+  if (!$('source-search-form').reportValidity()) return;
+  const request = (state.sourceSearchRequest || 0) + 1;
+  state.sourceSearchRequest = request;
+  const searchWorkspace = workspaceId;
+  const current = () => state.sourceSearchRequest === request && workspaceId === searchWorkspace;
+  const options = {
+    sort: $('source-sort').value,
+    filters: {
+      refereed: $('source-refereed').value,
+      collection: $('source-collection').value,
+      year: $('source-year').value,
+      minCitations: $('source-min-citations').value,
+    },
+  };
   dom.sourceFilterSuggestions.classList.remove('visible');
   dom.sourceSearchStatus.className = 'source-search-status visible loading';
   dom.sourceSearchStatus.innerHTML = '<span class="document-spinner"></span><span>Searching for papers...</span>';
@@ -1304,8 +1319,12 @@ async function runSourceSearch() {
   state.selectedSourceIds.clear();
   closeSourceDetail();
   state.sourcePapers.clear();
+  state.sourceResults = [];
+  dom.sourceResults.innerHTML = '';
+  $('source-results-header').hidden = true;
   try {
-    const data = await api.searchSources(query);
+    const data = await api.searchSources(query, 20, options);
+    if (!current()) return;
     state.sourceFilters = data.filters || SOURCE_FILTERS;
     renderSourceResults(data.results);
     void loadSourceKeywords(state.sourceResults);
@@ -1314,10 +1333,11 @@ async function runSourceSearch() {
     dom.sourceSearchStatus.className = `source-search-status visible${warning ? ' warning' : ''}`;
     dom.sourceSearchStatus.textContent = `${intent} complete.${warning}`;
   } catch (error) {
+    if (!current()) return;
     dom.sourceSearchStatus.className = 'source-search-status visible error';
     dom.sourceSearchStatus.textContent = stripEmoji(error.message);
   } finally {
-    $('source-search-submit').disabled = false;
+    if (current()) $('source-search-submit').disabled = false;
   }
 }
 
@@ -1421,6 +1441,11 @@ function monitorSourceJob(id) {
 
 document.querySelectorAll('[data-source-view]').forEach(button => button.addEventListener('click', () => setSourceView(button.dataset.sourceView)));
 dom.sourceSearchForm.addEventListener('submit', event => { event.preventDefault(); void runSourceSearch(); });
+for (const id of ['source-sort', 'source-refereed', 'source-collection', 'source-year', 'source-min-citations']) {
+  $(id).addEventListener('change', () => {
+    if (dom.sourceSearchInput.value.trim()) void runSourceSearch();
+  });
+}
 dom.sourceSearchInput.addEventListener('input', () => {
   updateFilterSuggestions();
 });

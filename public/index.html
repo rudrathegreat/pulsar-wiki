@@ -240,8 +240,39 @@
             </form>
 
             <div class="source-search-status" id="source-search-status" role="status" aria-live="polite"></div>
-            <section class="source-results-section" id="source-results-section" hidden>
-              <header class="source-results-header">
+            <section class="source-results-section" id="source-results-section">
+              <div class="source-result-controls" aria-label="Search filters and sorting">
+                <label for="source-sort">Sort by
+                  <select id="source-sort" form="source-search-form">
+                    <option value="default" selected>Default</option>
+                    <option value="citations">Most citations</option>
+                    <option value="recent">Most recent</option>
+                    <option value="author">First author</option>
+                  </select>
+                </label>
+                <label for="source-refereed">Publication status
+                  <select id="source-refereed" form="source-search-form">
+                    <option value="refereed" selected>Refereed (peer-reviewed)</option>
+                    <option value="non-refereed">Non-refereed</option>
+                    <option value="all">All publications</option>
+                  </select>
+                </label>
+                <label for="source-collection">Collection
+                  <select id="source-collection" form="source-search-form">
+                    <option value="all" selected>All collections</option>
+                    <option value="astronomy">Astronomy</option>
+                    <option value="physics">Physics</option>
+                    <option value="general">General</option>
+                  </select>
+                </label>
+                <label for="source-year">Publication year
+                  <input id="source-year" form="source-search-form" type="number" min="1000" max="9999" step="1" placeholder="Any year"/>
+                </label>
+                <label for="source-min-citations">Minimum citations
+                  <input id="source-min-citations" form="source-search-form" type="number" min="0" max="9007199254740991" step="1" placeholder="Any count"/>
+                </label>
+              </div>
+              <header class="source-results-header" id="source-results-header" hidden>
                 <div><h3 id="source-results-title">Search results</h3></div>
                 <button class="source-import-button" id="source-import-selected" type="button" disabled>Import selected <span id="source-selected-count">0</span></button>
               </header>

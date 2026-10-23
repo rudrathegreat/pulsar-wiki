@@ -2226,6 +2226,44 @@ button:disabled {
   margin-top: 24px;
 }
 
+.source-result-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 0 0 20px;
+}
+
+#source-results-header[hidden] { display: none; }
+
+.source-result-controls label {
+  display: flex;
+  flex: 1 1 140px;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.source-result-controls select,
+.source-result-controls input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #222;
+  color: var(--text-1);
+  font: inherit;
+  color-scheme: dark;
+}
+
+[data-theme="light"] .source-result-controls select,
+[data-theme="light"] .source-result-controls input {
+  border-color: #ccc;
+  background: #eee;
+  color-scheme: light;
+}
+
 .source-search-box {
   position: relative;
   min-height: 58px;

@@ -239,25 +239,41 @@ class SourceDiscoveryService {
     return response.text();
   }
 
-  async search(input, { limit = 20 } = {}) {
+  async search(input, { limit = 20, sort = 'default', filters = {} } = {}) {
     const query = classifyQuery(input);
+    const sorts = { default: 'score desc', citations: 'citation_count desc', recent: 'date desc', author: 'first_author asc' };
+    if (!Object.hasOwn(sorts, sort)) throw new Error('Choose a valid sort order.');
+    const { refereed = 'refereed', collection = 'all', year = '', minCitations = '' } = filters || {};
+    if (!['all', 'refereed', 'non-refereed'].includes(refereed)) throw new Error('Choose a valid refereed status.');
+    if (!['all', 'astronomy', 'physics', 'general'].includes(collection)) throw new Error('Choose a valid collection.');
+    if (year !== '' && !/^\d{4}$/.test(String(year))) throw new Error('Publication year must have four digits.');
+    if (minCitations !== '' && (!/^\d+$/.test(String(minCitations)) || !Number.isSafeInteger(Number(minCitations)))) throw new Error('Minimum citations must be a non-negative whole number.');
+    const clauses = [buildAdsQuery(query)];
+    if (refereed !== 'all') clauses.push(`property:${refereed === 'refereed' ? 'refereed' : 'notrefereed'}`);
+    if (collection !== 'all') clauses.push(`database:${collection}`);
+    if (year !== '') clauses.push(`year:${year}`);
+    if (minCitations !== '') clauses.push(`citation_count:[${Number(minCitations)} TO *]`);
+    // arXiv cannot verify peer review, ADS collections, or citation counts.
+    const requiresAds = refereed !== 'all' || collection !== 'all' || minCitations !== '' || ['citations', 'author'].includes(sort);
     const rows = Math.min(MAX_RESULTS, Math.max(1, Number(limit) || 20));
     const sourceFilter = query.filters.source?.[0]?.toLowerCase();
     const settled = [];
     if ((!sourceFilter || ['scix', 'ads', 'nasa-ads'].includes(sourceFilter)) && this.adsToken) {
-      const params = new URLSearchParams({ q: buildAdsQuery(query), fl: 'bibcode,title,author,year,pub,pubdate,abstract,doi,identifier,citation_count,reference_count', rows: String(rows), sort: 'score desc' });
+      const params = new URLSearchParams({ q: clauses.join(' AND '), fl: 'bibcode,title,author,year,pub,pubdate,abstract,doi,identifier,citation_count,reference_count', rows: String(rows), sort: sorts[sort] });
       settled.push(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` } }, 'NASA ADS')
         .then(JSON.parse).then(parseAdsResponse).then(results => ({ source: 'NASA ADS', results })).catch(error => ({ source: 'NASA ADS', results: [], error: error.message })));
     }
-    if (sourceFilter === 'arxiv' || (!sourceFilter && !settled.some(item => item.results.length))) {
-      const url = `${ARXIV_API}?search_query=${encodeURIComponent(buildArxivQuery(query))}&start=0&max_results=${rows}&sortBy=relevance&sortOrder=descending`;
+    if (!requiresAds && (sourceFilter === 'arxiv' || (!sourceFilter && !settled.some(item => item.results.length)))) {
+      const arxivQuery = year === '' ? query : { ...query, filters: { ...query.filters, year: [String(year)] } };
+      const url = `${ARXIV_API}?search_query=${encodeURIComponent(buildArxivQuery(arxivQuery))}&start=0&max_results=${rows}&sortBy=${sort === 'recent' ? 'submittedDate' : 'relevance'}&sortOrder=descending`;
       settled.push(await this.fetchText(url, { headers: { 'User-Agent': 'PulsarWiki/1.0 source discovery' } }, 'arXiv')
         .then(parseArxivFeed).then(results => ({ source: 'arXiv', results })).catch(error => ({ source: 'arXiv', results: [], error: error.message })));
     }
     const results = deduplicate(settled.flatMap(item => item.results)).slice(0, rows);
     this.remember(results);
     const warnings = settled.filter(item => item.error).map(item => `${item.source}: ${item.error}`);
-    if (!this.adsToken && sourceFilter !== 'arxiv') warnings.push(`NASA ADS is unavailable until a NASA ADS API token is added in Settings; ${sourceFilter ? 'no results are shown for this provider filter' : 'arXiv results are shown'}.`);
+    if (!this.adsToken && sourceFilter !== 'arxiv') warnings.push(`NASA ADS is unavailable until a NASA ADS API token is added in Settings; ${sourceFilter || requiresAds ? 'no results are shown for the selected filters' : 'arXiv results are shown'}.`);
+    if (requiresAds && (!settled.length || settled.some(item => item.error))) warnings.push('The selected filters or sort order require NASA ADS metadata. arXiv fallback is unavailable for these options. Choose All publications, All collections, no minimum citations, and Default or Most recent to allow arXiv results.');
     return { query: { intent: query.intent, terms: query.terms, filters: query.filters }, results, warnings, filters: FILTERS };
   }
 

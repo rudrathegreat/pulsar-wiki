@@ -147,3 +147,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-23 | Default paper search provider / application | Made sciX (formerly NASA ADS) the default results provider, with arXiv as backup for missing credentials, failures or no matches. Preserved explicit provider filters and added source:scix as an alias. Added provider selection and fallback checks; updated documentation and wiki index. |
 
 | 2026-10-23 | Citation counts in paper results / application | Displayed citation counts beneath authors on search and related-paper cards, including zero citations and an explicit unavailable label for records without citation data. Updated the wiki index and checked card rendering. |
+
+| 2026-10-23 | Paper search filters and sorting / application | Added controls at the top of search results for citation count, recency, first author and default relevance sorting, plus refereed status, collection, publication year and minimum citations. Defaulted to refereed publications, applied ADS options before limiting results, explained unsupported arXiv fallbacks, and prevented stale search responses. Updated the wiki index and search guide. |

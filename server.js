@@ -466,7 +466,7 @@ app.post('/api/sources/search', requireLocalSession, async (req, res) => {
   const query = String(req.body?.query || '').trim();
   if (!query) return res.status(400).json({ error: 'Enter a research question, keywords, title, DOI, or paper link.' });
   try {
-    return res.json(await currentWorkspace().sourceDiscovery.search(query, { limit: req.body?.limit }));
+    return res.json(await currentWorkspace().sourceDiscovery.search(query, { limit: req.body?.limit, sort: req.body?.sort, filters: req.body?.filters }));
   } catch (error) {
     return res.status(502).json({ error: error.message || 'The paper search could not be completed.' });
   }

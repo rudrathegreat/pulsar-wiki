@@ -91,7 +91,7 @@ test('search caches previews and import writes a validated PDF without overwriti
     throw new Error(`Unexpected URL ${url}`);
   };
   const service = new SourceDiscoveryService({ rawDir, fetchImpl, adsToken: '' });
-  const search = await service.search('How do pulsars keep time?', { limit: 5 });
+  const search = await service.search('How do pulsars keep time?', { limit: 5, filters: { refereed: 'all' } });
   assert.equal(search.query.intent, 'research-question');
   assert.equal(search.results.length, 1);
   assert.match(search.warnings.join(' '), /NASA ADS is unavailable/);
@@ -115,8 +115,55 @@ test('default search uses sciX without requesting arXiv when matches exist', asy
   const result = await service.search('pulsar');
   assert.equal(calls.length, 1);
   assert.ok(calls[0].startsWith('https://api.adsabs.harvard.edu/'));
+  const params = new URL(calls[0]).searchParams;
+  assert.match(params.get('q'), /property:refereed/);
+  assert.equal(params.get('sort'), 'score desc');
   assert.equal(result.results[0].provider, 'NASA ADS');
   assert.deepEqual(result.warnings, []);
+});
+
+test('ADS receives filters and sorting before limiting results', async () => {
+  let params;
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', fetchImpl: async url => {
+    params = new URL(String(url)).searchParams;
+    return Response.json({ response: { docs: [] } });
+  } });
+  for (const [sort, expected] of [['default', 'score desc'], ['citations', 'citation_count desc'], ['recent', 'date desc'], ['author', 'first_author asc']]) {
+    await service.search('pulsar author:"Jane Doe"', { sort, filters: { refereed: 'non-refereed', collection: 'astronomy', year: '2024', minCitations: '12' } });
+    assert.equal(params.get('sort'), expected);
+    assert.equal(params.get('rows'), '20');
+    for (const clause of ['author:"Jane Doe"', 'property:notrefereed', 'database:astronomy', 'year:2024', 'citation_count:[12 TO *]']) assert.ok(params.get('q').includes(clause));
+  }
+});
+
+test('restricted searches never silently fall back to unverified arXiv records', async () => {
+  const calls = [];
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: '', fetchImpl: async url => { calls.push(url); return new Response(ARXIV_FEED); } });
+  for (const options of [{}, { sort: 'citations', filters: { refereed: 'all' } }, { sort: 'author', filters: { refereed: 'all' } }, { filters: { refereed: 'all', minCitations: '0' } }, { filters: { refereed: 'all', collection: 'physics' } }]) {
+    const data = await service.search('pulsar', options);
+    assert.equal(data.results.length, 0);
+    assert.match(data.warnings.join(' '), /require NASA ADS metadata/);
+  }
+  assert.equal(calls.length, 0);
+});
+
+test('arXiv supports recent sorting and publication year when ADS-only filters are cleared', async () => {
+  let params;
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: '', fetchImpl: async url => {
+    params = new URL(String(url)).searchParams;
+    return new Response(ARXIV_FEED);
+  } });
+  const data = await service.search('pulsar', { sort: 'recent', filters: { refereed: 'all', year: '2024' } });
+  assert.equal(data.results.length, 1);
+  assert.equal(params.get('sortBy'), 'submittedDate');
+  assert.match(params.get('search_query'), /submittedDate:\[202401010000 TO 202412312359\]/);
+});
+
+test('invalid search controls are rejected before contacting a provider', async () => {
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', fetchImpl: async () => { assert.fail('Unexpected provider call'); } });
+  for (const options of [{ sort: '__proto__' }, { filters: { refereed: 'unknown' } }, { filters: { collection: 'astronomy OR *' } }, { filters: { year: '2024 OR *' } }, { filters: { minCitations: '-1' } }, { filters: { minCitations: '1.5' } }]) {
+    await assert.rejects(service.search('pulsar', options));
+  }
 });
 
 for (const outcome of ['empty', 'error', 'invalid response']) {
@@ -131,7 +178,7 @@ for (const outcome of ['empty', 'error', 'invalid response']) {
       }
       return new Response(ARXIV_FEED);
     } });
-    const result = await service.search('pulsar');
+    const result = await service.search('pulsar', { filters: { refereed: 'all' } });
     assert.equal(calls.length, 2);
     assert.ok(calls[0].startsWith('https://api.adsabs.harvard.edu/'));
     assert.ok(calls[1].startsWith('https://export.arxiv.org/'));
@@ -147,7 +194,7 @@ for (const provider of ['arxiv', 'scix', 'ads', 'nasa-ads']) {
       calls.push(String(url));
       return provider === 'arxiv' ? new Response(ARXIV_FEED) : Response.json({ response: { docs: [] } });
     } });
-    await service.search(`pulsar source:${provider}`);
+    await service.search(`pulsar source:${provider}`, { filters: { refereed: 'all' } });
     assert.equal(calls.length, 1);
     assert.ok(calls[0].startsWith(provider === 'arxiv' ? 'https://export.arxiv.org/' : 'https://api.adsabs.harvard.edu/'));
   });
