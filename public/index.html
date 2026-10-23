@@ -319,12 +319,25 @@
             <header class="saved-sources-header">
               <div><h3>references.bib</h3></div>
               <div class="references-actions">
+                <div class="references-view-switch" role="group" aria-label="References view">
+                  <button class="btn" id="references-library-toggle" type="button" aria-pressed="true">Library</button>
+                  <button class="btn" id="references-source-toggle" type="button" aria-pressed="false">BibTeX</button>
+                </div>
                 <button class="btn" id="references-reload" type="button">Reload file</button>
                 <button class="btn" id="references-save" type="button" disabled>Save changes</button>
               </div>
             </header>
             <p id="references-status" role="status" aria-live="polite"></p>
-            <textarea id="references-editor" spellcheck="false" autocomplete="off" aria-label="References editor" aria-describedby="references-status" disabled></textarea>
+            <div id="references-library">
+              <div class="references-tools">
+                <input id="references-search" type="search" placeholder="Search titles, authors, keywords…" aria-label="Search references"/>
+                <select id="references-type" aria-label="Filter by reference type"><option value="">All types</option></select>
+                <span id="references-count" role="status" aria-live="polite"></span>
+              </div>
+              <p id="references-warning" role="status" hidden></p>
+              <div id="references-cards"></div>
+            </div>
+            <textarea id="references-editor" spellcheck="false" autocomplete="off" aria-label="References editor" aria-describedby="references-status" disabled hidden></textarea>
           </section>
         </div>
       </div>
@@ -607,6 +620,7 @@
 <script src="/workspaces.js"></script>
 <dialog id="notebook-dialog" aria-labelledby="notebook-dialog-title"><form id="notebook-dialog-form"><header><h2 id="notebook-dialog-title"></h2><button class="btn" id="notebook-dialog-close" type="button">Close</button></header><div id="notebook-dialog-body"></div><p id="notebook-dialog-error" role="alert"></p><button class="btn" id="notebook-dialog-submit" type="submit">Save</button></form></dialog>
 <script src="/notebooks.js"></script>
+<script src="/bibtex.js"></script>
 <script src="/references.js"></script>
 <script src="/app.js"></script>
 </body>

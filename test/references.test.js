@@ -79,13 +79,14 @@ test('batch imports save full citation metadata before the next download can exp
 function editorClient() {
   const nodes = new Map();
   const node = id => {
-    if (!nodes.has(id)) nodes.set(id, { value: '', textContent: '', disabled: false, handlers: {}, addEventListener(type, handler) { this.handlers[type] = handler; } });
+    if (!nodes.has(id)) nodes.set(id, { value: '', textContent: '', innerHTML: '', disabled: false, handlers: {}, setAttribute(name, value) { this[name] = value; }, addEventListener(type, handler) { this.handlers[type] = handler; } });
     return nodes.get(id);
   };
   let data = { content: '@misc{old, title={Original}}', revision: '1' };
   let fail = false;
   const requests = [];
   const context = {
+    BibTeX: require('../public/bibtex'), URL,
     document: { getElementById: node },
     window: { addEventListener() {}, confirm: () => false },
     readJsonResponse: async response => response,
@@ -124,4 +125,41 @@ test('editor keeps changes available after save conflicts', async () => {
   assert.equal(c.node('references-editor').disabled, false);
   assert.equal(c.node('references-save').disabled, false);
   assert.match(c.node('references-status').textContent, /Copy edits/);
+});
+
+test('library groups and filters papers and previews unsaved edits without rewriting BibTeX', async () => {
+  const c = editorClient(); await c.context.window.ReferencesEditor.open();
+  const source = '@article{new, title={A {Pulsar} study}, author={A and B and C and D}, year={2024}, keywords={timing; gravity}, doi={10.1/example}, url={javascript:alert(1)}, custom={keep me}}\n@misc{old, title={Undated source}}';
+  c.node('references-source-toggle').handlers.click();
+  assert.equal(c.node('references-editor').hidden, false);
+  c.node('references-editor').value = source;
+  c.node('references-editor').handlers.input();
+  c.node('references-library-toggle').handlers.click();
+  const markup = c.node('references-cards').innerHTML;
+  assert.match(markup, /A Pulsar study/);
+  assert.match(markup, /\+1 authors/);
+  assert.ok(markup.indexOf('2024') < markup.indexOf('Undated'));
+  assert.match(markup, /gravity/);
+  assert.match(markup, /keep me/);
+  assert.match(markup, /https:\/\/doi.org\/10.1\/example/);
+  assert.doesNotMatch(markup, /href="javascript:/);
+  assert.equal(c.node('references-editor').value, source);
+  assert.equal(c.node('references-save').disabled, false);
+  c.node('references-search').value = 'gravity';
+  c.node('references-search').handlers.input();
+  assert.equal(c.node('references-count').textContent, '1 of 2 references');
+  assert.doesNotMatch(c.node('references-cards').innerHTML, /Undated source/);
+  c.node('references-type').value = 'misc';
+  c.node('references-type').handlers.change();
+  assert.match(c.node('references-cards').innerHTML, /No matching references/);
+});
+
+test('library escapes imported metadata and warns about incomplete drafts', async () => {
+  const c = editorClient(); await c.context.window.ReferencesEditor.open();
+  c.node('references-editor').value = '@misc{x, title={<img src=x onerror=alert(1)>}, note={A & B}}\n@article{unfinished, title={';
+  c.node('references-library-toggle').handlers.click();
+  assert.match(c.node('references-cards').innerHTML, /&lt;img/);
+  assert.doesNotMatch(c.node('references-cards').innerHTML, /<img/);
+  assert.equal(c.node('references-warning').hidden, false);
+  assert.match(c.node('references-warning').textContent, /source is preserved/);
 });
