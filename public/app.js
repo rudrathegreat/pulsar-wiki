@@ -1171,6 +1171,9 @@ async function loadSourceKeywords(results, isCurrent) {
 function resultPaperMarkup(paper, keywordPrefix = 'source-keywords') {
   const selected = state.selectedSourceIds.has(paper.id);
   const unavailable = !paper.canImport;
+  const citations = Number.isInteger(paper.citationCount) && paper.citationCount >= 0
+    ? `${paper.citationCount.toLocaleString()} citation${paper.citationCount === 1 ? '' : 's'}`
+    : 'Citations unavailable';
   const identifier = paper.doi || paper.arxivId || paper.bibcode;
   const identifierLabel = paper.doi ? `DOI: ${paper.doi}` : paper.arxivId ? `arXiv: ${paper.arxivId}` : paper.bibcode ? `ADS: ${paper.bibcode}` : 'Identifier unavailable';
   const identifierUrl = paper.doi ? `https://doi.org/${encodeURIComponent(paper.doi)}` : paper.recordUrl;
@@ -1188,6 +1191,7 @@ function resultPaperMarkup(paper, keywordPrefix = 'source-keywords') {
         </header>
         <h4>${escHtml(paper.title)}</h4>
         <p class="source-result-authors">${escHtml(authorSummary(paper.authors))}</p>
+        <p class="source-result-citations">${escHtml(citations)}</p>
         <div class="source-result-tags" id="${keywordPrefix}-${escHtml(paper.id)}" aria-label="AI keywords from abstract" aria-live="polite">
           ${sourceKeywordMarkup(paper)}
         </div>

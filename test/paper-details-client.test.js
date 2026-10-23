@@ -25,6 +25,14 @@ function client(getRelatedSources = async () => ({ groups: [] })) {
   context.setSourceView = () => {};
   return { context, element };
 }
+test('paper cards show citation counts and distinguish missing counts from zero', () => {
+  const c = client();
+  for (const [citationCount, expected] of [[8, '8 citations'], [1, '1 citation'], [0, '0 citations'], [null, 'Citations unavailable'], [undefined, 'Citations unavailable']]) {
+    const markup = c.context.resultPaperMarkup({ ...paper, citationCount });
+    assert.ok(markup.includes(`<p class="source-result-citations">${expected}</p>`));
+  }
+});
+
 test('direct import uses only the open paper and preserves other selections', async () => {
   const c = client();
   c.context.state.selectedSourceIds.add('other');
