@@ -403,6 +403,12 @@ body {
   padding: 8px 0;
 }
 
+.sidebar-reference {
+  flex-shrink: 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-sub);
+}
+
 .nav-section {
   margin-bottom: 4px;
 }

@@ -162,3 +162,5 @@ All major updates to the wiki are recorded here.
 
 | 2026-10-23 | AI bibliography recovery / application | Added direct PDF attachment and supported text-document extraction through the connected AI before creating fallback bibliography entries. Imports and References recover missing fields, preserve partial results and concurrent manual edits, and retry unsuccessful placeholders. Added extraction, validation, fallback and bibliography preservation regression checks; updated the wiki index. |
 - 2026-10-23: Published the researcher-reviewed Project Handover guide and updated the wiki index.
+
+| 2026-10-24 | Bibliography sidebar shortcuts / public | Added persistent references.bib shortcuts to the Wiki and Sources sidebars, opening the current workspace's existing References preview and BibTeX editor. Updated the wiki index. |

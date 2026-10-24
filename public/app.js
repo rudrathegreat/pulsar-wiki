@@ -758,6 +758,13 @@ $('source-sidebar-add').addEventListener('click', () => {
   setSourceView('add');
 });
 
+for (const id of ['wiki-sidebar-references', 'source-sidebar-references']) {
+  $(id).addEventListener('click', () => {
+    showPanel('files');
+    setSourceView('references');
+  });
+}
+
 async function loadFiles() {
   let files;
   try {

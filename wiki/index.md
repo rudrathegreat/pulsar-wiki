@@ -12,6 +12,8 @@ Settings: add, replace or remove a NASA ADS API token for literature searches. T
 
 After updating the application, restart its server and refresh the browser to load new settings endpoints. NASA ADS settings show a restart instruction if the running server does not support token saving.
 
+Bibliography access: both the Wiki and Sources sidebars include a persistent `references.bib` shortcut below their file lists. Select it to open the current workspace's References preview and BibTeX editor.
+
 Bibliography recovery: when source metadata is incomplete, uploads, paper imports and opening References ask the connected AI to extract bibliographic fields from the original PDF (or supported text document). Available fields are saved even when extraction is partial, without overwriting existing metadata, citation keys or comments. The completion note remains only if extraction fails or returns no usable fields. Opening References retries earlier failures; successful extraction is reused during the server session. Sources in `raw/` stay unchanged.
 
 AI-assisted reading workspace: white surfaces with borderless light grey (`#eee`) highlight cards in light mode; `#1c1c1c` surfaces with `#222` inputs and highlight cards in dark mode, with a transparent page number input and borderless sidebar inputs and Find in paper search bar. The filename, file details, back and download header is removed; the reading toolbar remains above the document. The toolbar omits the Record lag button.
