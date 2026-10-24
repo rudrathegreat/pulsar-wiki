@@ -31,6 +31,11 @@
     try { const url = new URL(BibTeX.text(value)); return ['https:', 'http:'].includes(url.protocol) ? url.href : ''; }
     catch { return ''; }
   }
+  function sourceFilename(value) {
+    const path = BibTeX.text(value).trim().replace(/\\/g, '/').replace(/^\.\//, '');
+    const name = path.replace(/^raw\//, '');
+    return name && !/[/:\x00-\x1f]/.test(name) && name !== '.' && name !== '..' ? name : '';
+  }
   function entryTree(entry) {
     const path = String(parsed.entries.indexOf(entry));
     const fields = Object.entries(entry.fields).map(([key, value]) => {
@@ -42,6 +47,10 @@
       if (key === 'keywords' || key === 'keyword') {
         const keywords = BibTeX.text(value).split(/[,;]/).map(s => s.trim()).filter(Boolean);
         return `<div class="reference-field"><dt>${esc(key)}</dt><dd class="reference-keywords">${keywords.map(keyword => tag(keyword)).join('')}</dd></div>`;
+      }
+      if (key === 'file') {
+        const name = sourceFilename(value);
+        if (name) return `<div class="reference-field"><dt>file</dt><dd><a href="#file/${encodeURIComponent(name)}" data-reference-file="${esc(name)}">${readable(value)}</a></dd></div>`;
       }
       let url = '';
       if (key === 'url') url = safeUrl(value);
@@ -83,6 +92,14 @@
   sourceToggle.addEventListener('click', () => setView(true));
   search.addEventListener('input', renderPreview);
   typeFilter.addEventListener('change', renderPreview);
+  tree.addEventListener('click', event => {
+    const link = event.target.closest('[data-reference-file]');
+    if (!link || event.button > 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    const name = link.dataset.referenceFile;
+    const ext = name.includes('.') ? name.split('.').pop() : '';
+    void window.openRawFile(name, ext);
+  });
   tree.addEventListener('toggle', event => {
     if (event.target.isConnected === false) return;
     const path = event.target.dataset?.path;

@@ -166,3 +166,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-24 | Bibliography sidebar shortcuts / public | Added persistent references.bib shortcuts to the Wiki and Sources sidebars, opening the current workspace's existing References preview and BibTeX editor. Updated the wiki index. |
 
 | 2026-10-24 | Compact bibliography preview / public | Arranged reference properties in responsive horizontal columns and author/editor names in wrapping horizontal lists. Kept titles and longer notes full width, preserved field order and collapse controls, and updated the wiki index. Verified all 12 bibliography parser and reference tests. |
+
+| 2026-10-24 | Reference source links / public | Linked file fields in the References preview to the workspace document reader, including PDF reading tools. Preserved modified clicks and escaped filenames, left unsupported paths as text, and added navigation regression coverage. Updated the wiki index. |

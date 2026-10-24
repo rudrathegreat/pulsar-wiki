@@ -169,6 +169,29 @@ test('preview escapes imported metadata and warns about incomplete drafts', asyn
   assert.match(c.node('references-warning').textContent, /source is preserved/);
 });
 
+test('file fields open workspace sources in the document reader and preserve modified clicks', async () => {
+  const c = editorClient(); await c.context.window.ReferencesEditor.open();
+  const name = 'Timing & "results" #1.PDF';
+  c.node('references-editor').value = `@article{paper, file={raw/${name}}}\n@misc{notes, file={raw/notes.txt}}\n@misc{unsafe, file={../outside.pdf}}\n@misc{external, file={javascript:alert(1)}}`;
+  c.node('references-preview-toggle').handlers.click();
+  const tree = c.node('references-tree');
+  assert.ok(tree.innerHTML.includes(`href="#file/${encodeURIComponent(name)}"`));
+  assert.match(tree.innerHTML, /data-reference-file="Timing &amp; &quot;results&quot; #1.PDF"/);
+  assert.match(tree.innerHTML, /href="#file\/notes.txt"/);
+  assert.equal((tree.innerHTML.match(/data-reference-file=/g) || []).length, 2);
+  const opened = [];
+  c.context.window.openRawFile = (...args) => opened.push(args);
+  let prevented = false;
+  const event = { target: { closest: () => ({ dataset: { referenceFile: name } }) }, button: 0, preventDefault() { prevented = true; } };
+  tree.handlers.click(event);
+  assert.equal(prevented, true);
+  assert.deepEqual(opened, [[name, 'PDF']]);
+  prevented = false;
+  tree.handlers.click({ ...event, ctrlKey: true });
+  assert.equal(prevented, false);
+  assert.equal(opened.length, 1);
+});
+
 test('entry and author branches fold independently and keep their state through filtering', async () => {
   const c = editorClient(); await c.context.window.ReferencesEditor.open();
   c.node('references-editor').value = '@article{paper, title={Pulsars}, author={First and Second}}';
