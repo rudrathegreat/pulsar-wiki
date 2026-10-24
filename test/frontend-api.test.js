@@ -152,12 +152,9 @@ test('wiki page names produce canonical direct routes and legacy names normalize
 
 test('a plain app launch opens the wiki index after explicit routes are considered', () => {
   const bootstrap = appSource.slice(appSource.indexOf('(async function init()'));
-  const directRoute = bootstrap.indexOf('handleWikiRoute({ migrateLegacyHash: true })');
-  const fileRoute = bootstrap.indexOf("hash.startsWith('#file/')");
+  const explicitRoute = bootstrap.indexOf('await handleAppRoute()');
   const defaultRoute = bootstrap.indexOf("openPage('index', { historyMode: 'replace' })");
-  assert.ok(directRoute !== -1 && directRoute < defaultRoute);
-  assert.ok(fileRoute !== -1 && fileRoute < defaultRoute);
-  assert.match(bootstrap, /if \(!routedToWiki\) await openPage\('index', \{ historyMode: 'replace' \}\)/);
+  assert.ok(explicitRoute !== -1 && explicitRoute < defaultRoute);
 });
 
 test('emoji sanitizer removes emojis from plain text and Markdown before rendering', () => {

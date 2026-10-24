@@ -62,7 +62,7 @@
     } catch (error) { failStartup(error.message); }
   }
   async function open(id, options = {}) {
-    showPanel('notebooks'); await show();
+    showPanel('notebooks', { historyMode: 'none' }); await show();
     n.selected = id; n.historical = options.revision ? { revision: Number(options.revision), cellId: options.cellId } : null;
     const book = entry(); if (!book) throw new Error('This notebook is not in the active workspace.');
 
@@ -221,6 +221,5 @@
   $('notebook-python-save').addEventListener('click', guard(async () => { message('Checking Python…'); await request('/runtime/python', 'PUT', { python: $('notebook-python').value }); await refresh(); message(n.data.runtime.environment?.ready ? 'Python environment is ready.' : 'Install the missing packages in this Python environment.'); }));
   $('notebook-tray-close').addEventListener('click', () => { n.tray = ''; $('notebook-tray').hidden = true; }); $('notebook-dialog-close').addEventListener('click', () => $('notebook-dialog').close());
   document.addEventListener('click', guard(async event => { const link = event.target.closest('a[href^="/#notebook/"]'); if (link && event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey) { event.preventDefault(); await route(new URL(link.href).hash); history.pushState(null, '', link.getAttribute('href')); } }));
-  window.addEventListener('popstate', guard(() => route())); window.addEventListener('hashchange', guard(() => route()));
   window.ResearchNotebooks = { show, open: guard(open), route, transfer: guard(transferDialog), prepareToLeave, theme: theme => { if (n.ready) void guard(() => bridge('theme', { theme }))(); } };
 })();

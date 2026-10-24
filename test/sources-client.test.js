@@ -33,7 +33,9 @@ function client() {
     document: { getElementById: element, querySelectorAll() { return []; }, body: { classList: { toggle() {} } } },
     api: { async getRawList() { if (failure) throw failure; return files; } },
     window: { ActiveReading: { close() {}, closeHelper() {}, async open(pdf, name, session) { opened.push({ pdf, name, session }); } } },
-    history: { replaceState(_state, _title, url) { context.hash = url; } },
+    location: { pathname: '/', search: '', hash: '' },
+    wikiPath: name => `/wiki/${name}`,
+    history: { pushState(_state, _title, url) { context.hash = url; Object.assign(context.location, { pathname: new URL(url, 'http://localhost').pathname, hash: new URL(url, 'http://localhost').hash }); } },
     workspaceUrl: url => `${url}?workspace=test-project`,
     stripEmoji: value => String(value),
     escHtml: value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
@@ -81,7 +83,7 @@ test('clicking a sidebar PDF opens the AI-assisted reader and keeps the source l
   assert.equal(c.element('sidebar').classList.contains('sources-mode'), true);
   assert.equal(c.opened.length, 1);
   assert.equal(c.opened[0].name, 'timing.pdf');
-  assert.equal(c.context.hash, '#file/timing.pdf');
+  assert.equal(c.context.hash, '/#file/timing.pdf');
   assert.match(c.element('source-sidebar-list').innerHTML, /data-source-file="timing.pdf"[^>]*aria-current="true"/);
   assert.match(c.state.currentDocument.url, /workspace=test-project/);
   c.element('source-sidebar-add').handlers.click();

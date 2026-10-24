@@ -313,7 +313,23 @@ const dom = {
   get pdfToolbar() { return $('pdf-toolbar'); },
 };
 
-function showPanel(name) {
+let lastHistoryRoute = null;
+
+function updateAppHistory(target, mode = 'push') {
+  if (mode === 'none' || location.pathname + location.search + location.hash === target) return;
+  history[mode === 'replace' ? 'replaceState' : 'pushState'](null, '', target);
+  lastHistoryRoute = null;
+}
+
+function panelUrl(name) {
+  if (name === 'wiki') return wikiPath(state.currentPage || 'index');
+  if (name === 'files') return `/#sources/${state.sourceView}`;
+  return `/#${name}`;
+}
+
+function showPanel(name, { historyMode = 'push' } = {}) {
+  // Documents and individual notebooks manage their more specific URLs themselves.
+  if (name !== 'document') updateAppHistory(panelUrl(name), historyMode);
   if (name !== state.panel) window.ActiveReading?.closeHelper();
   state.panel = name;
   document.body.classList.toggle('notebook-mode', name === 'notebooks');
@@ -389,17 +405,14 @@ dom.sidebarBody.addEventListener('click', event => {
 });
 
 function updateWikiHistory(page, mode) {
-  if (mode === 'none') return;
-  const target = wikiPath(page);
-  if (location.pathname === target && !location.hash) return;
-  history[mode === 'replace' ? 'replaceState' : 'pushState'](null, '', target);
+  updateAppHistory(wikiPath(page), mode);
 }
 
 async function openPage(name, { historyMode = 'push' } = {}) {
   const page = normalizeWikiPageName(name);
   if (!page) return;
   updateWikiHistory(page, historyMode);
-  showPanel('wiki');
+  showPanel('wiki', { historyMode: 'none' });
   highlightSidebarItem(page);
   state.currentPage = page;
   dom.wikiBc.innerHTML = `<button class="breadcrumb-link" type="button" data-action="show-wiki">Wiki</button><span>/</span><span>${escHtml(page)}</span>`;
@@ -754,14 +767,14 @@ $('source-sidebar-list').addEventListener('click', event => {
 });
 
 $('source-sidebar-add').addEventListener('click', () => {
-  showPanel('files');
   setSourceView('add');
+  showPanel('files');
 });
 
 for (const id of ['wiki-sidebar-references', 'source-sidebar-references']) {
   $(id).addEventListener('click', () => {
-    showPanel('files');
     setSourceView('references');
+    showPanel('files');
   });
 }
 
@@ -1117,8 +1130,9 @@ const SOURCE_FILTERS = [
   { key: 'bibcode', label: 'ADS bibcode', example: 'bibcode:2024ApJ...' },
 ];
 
-function setSourceView(name) {
+function setSourceView(name, { historyMode = 'push' } = {}) {
   state.sourceView = ['add', 'upload', 'saved', 'references'].includes(name) ? name : 'add';
+  if (state.panel === 'files') updateAppHistory(panelUrl('files'), historyMode);
   document.querySelectorAll('[data-source-view]').forEach(button => {
     const active = button.dataset.sourceView === state.sourceView;
     button.classList.toggle('active', active);
@@ -1519,7 +1533,7 @@ async function openRawFile(name, ext, file = {}, updateHash = true) {
   if (state.pdf.renderTask) state.pdf.renderTask.cancel();
 
   showPanel('document');
-  if (updateHash) history.replaceState(null, '', `#file/${encodeURIComponent(name)}`);
+  if (updateHash) updateAppHistory(`/#file/${encodeURIComponent(name)}`);
   dom.pdfToolbar.hidden = normalizedExt !== 'pdf';
   setDocumentStatus(`Opening ${normalizedExt ? normalizedExt.toUpperCase() : 'document'}...`);
 
@@ -1761,8 +1775,8 @@ function applyTheme(t) {
 }
 
 // ── Sidebar panel tabs ─────────────────────────────────────────────
-document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => showPanel(b.dataset.panel)));
-document.querySelectorAll('.icon-btn[data-panel]').forEach(b => b.addEventListener('click', () => showPanel(b.dataset.panel)));
+document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => b.dataset.panel === 'wiki' ? openPage(state.currentPage || 'index') : showPanel(b.dataset.panel)));
+document.querySelectorAll('.icon-btn[data-panel]').forEach(b => b.addEventListener('click', () => b.dataset.panel === 'wiki' ? openPage(state.currentPage || 'index') : showPanel(b.dataset.panel)));
 
 // ── Wiki refresh ───────────────────────────────────────────────────
 async function refreshWiki() {
@@ -1784,6 +1798,8 @@ window.openPage = openPage;
 window.openRawFile = openRawFile;
 
 function handleWikiRoute({ migrateLegacyHash = false } = {}) {
+  // Older document/source links can have a wiki pathname: the explicit hash wins.
+  if (/^#(?:sources|files|chat|graph|handover|notebooks|notebook|file|reading)(?:[/?]|$)/.test(location.hash)) return false;
   let page = wikiPageFromPath(location.pathname);
   if (page && location.pathname !== wikiPath(page)) history.replaceState(null, '', wikiPath(page));
   if (!page && location.hash.startsWith('#wiki/')) {
@@ -1795,15 +1811,51 @@ function handleWikiRoute({ migrateLegacyHash = false } = {}) {
   return true;
 }
 
-window.addEventListener('popstate', () => {
-  if (/^#notebook\/[a-f0-9-]{36}(?:\?|$)/.test(location.hash)) return;
-  if (!handleWikiRoute()) {
-    state.currentPage = null;
-    highlightSidebarItem(null);
-    showPanel('wiki');
+async function handleAppRoute() {
+  const hash = location.hash;
+  if (handleWikiRoute({ migrateLegacyHash: true })) return true;
+  const sources = /^#sources(?:\/(add|upload|saved|references))?$/.exec(hash);
+  if (sources || hash === '#files') {
+    setSourceView(sources?.[1] || 'add', { historyMode: 'none' });
+    showPanel('files', { historyMode: 'none' });
+    return true;
   }
-});
-window.addEventListener('hashchange', () => { handleWikiRoute({ migrateLegacyHash: true }); });
+  if (['#chat', '#graph', '#handover', '#notebooks'].includes(hash)) {
+    showPanel(hash.slice(1), { historyMode: 'none' });
+    return true;
+  }
+  if (await window.ResearchNotebooks?.route(hash)) return true;
+  if (await window.ActiveReading?.route(hash)) return true;
+  if (hash.startsWith('#file/')) {
+    const routeUrl = location.pathname + location.search + location.hash;
+    let name;
+    try { name = decodeURIComponent(hash.slice(6).split('?')[0]); } catch { return false; }
+    const files = await api.getRawList();
+    if (routeUrl !== location.pathname + location.search + location.hash) return true;
+    const file = files.find(item => item.name === name);
+    if (file) {
+      await openRawFile(file.name, file.ext, file, false);
+      return true;
+    }
+  }
+  return false;
+}
+
+// Browsers can emit both events for a single history traversal.
+async function restoreAppRoute(event) {
+  const url = location.pathname + location.search + location.hash;
+  if (event?.type === 'hashchange' && url === lastHistoryRoute) return;
+  lastHistoryRoute = url;
+  try {
+    if (!await handleAppRoute()) await openPage('index', { historyMode: 'replace' });
+  } catch (error) {
+    const status = $('workspace-status');
+    status.textContent = `Could not open this view: ${stripEmoji(error.message)}`;
+    status.hidden = false;
+  }
+}
+window.addEventListener('popstate', restoreAppRoute);
+window.addEventListener('hashchange', restoreAppRoute);
 
 // ── ChatGPT subscription chat ─────────────────────────────────────
 // OAuth credentials stay on the server; this client receives sanitized state.
@@ -2338,25 +2390,7 @@ dom.chatAbort.addEventListener('click', () => {
 
     const pages = await api.getWikiList();
     buildSidebar(pages);
-    const routedToWiki = handleWikiRoute({ migrateLegacyHash: true });
-    const hash = location.hash;
-    if (!routedToWiki && await window.ResearchNotebooks?.route(hash)) return;
-    if (!routedToWiki && await window.ActiveReading?.route(hash)) return;
-    if (!routedToWiki && ['#sources', '#sources/saved', '#sources/references'].includes(hash)) {
-      showPanel('files');
-      setSourceView(hash.endsWith('/references') ? 'references' : hash.endsWith('/saved') ? 'saved' : 'add');
-      return;
-    }
-    if (!routedToWiki && hash.startsWith('#file/')) {
-      const name = decodeURIComponent(hash.slice(6).split('?')[0]);
-      const files = await api.getRawList();
-      const file = files.find(item => item.name === name);
-      if (file) {
-        await openRawFile(file.name, file.ext, file, false);
-        return;
-      }
-    }
-    if (!routedToWiki) await openPage('index', { historyMode: 'replace' });
+    if (!await handleAppRoute()) await openPage('index', { historyMode: 'replace' });
   } catch (error) {
     const status = $('workspace-status');
     status.textContent = `Could not finish opening project: ${stripEmoji(error.message)}`;

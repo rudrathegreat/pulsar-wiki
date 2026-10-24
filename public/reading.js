@@ -640,10 +640,10 @@
   }
   async function route(hashValue = location.hash) {
     try { return await routeToPassage(hashValue); }
-    catch (error) { showPanel('files'); notify(error.message, true); return true; }
+    catch (error) { showPanel('files', { historyMode: 'none' }); notify(error.message, true); return true; }
   }
   async function routeToPassage(hashValue) {
-    if (hashValue === '#reading') { showPanel('files'); history.replaceState(null, '', '/#files'); return true; }
+    if (hashValue === '#reading') { showPanel('files', { historyMode: 'none' }); history.replaceState(null, '', '/#files'); return true; }
     const match = /^#reading\/([a-zA-Z0-9-]+)\/([a-zA-Z0-9-]*)(?:\?.*)?$/.exec(hashValue);
     if (match) {
       if (match[2]) { const revision = new URLSearchParams(hashValue.split('?')[1]).get('revision'); await openHighlight(match[2], { documentId: match[1], ...(revision ? { revision } : {}) }); }
@@ -994,8 +994,6 @@
       const hashValue = new URL(link.href).hash; history.pushState(null, '', `/${hashValue}`); await route(hashValue);
     }
   }));
-  window.addEventListener('popstate', guard(() => route()));
-  window.addEventListener('hashchange', guard(() => route()));
   window.addEventListener('resize', positionHelper);
   if (typeof ResizeObserver !== 'undefined') {
     const helperObserver = new ResizeObserver(positionHelper);

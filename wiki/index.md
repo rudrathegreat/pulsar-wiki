@@ -2,6 +2,8 @@
 
 Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pulsar science, observational tools, and relativistic physics.
 
+Application navigation: each main tab and Sources subtab has its own URL, including `/#sources/references`, `/#sources/upload`, `/#chat`, `/#graph`, `/#notebooks`, and `/#handover`. Reload restores the selected tab; browser Back and Forward restore earlier views. Existing wiki page, document, reading passage and notebook links remain supported.
+
 Application branding: the PulsarWiki logo appears at the top of the iconbar and adapts to dark and light themes.
 
 Source authors: search results, paper details, related papers, and the References preview link author names to ORCID profiles when a valid ID is supplied by the paper metadata or found through an ADS or Crossref lookup. Missing or ambiguous matches remain plain text; imported IDs are retained in positional BibTeX `orcid` lists.

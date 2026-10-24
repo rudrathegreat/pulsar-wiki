@@ -108,7 +108,7 @@ test('project loading lasts through initial data and clears on success or failur
       refreshChatGPTStatus: async () => {}, refreshThreads: async () => {},
       api: { getWikiList: () => pages },
       buildSidebar() { if (fail) throw new Error('Could not load pages.'); },
-      handleWikiRoute: () => false,
+      handleAppRoute: async () => false,
       openPage: async () => {
         assert.equal(c.document.body.classList.contains('workspace-loading'), true);
       },
