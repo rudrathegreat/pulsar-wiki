@@ -170,3 +170,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-24 | Reference source links / public | Linked file fields in the References preview to the workspace document reader, including PDF reading tools. Preserved modified clicks and escaped filenames, left unsupported paths as text, and added navigation regression coverage. Updated the wiki index. |
 
 | 2026-10-24 | References preview property rows / public | Placed each reference property on its own full-width row while preserving horizontal, wrapping author and editor lists. Updated the wiki index. |
+
+| 2026-10-24 | Sources abstract equations / public | Applied the existing KaTeX renderer whenever paper details open, preserving escaped abstract text and supporting inline and display LaTeX delimiters. Added scrolling for wide display equations and navigation regression coverage; updated the wiki index. |

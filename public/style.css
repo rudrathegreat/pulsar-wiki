@@ -770,7 +770,8 @@ body {
   padding: 0;
 }
 
-.md-body .katex-display {
+.md-body .katex-display,
+.source-paper-abstract .katex-display {
   max-width: 100%;
   margin: 20px 0;
   padding: 4px 0;
@@ -778,7 +779,8 @@ body {
   overflow-y: hidden;
 }
 
-.md-body .katex {
+.md-body .katex,
+.source-paper-abstract .katex {
   color: inherit;
   font-size: 1.05em;
 }
@@ -3132,6 +3134,7 @@ button:disabled {
 .source-paper-abstract, .source-paper-keywords { margin: 30px 0; }
 .source-paper-page h3 { color: var(--text-1); font-size: 18px; font-weight: 400; }
 .source-paper-abstract p { margin-top: 14px; color: var(--text-2); font-size: 14px; line-height: 1.8; white-space: pre-line; }
+.source-paper-abstract .katex { white-space: normal; }
 .source-paper-group { margin-top: 40px; padding-top: 26px; border-top: 1px solid var(--border); }
 .source-paper-page .source-related-empty { margin-top: 16px; }
 /* Workspace bibliography */

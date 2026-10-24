@@ -18,6 +18,7 @@ function client(getRelatedSources = async () => ({ groups: [] })) {
     dom: { sourceResultsSection: element('results-section'), sourceResults: element('results'), sourceSelectedCount: element('count'), sourceImportSelected: element('import') },
   };
   vm.createContext(context);
+  vm.runInContext(app.slice(app.indexOf('function typesetMath('), app.indexOf('function wikiLinkForInAppNavigation(')), context);
   vm.runInContext(app.slice(app.indexOf('function formatPaperDate('), app.indexOf('async function runSourceSearch(')), context);
   vm.runInContext(app.slice(app.indexOf('async function importSelectedSources('), app.indexOf('function monitorSourceJob(')), context);
   context.dom.sourceJobStatus = element('job-status');
@@ -25,6 +26,26 @@ function client(getRelatedSources = async () => ({ groups: [] })) {
   context.setSourceView = () => {};
   return { context, element };
 }
+test('paper abstracts typeset math on every navigation and keep HTML escaped', async () => {
+  const c = client();
+  const calls = [];
+  c.context.renderMathInElement = (root, options) => calls.push({ root, options, markup: c.element('source-paper-metadata').innerHTML });
+  const abstract = String.raw`A <script>alert(1)</script> & $M_\odot$; \(x_1^2\); $$\frac{a}{b}$$; \[\Delta t\].`;
+  c.context.state.sourcePapers.set('math', { ...paper, id: 'math', abstract });
+  await c.context.showSourceDetail('math');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].root, c.element('source-paper-abstract'));
+  assert.ok(calls[0].markup.includes(c.context.escHtml(abstract)));
+  assert.doesNotMatch(calls[0].markup, /<script>/);
+  assert.deepEqual(Array.from(calls[0].options.delimiters, d => [d.left, d.right, d.display]), [
+    ['$$', '$$', true], ['\\[', '\\]', true], ['\\(', '\\)', false], ['$', '$', false],
+  ]);
+  assert.equal(calls[0].options.throwOnError, false);
+  await c.context.showSourceDetail('one');
+  assert.equal(calls.length, 2);
+  assert.match(calls[1].markup, /Timing &amp; noise/);
+});
+
 test('paper cards show citation counts and distinguish missing counts from zero', () => {
   const c = client();
   for (const [citationCount, expected] of [[8, '8 citations'], [1, '1 citation'], [0, '0 citations'], [null, 'Citations unavailable'], [undefined, 'Citations unavailable']]) {

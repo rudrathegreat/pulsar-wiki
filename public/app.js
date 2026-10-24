@@ -1271,9 +1271,10 @@ async function showSourceDetail(id, remember = true) {
       <p class="source-result-authors">${escHtml(paper.authors?.length ? paper.authors.map(stripEmoji).join(', ') : 'Authors unavailable')}</p>
       <p class="source-paper-journal"><strong>Journal</strong> ${escHtml(paper.publication || 'Journal unavailable')} &middot; ${escHtml(formatPaperDate(paper.published))}</p>
     </header>
-    <section class="source-paper-abstract"><h3>Abstract</h3><p>${escHtml(paper.abstract || 'No abstract is available for this record.')}</p></section>
+    <section class="source-paper-abstract" id="source-paper-abstract"><h3>Abstract</h3><p>${escHtml(paper.abstract || 'No abstract is available for this record.')}</p></section>
     <section class="source-paper-keywords"><h3>Keywords</h3><div class="source-result-tags" id="paper-keywords-${escHtml(id)}" aria-label="AI keywords from abstract" aria-live="polite">${sourceKeywordMarkup(paper)}</div></section>
     ${paper.recordUrl ? `<a class="source-record-link" href="${escHtml(paper.recordUrl)}" target="_blank" rel="noreferrer">Open publication record</a>` : ''}`;
+  typesetMath($('source-paper-abstract'));
   $('source-paper-title').focus({ preventScroll: true });
   $('panel-files').scrollTop = 0;
   updateSourceSelection();
