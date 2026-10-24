@@ -419,12 +419,16 @@ async function openPage(name, { historyMode = 'push' } = {}) {
   dom.wikiBody.innerHTML = '<div class="wiki-loading">Loading...</div>';
   try {
     const data = await api.getWikiPage(page);
+    if (state.currentPage !== page) return;
     dom.wikiBody.innerHTML = `<div class="md-body">${renderMd(data.content)}</div>`;
     typesetMath(dom.wikiBody);
+    const editAction = document.createElement('button');
+    editAction.type = 'button'; editAction.className = 'btn wiki-edit-action'; editAction.textContent = 'Edit';
+    editAction.addEventListener('click', () => editWikiPage(page, data.content, editAction, notebookAction));
     const notebookAction = document.createElement('button');
     notebookAction.type = 'button'; notebookAction.className = 'btn wiki-notebook-action'; notebookAction.textContent = 'Add page reference to notebook';
     notebookAction.addEventListener('click', () => window.ResearchNotebooks?.transfer({ kind: 'wiki', page }));
-    dom.wikiBc.append(notebookAction);
+    dom.wikiBc.append(editAction, notebookAction);
     window.ActiveReading?.backlinks(page, dom.wikiBody);
     dom.wikiBody.querySelectorAll('a.wiki-link').forEach(link => link.addEventListener('click', event => {
       event.preventDefault();
@@ -435,6 +439,45 @@ async function openPage(name, { historyMode = 'push' } = {}) {
     const message = error.message === 'Not found' ? `Page not found: ${page}` : error.message;
     dom.wikiBody.innerHTML = `<div class="wiki-empty"><p class="wiki-empty-copy">${escHtml(message)}</p></div>`;
   }
+}
+
+function editWikiPage(page, content, editAction, notebookAction) {
+  const renderedPage = document.createDocumentFragment();
+  renderedPage.append(...dom.wikiBody.childNodes);
+  const form = document.createElement('form');
+  form.className = 'wiki-editor';
+  form.innerHTML = `<label for="wiki-page-editor">Edit page Markdown</label>
+    <textarea id="wiki-page-editor" spellcheck="false"></textarea>
+    <div class="wiki-editor-actions"><button class="btn" type="submit">Save</button><button class="btn" type="button" data-cancel>Cancel</button></div>
+    <p role="status" aria-live="polite"></p>`;
+  const editor = form.querySelector('textarea');
+  const save = form.querySelector('[type="submit"]');
+  const cancel = form.querySelector('[data-cancel]');
+  const status = form.querySelector('[role="status"]');
+  editor.value = content;
+  editAction.disabled = true;
+  notebookAction.disabled = true;
+  cancel.addEventListener('click', () => {
+    dom.wikiBody.replaceChildren(renderedPage);
+    editAction.disabled = false;
+    notebookAction.disabled = false;
+    editAction.focus();
+  });
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (save.disabled) return;
+    save.disabled = cancel.disabled = editor.disabled = true;
+    status.textContent = 'Saving...';
+    try {
+      await api.saveWikiPage(page, editor.value);
+      if (state.currentPage === page && form.isConnected) await openPage(page, { historyMode: 'none' });
+    } catch (error) {
+      status.textContent = `Could not save page: ${error.message}`;
+      save.disabled = cancel.disabled = editor.disabled = false;
+    }
+  });
+  dom.wikiBody.append(form);
+  editor.focus();
 }
 
 dom.wikiBc.addEventListener('click', event => {
@@ -1783,7 +1826,7 @@ async function refreshWiki() {
   const pages = await api.getWikiList();
   buildSidebar(pages);
   // Refresh current page if open
-  if (state.panel === 'wiki' && state.currentPage) openPage(state.currentPage, { historyMode: 'none' });
+  if (state.panel === 'wiki' && state.currentPage && !document.getElementById('wiki-page-editor')) openPage(state.currentPage, { historyMode: 'none' });
 }
 
 // ── Utility ────────────────────────────────────────────────────────

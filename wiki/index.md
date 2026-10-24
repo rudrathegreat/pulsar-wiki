@@ -6,6 +6,8 @@ Application navigation: each main tab and Sources subtab has its own URL, includ
 
 Application branding: the PulsarWiki logo appears at the top of the iconbar and adapts to dark and light themes.
 
+Wiki editing: select Edit to the left of Add page reference to notebook on any page to edit its Markdown. Save applies the changes; Cancel restores the displayed page. Background file refreshes leave the editor open, and failed saves retain the draft.
+
 Source authors: search results, paper details, related papers, and the References preview link author names to ORCID profiles when a valid ID is supplied by the paper metadata or found through an ADS or Crossref lookup. Missing or ambiguous matches remain plain text; imported IDs are retained in positional BibTeX `orcid` lists.
 
 Application workspace guide: [Research workspaces](../README.md#research-workspaces). Choose a project folder with the system folder dialog or plain path field; a loading animation appears while the project opens and its initial data loads. The full selected path stays visible in the title bar, and each workspace keeps its own sources, pages, chats and reading notes, and the folder stays selected for the session.

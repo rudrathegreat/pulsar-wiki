@@ -644,9 +644,23 @@ body {
   min-width: 0;
 }
 
-.wiki-breadcrumb .wiki-notebook-action {
+.wiki-breadcrumb .wiki-edit-action {
   margin-left: auto;
 }
+
+.wiki-editor { display: flex; flex-direction: column; gap: 12px; }
+.wiki-editor textarea {
+  width: 100%;
+  min-height: 60vh;
+  resize: vertical;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-1);
+  font: 13px/1.6 var(--mono);
+}
+.wiki-editor-actions { display: flex; gap: 8px; }
 
 .wiki-breadcrumb .breadcrumb-link {
   border: 0 !important;
