@@ -14,7 +14,7 @@ After updating the application, restart its server and refresh the browser to lo
 
 Bibliography access: both the Wiki and Sources sidebars include a persistent `references.bib` shortcut below their file lists. Select it to open the current workspace's References preview and BibTeX editor.
 
-References preview: select a `file` field link to open that source in PulsarWiki's document reader, including the PDF reading tools for PDFs.
+References preview: papers start collapsed by default. Expand a paper to view its properties, or use Expand all. Select a `file` field link to open that source in PulsarWiki's document reader, including the PDF reading tools for PDFs.
 
 Bibliography recovery: when source metadata is incomplete, uploads, paper imports and opening References ask the connected AI to extract bibliographic fields from the original PDF (or supported text document). Available fields are saved even when extraction is partial, without overwriting existing metadata, citation keys or comments. The completion note remains only if extraction fails or returns no usable fields. Opening References retries earlier failures; successful extraction is reused during the server session. Sources in `raw/` stay unchanged.
 

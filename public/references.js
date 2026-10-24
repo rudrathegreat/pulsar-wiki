@@ -16,6 +16,7 @@
   const tag = (value, extra = '') => `<span class="reference-tag ${extra}">${esc(value)}</span>`;
   let parsed = { entries: [], warnings: [] };
   const folded = new Set();
+  const expandedEntries = new Set();
   let sourceView = false;
   let revision = null;
   let saved = '';
@@ -62,7 +63,7 @@
       const wide = ['title', 'abstract', 'note', 'annotation'].includes(key) ? ' reference-field-wide' : '';
       return `<div class="reference-field${wide}"><dt>${esc(key)}</dt><dd>${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${readable(value)}</a>` : readable(value)}</dd></div>`;
     }).join('');
-    return `<details class="reference-entry" data-path="${path}"${folded.has(path) ? '' : ' open'}><summary><span class="reference-key">${esc(entry.key)}</span>${tag(entry.type)}<span class="reference-meta">${Object.keys(entry.fields).length} properties</span></summary><dl class="reference-fields">${fields}</dl></details>`;
+    return `<details class="reference-entry" data-path="${path}"${expandedEntries.has(path) ? ' open' : ''}><summary><span class="reference-key">${esc(entry.key)}</span>${tag(entry.type)}<span class="reference-meta">${Object.keys(entry.fields).length} properties</span></summary><dl class="reference-fields">${fields}</dl></details>`;
   }
   function renderPreview() {
     const query = search.value.trim().toLocaleLowerCase();
@@ -104,12 +105,17 @@
     if (event.target.isConnected === false) return;
     const path = event.target.dataset?.path;
     if (path !== undefined) {
+      if (!path.includes('/')) {
+        if (event.target.open) expandedEntries.add(path); else expandedEntries.delete(path);
+        return;
+      }
       if (event.target.open) folded.delete(path); else folded.add(path);
     }
   }, true);
   function foldAll(collapse) {
     parsed.entries.forEach((entry, index) => {
-      for (const path of [String(index), ...Object.keys(entry.fields).map(key => `${index}/${key}`)]) {
+      if (collapse) expandedEntries.delete(String(index)); else expandedEntries.add(String(index));
+      for (const path of Object.keys(entry.fields).map(key => `${index}/${key}`)) {
         if (collapse) folded.add(path); else folded.delete(path);
       }
     });
@@ -127,6 +133,7 @@
       const data = await request();
       saved = data.content; revision = data.revision; editor.value = saved;
       folded.clear();
+      expandedEntries.clear();
       refreshPreview();
       status.textContent = '';
     } catch (error) { status.textContent = error.message; }

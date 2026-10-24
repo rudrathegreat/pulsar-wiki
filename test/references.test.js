@@ -141,7 +141,7 @@ test('preview preserves entry and property order, nested authors and unsaved Bib
   assert.match(markup, /<ol class="reference-values"><li>A<\/li><li>B<\/li><li>C<\/li><li>D<\/li><\/ol>/);
   assert.ok(markup.indexOf('2020') < markup.indexOf('2024'), 'source order survives rendering');
   assert.ok(markup.indexOf('<dt>title</dt>') < markup.indexOf('<dt>year</dt>'));
-  assert.match(markup, /class="reference-entry" data-path="1" open/);
+  assert.match(markup, /class="reference-entry" data-path="1">/);
   assert.match(markup, /<dt>custom<\/dt><dd>keep me<\/dd>/);
   assert.doesNotMatch(markup, /reference-card|reference-year|All properties/);
   assert.match(markup, /gravity/);
@@ -198,6 +198,7 @@ test('entry and author branches fold independently and keep their state through 
   c.node('references-preview-toggle').handlers.click();
   const tree = c.node('references-tree');
   tree.handlers.toggle({ target: { dataset: { path: '0/author' }, open: false } });
+  tree.handlers.toggle({ target: { dataset: { path: '0' }, open: true } });
   c.node('references-search').value = 'Pulsars';
   c.node('references-search').handlers.input();
   assert.match(tree.innerHTML, /reference-entry" data-path="0" open/);
