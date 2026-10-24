@@ -50,7 +50,8 @@
         if (doi) url = `https://doi.org/${encodeURIComponent(doi).replace(/%2F/gi, '/')}`;
       }
       if (key === 'eprint' && /arxiv/i.test(entry.fields.archiveprefix || entry.fields.eprinttype || '')) url = `https://arxiv.org/abs/${encodeURIComponent(BibTeX.text(value))}`;
-      return `<div class="reference-field"><dt>${esc(key)}</dt><dd>${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${readable(value)}</a>` : readable(value)}</dd></div>`;
+      const wide = ['title', 'abstract', 'note', 'annotation'].includes(key) ? ' reference-field-wide' : '';
+      return `<div class="reference-field${wide}"><dt>${esc(key)}</dt><dd>${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${readable(value)}</a>` : readable(value)}</dd></div>`;
     }).join('');
     return `<details class="reference-entry" data-path="${path}"${folded.has(path) ? '' : ' open'}><summary><span class="reference-key">${esc(entry.key)}</span>${tag(entry.type)}<span class="reference-meta">${Object.keys(entry.fields).length} properties</span></summary><dl class="reference-fields">${fields}</dl></details>`;
   }

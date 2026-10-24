@@ -3151,7 +3151,7 @@ button:disabled {
 .references-tools input:focus-visible, .references-tools select:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
 #references-count { font-size: 12px; color: var(--text-2); opacity: .65; white-space: nowrap; }
 #references-warning { padding: 14px 16px; margin-bottom: 24px; border-left: 2px solid var(--text-2); background: var(--surface); font-size: 13px; line-height: 1.7; }
-/* The preview follows the file structure: entry, field, then list item. */
+/* Keep file order while packing properties and names into horizontal rows. */
 .references-tree-tools { display: flex; gap: 8px; margin: -12px 0 18px; }
 .references-tree-tools .btn { font-size: 11px; padding: 5px 9px; }
 #references-tree { border-top: 1px solid var(--border); }
@@ -3167,24 +3167,23 @@ button:disabled {
 .reference-tag { display: inline-block; padding: 3px 7px; border: 1px solid var(--border); border-radius: 4px; font: 11px/1.4 var(--mono); background: var(--surface); overflow-wrap: anywhere; }
 .reference-meta { font: 11px/1.6 var(--font); opacity: .5; }
 .reference-entry > summary > .reference-meta { margin-left: auto; }
-.reference-fields { margin: 8px 0 4px 15px; padding: 2px 0 2px 24px; border-left: 1px solid var(--border); }
-.reference-field { position: relative; display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 16px; padding: 7px 10px 7px 0; line-height: 1.8; }
-.reference-field::before { content: ''; position: absolute; left: -24px; top: 19px; width: 12px; border-top: 1px solid var(--border); }
+.reference-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 4px 24px; margin: 6px 10px 4px 15px; padding: 2px 0 2px 18px; border-left: 1px solid var(--border); }
+.reference-field { min-width: 0; display: grid; grid-template-columns: 80px minmax(0, 1fr); align-content: start; gap: 10px; padding: 3px 0; line-height: 1.8; }
+.reference-field-wide, .reference-collection { grid-column: 1 / -1; }
 .reference-field dt { font: 12px/1.8 var(--mono); opacity: .6; overflow-wrap: anywhere; }
 .reference-field dd { min-width: 0; margin: 0; font: 13px/1.8 var(--font); overflow-wrap: anywhere; }
 .reference-field a { color: inherit; text-decoration-color: var(--border); text-underline-offset: 3px; }
 .reference-field a:hover { text-decoration-color: currentColor; }
 .reference-field details > summary { display: flex; align-items: center; gap: 8px; width: fit-content; padding: 1px 6px 1px 0; border-radius: 4px; }
-.reference-values { margin: 8px 0 0 4px; padding-left: 32px; border-left: 1px solid var(--border); }
-.reference-values li { padding: 4px 0 4px 8px; }
+.reference-values { display: flex; flex-wrap: wrap; gap: 2px 28px; margin: 2px 0 0; padding-left: 20px; }
+.reference-values li { max-width: 100%; padding: 0 4px 0 0; }
 .reference-values li::marker { font: 10px var(--mono); color: var(--text-2); }
 .reference-keywords { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .references-empty { padding: 48px 24px; text-align: center; }
 .references-empty h3 { font-weight: 400; font-size: 18px; }
 .references-empty p { margin-top: 12px; font-size: 13px; opacity: .6; line-height: 1.7; }
 @media (max-width: 700px) {
-  .reference-fields { padding-left: 16px; margin-left: 14px; }
-  .reference-field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-  .reference-field::before { left: -16px; width: 8px; }
+  .reference-fields { grid-template-columns: minmax(0, 1fr); padding-left: 12px; margin-left: 14px; }
+  .reference-field { grid-template-columns: 70px minmax(0, 1fr); gap: 8px; }
   .reference-entry > summary > .reference-meta { margin-left: 0; }
 }
