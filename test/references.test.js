@@ -88,7 +88,7 @@ function editorClient() {
   const context = {
     BibTeX: require('../public/bibtex'), URL,
     document: { getElementById: node },
-    window: { addEventListener() {}, confirm: () => false },
+    window: { addEventListener() {}, confirm: () => false, getComputedStyle: () => ({ lineHeight: '22.1px' }) },
     readJsonResponse: async response => response,
     workspaceFetch: async (url, options) => {
       requests.push({ url, options });
@@ -197,7 +197,7 @@ test('file fields open workspace sources in the document reader and preserve mod
   const opened = [];
   c.context.window.openRawFile = (...args) => opened.push(args);
   let prevented = false;
-  const event = { target: { closest: () => ({ dataset: { referenceFile: name } }) }, button: 0, preventDefault() { prevented = true; } };
+  const event = { target: { closest: selector => selector === '[data-reference-file]' ? { dataset: { referenceFile: name } } : null }, button: 0, preventDefault() { prevented = true; } };
   tree.handlers.click(event);
   assert.equal(prevented, true);
   assert.deepEqual(opened, [[name, 'PDF']]);
@@ -224,4 +224,40 @@ test('entry and author branches fold independently and keep their state through 
   assert.match(tree.innerHTML, /reference-entry" data-path="0" open/);
   assert.match(tree.innerHTML, /<details data-path="0\/author" open>/);
   assert.equal(c.node('references-editor').value, '@article{paper, title={Pulsars}, author={First and Second}}');
+});
+
+test('Edit opens and scrolls to the exact filtered entry, preserving unsaved source and duplicate keys', async () => {
+  const c = editorClient(); await c.context.window.ReferencesEditor.open();
+  const editor = c.node('references-editor');
+  const target = '@article(same, title={Selected {paper}}, note={Unicode: α})';
+  const prefix = '% Keep this comment\n@string{journal={Example}}\n@misc{same, title={Earlier paper}}\n\n';
+  const source = prefix + target + '\n@misc{last, title={Last paper}}';
+  editor.value = source;
+  editor.handlers.input();
+  c.node('references-preview-toggle').handlers.click();
+  c.node('references-search').value = 'Selected';
+  c.node('references-search').handlers.input();
+  const tree = c.node('references-tree');
+  assert.match(tree.innerHTML, /data-reference-edit="1" aria-label="Edit same in BibTeX">Edit<\/button>/);
+  let focused = false, scrolled = false, prevented = false;
+  editor.focus = () => { focused = true; };
+  editor.setSelectionRange = (start, end) => { editor.selectionStart = start; editor.selectionEnd = end; };
+  editor.scrollIntoView = () => { scrolled = true; };
+  tree.handlers.click({
+    target: { closest: selector => selector === '[data-reference-edit]' ? { dataset: { referenceEdit: '1' } } : null },
+    preventDefault() { prevented = true; },
+  });
+  assert.equal(prevented, true, 'Edit does not toggle the reference branch');
+  assert.equal(editor.hidden, false);
+  assert.equal(c.node('references-preview').hidden, true);
+  assert.equal(c.node('references-source-toggle')['aria-pressed'], 'true');
+  assert.equal(focused && scrolled, true);
+  assert.equal(editor.selectionStart, prefix.length);
+  assert.equal(source.slice(editor.selectionStart, editor.selectionEnd), target);
+  assert.equal(editor.scrollTop, 4 * 22.1);
+  assert.equal(editor.scrollLeft, 0);
+  assert.equal(editor.value, source);
+  assert.equal(c.requests.length, 1, 'navigation does not reload or save the bibliography');
+  assert.equal(c.node('references-save').disabled, false);
+  assert.match(c.node('references-status').textContent, /Editing same · Unsaved changes/);
 });

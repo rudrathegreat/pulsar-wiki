@@ -75,7 +75,7 @@
       const wide = ['title', 'abstract', 'note', 'annotation'].includes(key) ? ' reference-field-wide' : '';
       return `<div class="reference-field${wide}"><dt>${esc(key)}</dt><dd>${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${readable(value)}</a>` : readable(value)}</dd></div>`;
     }).join('');
-    return `<details class="reference-entry" data-path="${path}"${expandedEntries.has(path) ? ' open' : ''}><summary><span class="reference-key">${esc(entry.key)}</span>${tag(entry.type)}<span class="reference-meta">${Object.keys(entry.fields).length} properties</span></summary><dl class="reference-fields">${fields}</dl></details>`;
+    return `<details class="reference-entry" data-path="${path}"${expandedEntries.has(path) ? ' open' : ''}><summary><span class="reference-key">${esc(entry.key)}</span>${tag(entry.type)}<span class="reference-meta">${Object.keys(entry.fields).length} properties</span><button class="btn reference-edit" type="button" data-reference-edit="${path}" aria-label="Edit ${esc(entry.key)} in BibTeX">Edit</button></summary><dl class="reference-fields">${fields}</dl></details>`;
   }
   function renderPreview() {
     const query = search.value.trim().toLocaleLowerCase();
@@ -85,7 +85,7 @@
     void window.AuthorOrcids?.hydrate(tree, entries.map(authorPaper));
   }
   function refreshPreview() {
-    parsed = BibTeX.parse(editor.value);
+    parsed = BibTeX.parse(editor.value, { locations: true });
     const selected = typeFilter.value;
     typeFilter.innerHTML = '<option value="">All types</option>' + [...new Set(parsed.entries.map(entry => entry.type))].sort().map(type => `<option value="${esc(type)}">${esc(labels[type] || type)}</option>`).join('');
     typeFilter.value = parsed.entries.some(entry => entry.type === selected) ? selected : '';
@@ -107,6 +107,24 @@
   search.addEventListener('input', renderPreview);
   typeFilter.addEventListener('change', renderPreview);
   tree.addEventListener('click', event => {
+    const edit = event.target.closest('[data-reference-edit]');
+    if (edit) {
+      event.preventDefault();
+      if (busy || revision === null) return;
+      const entry = parsed.entries[Number(edit.dataset.referenceEdit)];
+      if (!entry) return;
+      setView(true);
+      editor.focus({ preventScroll: true });
+      editor.setSelectionRange(entry.start, entry.end);
+      // The unwrapped source uses one visual line per newline, so even long
+      // abstracts above the target cannot shift its scroll position.
+      const line = editor.value.slice(0, entry.start).split('\n').length - 1;
+      editor.scrollTop = line * parseFloat(window.getComputedStyle(editor).lineHeight);
+      editor.scrollLeft = 0;
+      editor.scrollIntoView({ block: 'nearest' });
+      status.textContent = `Editing ${entry.key}${dirty() ? ' · Unsaved changes' : ''}`;
+      return;
+    }
     const link = event.target.closest('[data-reference-file]');
     if (!link || event.button > 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     event.preventDefault();

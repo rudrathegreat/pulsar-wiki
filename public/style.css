@@ -3175,6 +3175,7 @@ button:disabled {
 .reference-entry summary:hover { background: var(--surface); }
 .reference-entry summary:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
 .reference-key { font: 13px/1.6 var(--mono); overflow-wrap: anywhere; }
+.reference-edit { flex-shrink: 0; }
 .reference-tag { display: inline-block; padding: 3px 7px; border: 1px solid var(--border); border-radius: 4px; font: 11px/1.4 var(--mono); background: var(--surface); overflow-wrap: anywhere; }
 .reference-meta { font: 11px/1.6 var(--font); opacity: .5; }
 .reference-entry > summary > .reference-meta { margin-left: auto; }
