@@ -2557,6 +2557,14 @@ button:disabled {
   line-height: 1.45;
 }
 
+.author-orcid {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 3px;
+}
+.author-orcid:hover, .author-orcid:focus-visible { text-decoration-color: currentColor; }
+
 .source-result-citations {
   margin-top: 6px;
   color: var(--text-2);

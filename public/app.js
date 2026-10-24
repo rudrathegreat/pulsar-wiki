@@ -1202,7 +1202,7 @@ function resultPaperMarkup(paper, keywordPrefix = 'source-keywords') {
           </label>
         </header>
         <h4>${escHtml(paper.title)}</h4>
-        <p class="source-result-authors">${escHtml(authorSummary(paper.authors))}</p>
+        <p class="source-result-authors" data-orcid-paper="${escHtml(paper.id)}">${window.AuthorOrcids ? window.AuthorOrcids.markup(paper, 3) : escHtml(authorSummary(paper.authors))}</p>
         <p class="source-result-citations">${escHtml(citations)}</p>
         <div class="source-result-tags" id="${keywordPrefix}-${escHtml(paper.id)}" aria-label="AI keywords from abstract" aria-live="polite">
           ${sourceKeywordMarkup(paper)}
@@ -1229,6 +1229,7 @@ function renderSourceResults(results) {
   dom.sourceResults.innerHTML = state.sourceResults.length
     ? state.sourceResults.map(paper => resultPaperMarkup(paper)).join('')
     : '<div class="source-empty"><strong>No matching papers found</strong><p>Try fewer terms, a broader date range, or remove a filter.</p></div>';
+  void window.AuthorOrcids?.hydrate(dom.sourceResults, state.sourceResults);
   updateSourceSelection();
 }
 
@@ -1268,13 +1269,14 @@ async function showSourceDetail(id, remember = true) {
   $('source-paper-metadata').innerHTML = `
     <header class="source-paper-header">
       <h2 id="source-paper-title" tabindex="-1">${escHtml(paper.title)}</h2>
-      <p class="source-result-authors">${escHtml(paper.authors?.length ? paper.authors.map(stripEmoji).join(', ') : 'Authors unavailable')}</p>
+      <p class="source-result-authors" data-orcid-paper="${escHtml(paper.id)}">${window.AuthorOrcids ? window.AuthorOrcids.markup(paper) : escHtml(paper.authors?.length ? paper.authors.map(stripEmoji).join(', ') : 'Authors unavailable')}</p>
       <p class="source-paper-journal"><strong>Journal</strong> ${escHtml(paper.publication || 'Journal unavailable')} &middot; ${escHtml(formatPaperDate(paper.published))}</p>
     </header>
     <section class="source-paper-abstract" id="source-paper-abstract"><h3>Abstract</h3><p>${escHtml(paper.abstract || 'No abstract is available for this record.')}</p></section>
     <section class="source-paper-keywords"><h3>Keywords</h3><div class="source-result-tags" id="paper-keywords-${escHtml(id)}" aria-label="AI keywords from abstract" aria-live="polite">${sourceKeywordMarkup(paper)}</div></section>
     ${paper.recordUrl ? `<a class="source-record-link" href="${escHtml(paper.recordUrl)}" target="_blank" rel="noreferrer">Open publication record</a>` : ''}`;
   typesetMath($('source-paper-abstract'));
+  void window.AuthorOrcids?.hydrate($('source-paper-metadata'), [paper]);
   $('source-paper-title').focus({ preventScroll: true });
   $('panel-files').scrollTop = 0;
   updateSourceSelection();
@@ -1299,6 +1301,7 @@ async function showSourceDetail(id, remember = true) {
         ${papers.length ? `<div class="source-results">${papers.map(item => resultPaperMarkup(item, `${key}-keywords`)).join('')}</div>` : !group?.error ? '<p class="source-related-empty">No records available.</p>' : ''}
         ${group?.limit && papers.length >= group.limit ? `<p class="source-related-empty">Showing the ${group.limit} most recent records.</p>` : ''}</section>`;
     }).join('');
+    void window.AuthorOrcids?.hydrate(relations, related);
     void loadSourceKeywords(related, current);
   } catch (error) {
     if (current()) relations.innerHTML = `<p class="source-related-empty">${escHtml(stripEmoji(error.message))}</p><button class="btn" type="button" data-source-preview="${escHtml(id)}">Retry</button>`;

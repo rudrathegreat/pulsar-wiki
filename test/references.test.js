@@ -101,6 +101,21 @@ function editorClient() {
   return { node, context, requests, fail: () => { fail = true; } };
 }
 
+test('existing References links positional ORCID IDs and requests missing profiles', async () => {
+  const c = editorClient();
+  const lookups = [];
+  c.context.window.AuthorOrcids = { ...require('../public/orcid'), hydrate: (_container, papers) => { lookups.push(papers); } };
+  await c.context.window.ReferencesEditor.open();
+  c.node('references-editor').value = '@article{paper, title={Timing}, author={Doe, Jane and Smith, Sam}, doi={10.1234/timing}, orcid={- and 0000-0002-1825-0097}}';
+  c.node('references-preview-toggle').handlers.click();
+  const markup = c.node('references-tree').innerHTML;
+  assert.match(markup, /href="https:\/\/orcid.org\/0000-0002-1825-0097"[^>]*>Smith, Sam<\/a>/);
+  assert.match(markup, /<li data-orcid-index="0">Doe, Jane<\/li>/);
+  const paper = lookups.at(-1)[0];
+  assert.equal(paper.doi, '10.1234/timing');
+  assert.equal(paper.authors[0], 'Doe, Jane');
+});
+
 test('editor preserves unsaved text across tab changes, confirms reload and saves edits', async () => {
   const c = editorClient();
   await c.context.window.ReferencesEditor.open();

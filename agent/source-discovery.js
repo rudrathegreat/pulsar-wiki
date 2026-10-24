@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { normalize: normalizeOrcid, matchAuthors } = require('../public/orcid');
 
 const ARXIV_API = 'https://export.arxiv.org/api/query';
 const ADS_API = 'https://api.adsabs.harvard.edu/v1/search/query';
@@ -159,6 +160,7 @@ function parseArxivFeed(xml) {
     const result = {
       provider: 'arXiv', arxivId, bibcode: null, doi: textOf(entry, 'arxiv:doi') || null,
       title: textOf(entry, 'title'), authors: textsOf(entry, 'name'), abstract: textOf(entry, 'summary'),
+      authorOrcids: [...entry.matchAll(/<author(?:\s[^>]*)?>([\s\S]*?)<\/author>/gi)].map(match => normalizeOrcid(textOf(match[1], 'orcid') || textOf(match[1], 'arxiv:orcid'))),
       published: textOf(entry, 'published'), publication: textOf(entry, 'arxiv:journal_ref') || 'arXiv preprint', categories,
       pdfUrl, recordUrl: hrefFor(attrs => /rel=["']alternate["']/i.test(attrs)) || idUrl,
       citationCount: null, referenceCount: null,
@@ -177,6 +179,7 @@ function parseAdsResponse(payload) {
       doi: (Array.isArray(doc.doi) ? doc.doi[0] : doc.doi) || null,
       title: (Array.isArray(doc.title) ? doc.title[0] : doc.title) || 'Untitled paper',
       authors: Array.isArray(doc.author) ? doc.author : [], abstract: doc.abstract || '',
+      authorOrcids: (Array.isArray(doc.author) ? doc.author : []).map((_, index) => normalizeOrcid(doc.orcid_pub?.[index]) || normalizeOrcid(doc.orcid_user?.[index])),
       published: doc.pubdate || (doc.year ? `${doc.year}-01-01` : ''), publication: doc.pub || 'NASA ADS record',
       categories: [], pdfUrl: arxivId ? `https://arxiv.org/pdf/${arxivId}` : null,
       recordUrl: doc.bibcode ? `https://ui.adsabs.harvard.edu/abs/${encodeURIComponent(doc.bibcode)}/abstract` : null,
@@ -214,6 +217,7 @@ class SourceDiscoveryService {
     this.adsToken = adsToken || '';
     this.now = now;
     this.cache = new Map();
+    this.orcidCache = new Map();
     this.onImport = onImport;
   }
 
@@ -240,6 +244,66 @@ class SourceDiscoveryService {
     return response.text();
   }
 
+  async authorOrcids(papers) {
+    if (!Array.isArray(papers) || papers.length > 50 || papers.some(paper => !paper || !Array.isArray(paper.authors) || paper.authors.length > 3000 || paper.authors.some(name => typeof name !== 'string' || name.length > 500))) {
+      throw new Error('Provide up to 50 papers with author names.');
+    }
+    const output = new Array(papers.length);
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(4, papers.length) }, async () => {
+      while (next < papers.length) {
+        const index = next++;
+        const paper = papers[index];
+        const doi = typeof paper.doi === 'string' ? paper.doi.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '').trim().slice(0, 512) : '';
+        const bibcode = typeof paper.bibcode === 'string' ? paper.bibcode.slice(0, 100) : '';
+        const arxivId = typeof paper.arxivId === 'string' ? arxivIdFromValue(paper.arxivId) : '';
+        const title = typeof paper.title === 'string' ? paper.title.trim().slice(0, 1000) : '';
+        const key = JSON.stringify([doi, bibcode, arxivId, title, Boolean(this.adsToken)]);
+        if (!doi && !bibcode && !arxivId && !title) { output[index] = paper.authors.map(() => null); continue; }
+        let cached = this.orcidCache.get(key);
+        if (!cached || cached.expires < this.now()) {
+          const promise = (async () => {
+            const records = [];
+            let resolvedDoi = doi;
+            if (this.adsToken) {
+              try {
+                const q = bibcode ? `bibcode:"${escapeQueryValue(bibcode)}"` : doi ? `doi:"${escapeQueryValue(doi)}"` : arxivId ? `identifier:"arXiv:${escapeQueryValue(arxivId)}"` : `title:"${escapeQueryValue(title)}"`;
+                const params = new URLSearchParams({ q, fl: 'title,doi,author,orcid_pub,orcid_user', rows: '2' });
+                const payload = JSON.parse(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` } }, 'NASA ADS'));
+                const docs = payload.response?.docs || [];
+                const titleKey = value => String(value || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+                const matches = !doi && !bibcode && !arxivId ? docs.filter(doc => titleKey(doc.title?.[0]) === titleKey(title)) : docs;
+                const doc = matches.length === 1 ? matches[0] : null;
+                if (!resolvedDoi && doc) resolvedDoi = Array.isArray(doc.doi) ? doc.doi[0] : doc.doi;
+                if (Array.isArray(doc?.author)) doc.author.forEach((name, i) => records.push({ name, orcid: normalizeOrcid(doc.orcid_pub?.[i]) || normalizeOrcid(doc.orcid_user?.[i]) }));
+              } catch { /* Try DOI metadata independently. */ }
+            }
+            if (resolvedDoi && /^10\.\d{4,9}\/\S+$/i.test(resolvedDoi)) {
+              try {
+                const payload = JSON.parse(await this.fetchText(`https://api.crossref.org/works/${encodeURIComponent(resolvedDoi)}`, { headers: { Accept: 'application/json' } }, 'Crossref'));
+                if (Array.isArray(payload.message?.author)) payload.message.author.forEach(item => records.push({ name: [item.given, item.family].filter(Boolean).join(' ') || item.name, orcid: item.ORCID }));
+              } catch { /* Missing IDs leave names as text. */ }
+            }
+            return records;
+          })();
+          cached = { promise, expires: this.now() + 10 * 60 * 1000 };
+          this.orcidCache.set(key, cached);
+          if (this.orcidCache.size > 1000) this.orcidCache.delete(this.orcidCache.keys().next().value);
+        }
+        const records = await cached.promise;
+        output[index] = matchAuthors(paper.authors, records);
+        // Retain discovered IDs for a subsequent import of this same work.
+        for (const { result } of this.cache.values()) {
+          if ((doi && result.doi?.toLowerCase() === doi.toLowerCase()) || (bibcode && result.bibcode === bibcode) || (arxivId && result.arxivId === arxivId)) {
+            const ids = matchAuthors(result.authors, records);
+            result.authorOrcids = result.authors.map((_, i) => normalizeOrcid(result.authorOrcids?.[i]) || ids[i]);
+          }
+        }
+      }
+    }));
+    return { orcids: output };
+  }
+
   async search(input, { limit = 20, sort = 'default', filters = {} } = {}) {
     const query = classifyQuery(input);
     const sorts = { default: 'score desc', citations: 'citation_count desc', recent: 'date desc', author: 'first_author asc' };
@@ -260,7 +324,7 @@ class SourceDiscoveryService {
     const sourceFilter = query.filters.source?.[0]?.toLowerCase();
     const settled = [];
     if ((!sourceFilter || ['scix', 'ads', 'nasa-ads'].includes(sourceFilter)) && this.adsToken) {
-      const params = new URLSearchParams({ q: clauses.join(' AND '), fl: 'bibcode,title,author,year,pub,pubdate,abstract,doi,identifier,citation_count,reference_count', rows: String(rows), sort: sorts[sort] });
+      const params = new URLSearchParams({ q: clauses.join(' AND '), fl: 'bibcode,title,author,orcid_pub,orcid_user,year,pub,pubdate,abstract,doi,identifier,citation_count,reference_count', rows: String(rows), sort: sorts[sort] });
       settled.push(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` } }, 'NASA ADS')
         .then(JSON.parse).then(parseAdsResponse).then(results => ({ source: 'NASA ADS', results })).catch(error => ({ source: 'NASA ADS', results: [], error: error.message })));
     }
@@ -290,7 +354,7 @@ class SourceDiscoveryService {
       if ((candidate.bibcode || candidate.doi || candidate.arxivId) && resultId(candidate) === id) source = { ...candidate, id };
     }
     if (!source) throw new Error('This paper preview expired. Search for it again.');
-    const fields = 'bibcode,title,author,year,pub,pubdate,abstract,doi,identifier,citation_count,reference_count';
+    const fields = 'bibcode,title,author,orcid_pub,orcid_user,year,pub,pubdate,abstract,doi,identifier,citation_count,reference_count';
     const limit = 25;
     const unavailable = error => ({ sourceId: source.id, groups: [
       { key: 'references', label: 'References', results: [], error },

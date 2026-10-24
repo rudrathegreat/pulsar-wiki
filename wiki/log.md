@@ -174,3 +174,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-24 | Sources abstract equations / public | Applied the existing KaTeX renderer whenever paper details open, preserving escaped abstract text and supporting inline and display LaTeX delimiters. Added scrolling for wide display equations and navigation regression coverage; updated the wiki index. |
 
 | 2026-10-24 | Collapsed references preview / public | Made papers start collapsed when References opens or reloads, preserving manual expansion through filtering and the Expand all and Collapse all controls. Updated the wiki index and existing preview checks. |
+
+| 2026-10-24 | Author ORCID profiles / application | Linked author names in search results, full paper details, related papers, and existing References when valid ORCID IDs are available. Added cached, bounded background lookups using ADS paper identifiers or exact titles and Crossref DOIs, conservative author-name matching, checksum validation, and positional IDs in imported BibTeX. Added regression coverage for provider metadata, lookup failures, ambiguous matches, import retention, and browser links; updated the wiki index. |

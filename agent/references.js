@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { parse, text } = require('../public/bibtex');
+const { normalize: normalizeOrcid } = require('../public/orcid');
 const COMPLETION_NOTE = 'Bibliographic metadata needs completion';
 
 // Treat metadata as text, never as BibTeX syntax supplied by a source.
@@ -50,6 +51,7 @@ class References {
       keys.add(key);
       const fields = { title: source.title || source.name };
       if (source.authors?.length) fields.author = source.authors.map(bibText).join(' and ');
+      if (source.authorOrcids?.some(id => normalizeOrcid(id))) fields.orcid = source.authors.map((_, i) => normalizeOrcid(source.authorOrcids[i]) || '-').join(' and ');
       const year = String(source.year || source.published || '').match(/^\d{4}/)?.[0];
       if (year) fields.year = year;
       if (source.publication && !['arXiv preprint', 'NASA ADS record'].includes(source.publication)) fields.journal = source.publication;

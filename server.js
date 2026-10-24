@@ -477,6 +477,12 @@ app.get('/api/sources/filters', requireLocalSession, (_req, res) => {
   res.json({ filters: SOURCE_FILTERS, adsConfigured: Boolean(currentWorkspace().sourceDiscovery.adsToken) });
 });
 
+app.post('/api/sources/orcids', requireLocalSession, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try { return res.json(await currentWorkspace().sourceDiscovery.authorOrcids(req.body?.papers)); }
+  catch (error) { return res.status(400).json({ error: error.message }); }
+});
+
 app.post('/api/sources/search', requireLocalSession, async (req, res) => {
   const query = String(req.body?.query || '').trim();
   if (!query) return res.status(400).json({ error: 'Enter a research question, keywords, title, DOI, or paper link.' });

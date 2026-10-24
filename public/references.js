@@ -37,13 +37,25 @@
     const name = path.replace(/^raw\//, '');
     return name && !/[/:\x00-\x1f]/.test(name) && name !== '.' && name !== '..' ? name : '';
   }
+  function authorPaper(entry) {
+    const fields = entry.fields;
+    const authors = BibTeX.authors(fields.author || '');
+    // Positional lists retain explicit '-' placeholders for authors without an ID.
+    const ids = String(fields.orcid || '').split(/\s+and\s+|\s*;\s*/i);
+    const authorOrcids = ids.length === authors.length ? ids : authors.map(() => null);
+    return { id: String(parsed.entries.indexOf(entry)), title: BibTeX.text(fields.title || ''), authors, authorOrcids,
+      doi: BibTeX.text(fields.doi || ''), bibcode: BibTeX.text(fields.bibcode || fields.adsbibcode || ''),
+      arxivId: /arxiv/i.test(fields.archiveprefix || fields.eprinttype || '') ? BibTeX.text(fields.eprint || '') : null };
+  }
   function entryTree(entry) {
     const path = String(parsed.entries.indexOf(entry));
     const fields = Object.entries(entry.fields).map(([key, value]) => {
       const fieldPath = `${path}/${key}`;
       if (key === 'author' || key === 'editor') {
         const names = BibTeX.authors(value);
-        return `<div class="reference-field reference-collection"><dt>${esc(key)}</dt><dd><details data-path="${esc(fieldPath)}"${folded.has(fieldPath) ? '' : ' open'}><summary><span class="reference-meta">${names.length} ${key === 'author' ? 'author' : 'editor'}${names.length === 1 ? '' : 's'}</span></summary><ol class="reference-values">${names.map(name => `<li>${esc(name)}</li>`).join('')}</ol></details></dd></div>`;
+        const paper = authorPaper(entry);
+        const profiles = key === 'author' && window.AuthorOrcids;
+        return `<div class="reference-field reference-collection"><dt>${esc(key)}</dt><dd><details data-path="${esc(fieldPath)}"${folded.has(fieldPath) ? '' : ' open'}><summary><span class="reference-meta">${names.length} ${key === 'author' ? 'author' : 'editor'}${names.length === 1 ? '' : 's'}</span></summary><ol class="reference-values"${profiles ? ` data-orcid-paper="${esc(path)}"` : ''}>${names.map((name, i) => `<li${profiles ? ` data-orcid-index="${i}"` : ''}>${profiles ? profiles.author(name, paper.authorOrcids[i]) : esc(name)}</li>`).join('')}</ol></details></dd></div>`;
       }
       if (key === 'keywords' || key === 'keyword') {
         const keywords = BibTeX.text(value).split(/[,;]/).map(s => s.trim()).filter(Boolean);
@@ -70,6 +82,7 @@
     const entries = parsed.entries.filter(entry => (!typeFilter.value || entry.type === typeFilter.value) && (!query || BibTeX.text([entry.key, entry.type, ...Object.values(entry.fields)].join(' ')).toLocaleLowerCase().includes(query)));
     $('references-count').textContent = `${entries.length}${entries.length !== parsed.entries.length ? ` of ${parsed.entries.length}` : ''} reference${(entries.length !== parsed.entries.length ? parsed.entries.length : entries.length) === 1 ? '' : 's'}`;
     tree.innerHTML = entries.map(entryTree).join('') || `<div class="references-empty"><h3>${query || typeFilter.value ? 'No matching references' : 'No entries'}</h3><p>${query || typeFilter.value ? 'Try another search or reference type.' : 'Add entries in BibTeX or import a paper.'}</p></div>`;
+    void window.AuthorOrcids?.hydrate(tree, entries.map(authorPaper));
   }
   function refreshPreview() {
     parsed = BibTeX.parse(editor.value);

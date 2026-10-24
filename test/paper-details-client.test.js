@@ -13,6 +13,7 @@ function client(getRelatedSources = async () => ({ groups: [] })) {
     return nodes.get(id);
   };
   const context = { workspaceId: 'workspace1', state: { sourceResults: [paper], sourcePapers: new Map([[paper.id, paper]]), sourcePaperHistory: [], sourceDetailRequest: 0, selectedSourceIds: new Set() },
+    window: {},
     api: { getRelatedSources, async getSourceKeywords() { return { keywords: ['Timing'] }; } },
     stripEmoji: String, escHtml: value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'), $: element,
     dom: { sourceResultsSection: element('results-section'), sourceResults: element('results'), sourceSelectedCount: element('count'), sourceImportSelected: element('import') },
@@ -151,4 +152,20 @@ test('failed relations provide an escaped retry action', async () => {
   await c.context.showSourceDetail('one');
   assert.match(c.element('source-paper-relations').innerHTML, /&lt;Unavailable&gt;/);
   assert.match(c.element('source-paper-relations').innerHTML, /data-source-preview="one">Retry/);
+});
+
+test('author profile links appear in search cards, full details and related papers', async () => {
+  const id = '0000-0002-1825-0097';
+  const related = { ...paper, id: 'linked', authors: ['Ada'], authorOrcids: [id] };
+  const c = client(async () => ({ groups: [{ key: 'references', results: [related] }] }));
+  const lookups = [];
+  c.context.window.AuthorOrcids = { ...require('../public/orcid'), hydrate: (container, papers) => { lookups.push({ container, papers }); } };
+  c.context.state.sourcePapers.set('linked', related);
+  assert.ok(c.context.resultPaperMarkup(related).includes(`href="https://orcid.org/${id}"`));
+  await c.context.showSourceDetail('linked');
+  assert.ok(c.element('source-paper-metadata').innerHTML.includes(`href="https://orcid.org/${id}"`));
+  assert.ok(c.element('source-paper-relations').innerHTML.includes(`href="https://orcid.org/${id}"`));
+  c.context.renderSourceResults([related]);
+  assert.ok(c.element('results').innerHTML.includes(`href="https://orcid.org/${id}"`));
+  assert.equal(lookups.length, 3);
 });
