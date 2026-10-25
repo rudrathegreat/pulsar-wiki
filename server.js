@@ -9,7 +9,7 @@ const crypto = require('node:crypto');
 const { pipeline } = require('node:stream/promises');
 const chokidar = require('chokidar');
 const { AsyncLocalStorage } = require('node:async_hooks');
-const { initializeWorkspace, describe } = require('./agent/workspaces');
+const { initializeWorkspace, createWorkspace, describe } = require('./agent/workspaces');
 const { pickFolder } = require('./agent/folder-picker');
 const { AgentService, AgentServiceError } = require('./agent/agent-service');
 const { ChatGPTAuthError, ChatGPTAuthService } = require('./agent/chatgpt-auth');
@@ -268,6 +268,16 @@ app.post('/api/workspaces/open', requireLocalMutation, (req, res) => {
     res.json({ active: describe(workspace) });
   } catch (error) {
     res.status(400).json({ error: error.code ? 'This folder could not be opened. Check that it exists and is writable.' : error.message });
+  }
+});
+app.post('/api/workspaces/create', requireLocalMutation, (req, res) => {
+  try {
+    const created = createWorkspace(req.body?.parentPath, req.body?.name);
+    const workspace = openWorkspace(created.rootDir);
+    res.append('Set-Cookie', `${WORKSPACE_COOKIE}=${workspace.id}; Path=/; HttpOnly; SameSite=Strict`);
+    res.status(201).json({ active: describe(workspace) });
+  } catch (error) {
+    res.status(400).json({ error: error.code ? 'This project could not be created. Check the parent folder exists and is writable.' : error.message });
   }
 });
 app.post('/api/workspaces/close', requireLocalMutation, (_req, res) => {

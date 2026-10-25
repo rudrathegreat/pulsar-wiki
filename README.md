@@ -26,7 +26,7 @@ Open the displayed loopback address, normally <http://127.0.0.1:3000>. PulsarWik
 
 ## Research workspaces
 
-On a new server session, the welcome screen shows a plain **Workspace folder** path field. Use **Browse** to select a folder in the system folder dialog, or enter its full path, then select **Open**. Recent folders can also be reopened directly. The native dialog supports creating a new folder; on Linux it requires Zenity, with manual path entry available if the dialog cannot open.
+On a new server session, choose **New project** or **Open project** from the welcome screen. **New project** asks for a project name and a parent folder, entered as a full path or selected with **Browse**. **Create project** creates a named subfolder, fills it with a clean research template, and opens it automatically. The template includes `wiki/` with starter index and log pages, empty `raw/` and `notebooks/` folders, private `.pulsarwiki/` data, `GEMINI.md`, `AGENTS.md`, `CLAUDE.md`, an empty `references.bib`, and `.gitignore`. Existing files or folders with the same name are never reused or overwritten. **Open project** selects an existing folder with the system dialog; recent folders can also be reopened directly. On Linux the native dialog requires Zenity.
 
 Each selected folder holds its own `wiki/`, immutable `raw/` sources, `.pulsarwiki/chat/` conversations, and `.pulsarwiki/reading/` annotations and drafts. Missing folders, `GEMINI.md`, and starter index/log pages are created without replacing existing content. A new workspace starts with general research instructions; existing projects retain their own instructions and sources. Existing source files should be placed in that project's `raw/` folder to appear in Files.
 

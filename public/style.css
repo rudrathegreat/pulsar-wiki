@@ -14,6 +14,12 @@ body.workspace-ready #workspace-welcome { display: none; }
 .welcome-tagline { font-size: 20px; opacity: .5; margin-top: 8px; }
 .welcome-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 70px; margin-top: 48px; }
 .welcome-columns h2 { font-size: 16px; font-weight: 500; margin-bottom: 18px; }
+.welcome-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+#workspace-create-form { margin-top: 20px; }
+#workspace-create-form label { display: block; font-size: 12px; margin: 14px 0 6px; }
+#workspace-create-form input { width: 100%; min-width: 0; padding: 8px 10px; background: var(--bg); color: var(--text-1); border: 1px solid var(--border); border-radius: 4px; font: inherit; }
+#workspace-create-form .welcome-actions input { flex: 1 1 160px; width: auto; }
+#workspace-create-form .welcome-help { margin: 10px 0 14px; }
 .workspace-recent:hover strong { text-decoration: underline; text-underline-offset: 4px; }
 .welcome-help { font-size: 12px; opacity: .5; margin-top: 16px; line-height: 1.8; }
 .welcome-footnote { font-size: 11px; opacity: .4; margin-top: 65px; }

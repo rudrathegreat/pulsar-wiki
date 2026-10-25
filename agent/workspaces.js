@@ -70,4 +70,31 @@ function initializeWorkspace(value) {
   return { id: crypto.randomUUID(), rootDir, wikiDir: path.join(rootDir, 'wiki'), rawDir: path.join(rootDir, 'raw'), dataDir: path.join(rootDir, '.pulsarwiki'), instructions: fs.readFileSync(path.join(rootDir, 'GEMINI.md'), 'utf8') };
 }
 
-module.exports = { initializeWorkspace, describe };
+function createWorkspace(parentPath, projectName) {
+  const name = typeof projectName === 'string' ? projectName.trim() : '';
+  if (!name || name.length > 120 || /[<>:"/\\|?*\x00-\x1f]/.test(name) || /[. ]$/.test(name) || name === '.' || name === '..' || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) {
+    throw new Error('Enter a valid project name (up to 120 characters, without folder separators or reserved filename characters).');
+  }
+  const parent = existingDirectory(parentPath);
+  const rootDir = path.join(parent, name);
+  try { fs.mkdirSync(rootDir); }
+  catch (error) {
+    if (error.code === 'EEXIST') throw new Error('A file or folder with this project name already exists. Choose another name.');
+    throw error;
+  }
+  const workspace = initializeWorkspace(rootDir);
+  fs.mkdirSync(path.join(rootDir, 'notebooks'));
+  const entryPoint = '# PulsarWiki instruction entry point\n\nBefore answering, editing, or running commands, read and follow `GEMINI.md` at\nthis workspace root. It is the canonical source for all project instructions.\n';
+  const files = {
+    'AGENTS.md': entryPoint,
+    'CLAUDE.md': entryPoint,
+    'references.bib': '',
+    '.gitignore': '/.pulsarwiki/\n.env\n.env.*\n!.env.example\n.ipynb_checkpoints/\n__pycache__/\n*.pyc\n.DS_Store\nThumbs.db\n',
+  };
+  for (const [file, content] of Object.entries(files)) fs.writeFileSync(path.join(rootDir, file), content, { encoding: 'utf8', flag: 'wx' });
+  const indexPath = path.join(rootDir, 'wiki', 'index.md');
+  fs.writeFileSync(indexPath, fs.readFileSync(indexPath, 'utf8').replace('# Research workspace', () => `# ${name.replace(/[\[\]<>#`*_]/g, '')}`));
+  return workspace;
+}
+
+module.exports = { initializeWorkspace, createWorkspace, describe };

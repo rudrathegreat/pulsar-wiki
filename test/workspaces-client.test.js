@@ -18,7 +18,7 @@ function client({ active = null, remembered = null, fetchHandler } = {}) {
       classList: { add: value => classes.add(value), remove: value => classes.delete(value), contains: value => classes.has(value) },
       addEventListener(type, listener) { this.listeners[type] = listener; },
       append(...children) { this.children.push(...children); }, replaceChildren() { this.children = []; },
-      setAttribute() {}, removeAttribute() {}, showModal() { this.open = true; }, close() { this.open = false; },
+      focus() {}, setAttribute() {}, removeAttribute() {}, showModal() { this.open = true; }, close() { this.open = false; },
     };
   }
   const document = { body: element(), createElement: element, getElementById(id) {
@@ -40,6 +40,48 @@ function client({ active = null, remembered = null, fetchHandler } = {}) {
   vm.createContext(context); vm.runInContext(source, context);
   return { context, document, nodes, requests, stored, navigations, initialize: context.window.initializeWorkspaceUi };
 }
+
+test('New project collects a name and parent, creates and remembers the opened project', async () => {
+  const active = { id: 'created', name: 'Study', path: 'E:\\Research\\Study' };
+  const c = client({ fetchHandler: async url => url.endsWith('/create') ? { active } : url.endsWith('/pick') ? { path: 'E:\\Research' } : { active: null, recent: [] } });
+  await c.initialize();
+  await c.nodes.get('workspace-new').listeners.click();
+  assert.equal(c.nodes.get('workspace-create-form').hidden, false);
+  c.document.getElementById('workspace-create-name').value = 'Study';
+  await c.nodes.get('workspace-create-browse').listeners.click();
+  assert.equal(c.nodes.get('workspace-create-parent').value, 'E:\\Research');
+  assert.deepEqual(c.navigations, []);
+  await c.nodes.get('workspace-create-form').listeners.submit({ preventDefault() {} });
+  assert.deepEqual(JSON.parse(c.requests.at(-1).options.body), { name: 'Study', parentPath: 'E:\\Research' });
+  assert.equal(c.stored.get('pw-workspace'), active.id);
+  assert.equal(JSON.parse(c.stored.get('pw-recent-workspaces'))[0].path, active.path);
+  assert.deepEqual(c.navigations, ['reload']);
+  assert.equal(c.document.body.classList.contains('workspace-loading'), true);
+  assert.ok(html.indexOf('id="workspace-new"') < html.indexOf('id="workspace-open"'));
+});
+
+test('failed creation keeps form values and allows retry; cancelling creates nothing', async () => {
+  const c = client({ fetchHandler: async url => {
+    if (url.endsWith('/create')) throw new Error('A file or folder with this project name already exists.');
+    if (url.endsWith('/pick')) return { path: null };
+    return { active: null, recent: [] };
+  } });
+  await c.initialize();
+  c.document.getElementById('workspace-create-name').value = 'Study';
+  c.document.getElementById('workspace-create-parent').value = 'E:\\Research';
+  await c.nodes.get('workspace-create-browse').listeners.click();
+  assert.equal(c.nodes.get('workspace-create-parent').value, 'E:\\Research');
+  await c.nodes.get('workspace-create-form').listeners.submit({ preventDefault() {} });
+  assert.match(c.nodes.get('workspace-error').textContent, /already exists/);
+  assert.equal(c.nodes.get('workspace-create-name').value, 'Study');
+  assert.equal(c.nodes.get('workspace-create-submit').disabled, false);
+  assert.equal(c.document.body.classList.contains('workspace-loading'), false);
+  assert.deepEqual(c.navigations, []);
+  const requests = c.requests.length;
+  await c.nodes.get('workspace-create-cancel').listeners.click();
+  assert.equal(c.nodes.get('workspace-create-form').hidden, true);
+  assert.equal(c.requests.length, requests);
+});
 
 test('startup requires a workspace before connecting chat or loading project data', async () => {
   const c = client();
@@ -67,9 +109,9 @@ test('refresh and sign-in restoration reuse the selected workspace without brows
 
 test('opening a folder remembers its identity and recent path before reloading', async () => {
   const active = { id: 'new-project', name: 'New project', path: 'E:\\Research\\New project' };
-  const c = client({ fetchHandler: async url => url.endsWith('/open') ? { active } : { active: null, recent: [], defaultPath: active.path } });
+  const c = client({ fetchHandler: async url => url.endsWith('/open') ? { active } : url.endsWith('/pick') ? { path: active.path } : { active: null, recent: [], defaultPath: active.path } });
   await c.initialize();
-  await c.nodes.get('workspace-path-form').listeners.submit({ preventDefault() {} });
+  await c.nodes.get('workspace-open').listeners.click();
   assert.equal(c.stored.get('pw-workspace'), active.id);
   assert.equal(JSON.parse(c.stored.get('pw-recent-workspaces'))[0].path, active.path);
   assert.deepEqual(c.navigations, ['reload']);
@@ -81,9 +123,10 @@ test('first folder opening shows loading while the request is pending and recove
   let rejectOpen;
   const c = client({ fetchHandler: url => url.endsWith('/open')
     ? new Promise((resolve, reject) => { rejectOpen = reject; })
-    : { active: null, recent: [], defaultPath: 'E:\\Research' } });
+    : url.endsWith('/pick') ? { path: 'E:\\Research' } : { active: null, recent: [], defaultPath: 'E:\\Research' } });
   await c.initialize();
-  const opening = c.nodes.get('workspace-path-form').listeners.submit({ preventDefault() {} });
+  const opening = c.nodes.get('workspace-open').listeners.click();
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(c.document.body.classList.contains('workspace-loading'), true);
   assert.equal(c.nodes.get('app').inert, true);
   assert.equal(c.nodes.get('workspace-welcome').inert, true);
@@ -92,7 +135,7 @@ test('first folder opening shows loading while the request is pending and recove
   assert.equal(c.document.body.classList.contains('workspace-loading'), false);
   assert.equal(c.nodes.get('workspace-welcome').inert, false);
   assert.equal(c.nodes.get('workspace-error').textContent, 'Cannot open this folder.');
-  assert.equal(c.nodes.get('workspace-submit').disabled, false);
+  assert.equal(c.nodes.get('workspace-open').disabled, false);
 });
 
 test('project loading lasts through initial data and clears on success or failure', async () => {
@@ -130,11 +173,11 @@ test('a failed folder open leaves the current selection intact and displays the 
   const active = { id: 'current-project', name: 'Current project', path: 'E:\\Research' };
   const c = client({ active, remembered: active.id, fetchHandler: async url => {
     if (url.endsWith('/open')) throw new Error('The folder is unavailable.');
+    if (url.endsWith('/pick')) return { path: 'E:\\Missing folder' };
     return { active, recent: [], defaultPath: active.path };
   } });
   await c.initialize();
-  c.document.getElementById('workspace-path').value = 'E:\\Missing folder';
-  await c.nodes.get('workspace-path-form').listeners.submit({ preventDefault() {} });
+  await c.nodes.get('workspace-open').listeners.click();
   assert.equal(c.stored.get('pw-workspace'), active.id);
   assert.equal(c.nodes.get('workspace-status').textContent, 'The folder is unavailable.');
   assert.deepEqual(c.navigations, []);
@@ -155,15 +198,15 @@ test('all browser requests and document URLs pin the tab workspace', async () =>
   assert.equal(context.window.WorkspaceSession.url('/api/reading/export?format=json'), '/api/reading/export?format=json&workspace=tab-project');
 });
 
-test('Browse uses the system dialog and shows the chosen folder before opening it', async () => {
+test('Open project uses the system dialog and opens the chosen folder', async () => {
   const selected = 'E:\\Research\\Chosen folder';
-  const c = client({ fetchHandler: async url => url.endsWith('/pick') ? { path: selected } : { active: null, recent: [], defaultPath: 'E:\\Research' } });
+  const c = client({ fetchHandler: async url => url.endsWith('/pick') ? { path: selected } : url.endsWith('/open') ? { active: { id: 'chosen', path: selected } } : { active: null, recent: [], defaultPath: 'E:\\Research' } });
   await c.initialize();
   await c.nodes.get('workspace-open').listeners.click();
-  assert.equal(c.nodes.get('workspace-path').value, selected);
-  assert.equal(c.stored.get('pw-workspace'), 'closed');
+  assert.equal(c.stored.get('pw-workspace'), 'chosen');
+  assert.deepEqual(c.navigations, ['reload']);
   assert.equal(c.nodes.get('workspace-open').disabled, false);
-  assert.deepEqual(c.requests.map(request => request.url), ['/api/workspaces', '/api/workspaces/pick']);
+  assert.deepEqual(c.requests.map(request => request.url), ['/api/workspaces', '/api/workspaces/pick', '/api/workspaces/open']);
   assert.doesNotMatch(html, /id="workspace-picker"|id="workspace-folders"/);
 });
 

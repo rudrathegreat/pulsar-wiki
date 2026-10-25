@@ -24,7 +24,24 @@
     <div class="welcome-columns">
       <section aria-labelledby="welcome-start-title">
         <h2 id="welcome-start-title">Start</h2>
-        <button id="workspace-open" type="button" class="btn">Open project</button>
+        <div class="welcome-actions">
+          <button id="workspace-new" type="button" class="btn" aria-expanded="false" aria-controls="workspace-create-form">New project</button>
+          <button id="workspace-open" type="button" class="btn">Open project</button>
+        </div>
+        <form id="workspace-create-form" hidden>
+          <label for="workspace-create-name">Project name</label>
+          <input id="workspace-create-name" name="name" type="text" maxlength="120" required autocomplete="off" placeholder="My research project"/>
+          <label for="workspace-create-parent">Create inside</label>
+          <div class="welcome-actions">
+            <input id="workspace-create-parent" name="parentPath" type="text" required autocomplete="off" placeholder="Full path to parent folder" aria-describedby="workspace-create-help"/>
+            <button id="workspace-create-browse" type="button" class="btn">Browse</button>
+          </div>
+          <p id="workspace-create-help" class="welcome-help">A new subfolder with your project name will be created here.</p>
+          <div class="welcome-actions">
+            <button id="workspace-create-submit" type="submit" class="btn">Create project</button>
+            <button id="workspace-create-cancel" type="button" class="btn">Cancel</button>
+          </div>
+        </form>
       </section>
       <section aria-labelledby="welcome-recent-title">
         <h2 id="welcome-recent-title">Recent</h2>

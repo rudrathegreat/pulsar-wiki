@@ -7,7 +7,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const test = require('node:test');
 const WebSocket = require('ws');
-const { initializeWorkspace } = require('../agent/workspaces');
+const { initializeWorkspace, createWorkspace } = require('../agent/workspaces');
 
 function createFolder(root, name) { const folder = path.join(root, name); fs.mkdirSync(folder); return folder; }
 
@@ -16,6 +16,28 @@ function temporaryDirectory(t) {
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   return directory;
 }
+
+test('new projects create an independent base template in a named child folder', t => {
+  const parent = temporaryDirectory(t);
+  const workspace = createWorkspace(parent, 'Timing study');
+  assert.equal(workspace.rootDir, path.join(parent, 'Timing study'));
+  for (const folder of ['raw', 'wiki', 'notebooks', '.pulsarwiki']) assert.ok(fs.statSync(path.join(workspace.rootDir, folder)).isDirectory());
+  for (const file of ['GEMINI.md', 'AGENTS.md', 'CLAUDE.md', 'references.bib', '.gitignore', 'wiki/index.md', 'wiki/log.md']) assert.ok(fs.statSync(path.join(workspace.rootDir, file)).isFile());
+  assert.equal(fs.readFileSync(path.join(workspace.rootDir, 'references.bib'), 'utf8'), '');
+  assert.deepEqual(fs.readdirSync(workspace.rawDir), []);
+  assert.match(fs.readFileSync(path.join(workspace.wikiDir, 'index.md'), 'utf8'), /^# Timing study/);
+  assert.doesNotMatch(workspace.instructions, /pulsar astronomy/);
+  fs.writeFileSync(path.join(workspace.rootDir, 'keep.txt'), 'keep');
+  assert.throws(() => createWorkspace(parent, 'Timing study'), /already exists/);
+  assert.equal(fs.readFileSync(path.join(workspace.rootDir, 'keep.txt'), 'utf8'), 'keep');
+});
+
+test('new projects reject invalid names and missing parent folders before writing', t => {
+  const parent = temporaryDirectory(t);
+  for (const name of ['', '..', '../escape', 'nested/folder', 'nested\\folder', 'CON', 'nul.txt', 'trailing.', 'bad:name', 'x'.repeat(121)]) assert.throws(() => createWorkspace(parent, name), /valid project name/);
+  assert.throws(() => createWorkspace(path.join(parent, 'missing'), 'Study'));
+  assert.deepEqual(fs.readdirSync(parent), []);
+});
 
 test('workspace initialization preserves existing instructions, pages and source bytes', t => {
   const root = temporaryDirectory(t);
@@ -79,6 +101,15 @@ test('server remembers selections and isolates simultaneous projects across APIs
   assert.equal((await request('/api/wiki')).status, 409);
   assert.equal((await fetch(url + '/api/workspaces')).status, 403);
   assert.equal((await request('/api/workspaces/open', { method: 'POST', body: { path: firstPath }, origin: 'http://example.com' })).status, 403);
+  assert.equal((await request('/api/workspaces/create', { method: 'POST', body: { parentPath: root, name: 'New study' }, origin: 'http://example.com' })).status, 403);
+  const createdResponse = await request('/api/workspaces/create', { id: 'closed', method: 'POST', body: { parentPath: root, name: 'New study' } });
+  assert.equal(createdResponse.status, 201);
+  const created = (await createdResponse.json()).active;
+  assert.equal(created.path, path.join(fs.realpathSync(root), 'New study'));
+  assert.ok(createdResponse.headers.getSetCookie().some(value => value.startsWith(`pulsarwiki_workspace=${created.id};`)));
+  assert.equal((await (await request('/api/workspaces', { id: created.id })).json()).active.id, created.id);
+  assert.equal((await request('/api/wiki', { id: created.id })).status, 200);
+  assert.equal((await request('/api/workspaces/create', { method: 'POST', body: { parentPath: root, name: 'New study' } })).status, 400);
 
   const openResponse = await request('/api/workspaces/open', { method: 'POST', body: { path: firstPath } });
   assert.equal(openResponse.status, 200);

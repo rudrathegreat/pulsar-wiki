@@ -12,7 +12,7 @@
     target.textContent = error.message; target.hidden = false;
   };
   const setBusy = busy => {
-    for (const id of ['workspace-open', 'workspace-switch', 'workspace-change', 'workspace-close']) $(id).disabled = busy;
+    for (const id of ['workspace-open', 'workspace-switch', 'workspace-change', 'workspace-close', 'workspace-new', 'workspace-create-browse', 'workspace-create-submit', 'workspace-create-cancel', 'workspace-create-name', 'workspace-create-parent']) $(id).disabled = busy;
   };
   window.setWorkspaceLoading = loading => {
     if (loading) document.body.classList.add('workspace-loading');
@@ -35,7 +35,7 @@
     }
   }
 
-  async function select(path) {
+  async function select(path, creation = null) {
     if (opening) return;
     opening = true;
     setBusy(true);
@@ -43,7 +43,7 @@
     $('workspace-error').textContent = ''; $('workspace-status').hidden = true;
     try {
       if (info?.active) await window.ResearchNotebooks?.prepareToLeave();
-      const result = await post('/api/workspaces/open', { path });
+      const result = await post(creation ? '/api/workspaces/create' : '/api/workspaces/open', creation || { path });
       workspaceId = result.active.id;
       sessionStorage.setItem('pw-workspace', workspaceId);
       recent = [result.active, ...recent.filter(item => item.path !== result.active.path)].slice(0, 8);
@@ -67,6 +67,32 @@
   }
 
   $('workspace-open').addEventListener('click', browse);
+  $('workspace-new').addEventListener('click', () => {
+    $('workspace-create-form').hidden = false;
+    $('workspace-new').setAttribute('aria-expanded', 'true');
+    $('workspace-create-name').focus();
+  });
+  $('workspace-create-cancel').addEventListener('click', () => {
+    $('workspace-create-form').hidden = true;
+    $('workspace-new').setAttribute('aria-expanded', 'false');
+    $('workspace-error').textContent = '';
+    $('workspace-new').focus();
+  });
+  $('workspace-create-browse').addEventListener('click', async () => {
+    if (picking || opening) return;
+    picking = true; setBusy(true);
+    $('workspace-error').textContent = '';
+    try {
+      const result = await post('/api/workspaces/pick', { path: $('workspace-create-parent').value.trim() || info?.defaultPath });
+      if (result.path) $('workspace-create-parent').value = result.path;
+    } catch (error) { showError(error); }
+    finally { picking = false; setBusy(false); }
+  });
+  $('workspace-create-form').addEventListener('submit', event => {
+    event.preventDefault();
+    if (picking || opening) return;
+    return select(null, { name: $('workspace-create-name').value.trim(), parentPath: $('workspace-create-parent').value.trim() });
+  });
   $('workspace-switch').addEventListener('click', browse);
   $('workspace-change').addEventListener('click', browse);
   $('workspace-close').addEventListener('click', async () => {
