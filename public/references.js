@@ -1,6 +1,22 @@
 (() => {
   const $ = id => document.getElementById(id);
   const editor = $('references-editor');
+  const source = $('references-source');
+  const lineNumbers = $('references-line-numbers');
+  let lineCount = 0;
+  function syncGutterScroll() {
+    lineNumbers.style.transform = `translateY(${-editor.scrollTop}px)`;
+  }
+  function syncLineNumbers() {
+    const count = editor.value.split('\n').length;
+    if (count !== lineCount) {
+      lineCount = count;
+      lineNumbers.textContent = Array.from({ length: count }, (_, index) => index + 1).join('\n');
+      source.style.setProperty('--line-number-digits', Math.max(2, String(count).length));
+    }
+    syncGutterScroll();
+  }
+  editor.addEventListener('scroll', syncGutterScroll);
   const save = $('references-save');
   const reload = $('references-reload');
   const status = $('references-status');
@@ -98,6 +114,8 @@
     sourceView = showSource;
     preview.hidden = sourceView;
     editor.hidden = !sourceView;
+    source.hidden = !sourceView;
+    if (sourceView) syncLineNumbers();
     previewToggle.setAttribute('aria-pressed', String(!sourceView));
     sourceToggle.setAttribute('aria-pressed', String(sourceView));
     if (!sourceView) refreshPreview();
@@ -121,6 +139,7 @@
       const line = editor.value.slice(0, entry.start).split('\n').length - 1;
       editor.scrollTop = line * parseFloat(window.getComputedStyle(editor).lineHeight);
       editor.scrollLeft = 0;
+      syncGutterScroll();
       editor.scrollIntoView({ block: 'nearest' });
       status.textContent = `Editing ${entry.key}${dirty() ? ' · Unsaved changes' : ''}`;
       return;
@@ -163,6 +182,7 @@
     try {
       const data = await request();
       saved = data.content; revision = data.revision; editor.value = saved;
+      syncLineNumbers();
       folded.clear();
       expandedEntries.clear();
       refreshPreview();
@@ -171,6 +191,7 @@
     finally { busy = false; render(); }
   }
   editor.addEventListener('input', () => {
+    syncLineNumbers();
     status.textContent = dirty() ? 'Unsaved changes' : 'All changes saved'; render();
   });
   save.addEventListener('click', async () => {
@@ -180,6 +201,7 @@
       const data = await request({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: editor.value, revision }) });
       saved = data.content; revision = data.revision;
       editor.value = saved;
+      syncLineNumbers();
       refreshPreview();
       status.textContent = 'Saved references.bib';
     } catch (error) { status.textContent = error.message; }

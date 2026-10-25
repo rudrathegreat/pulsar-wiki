@@ -18,7 +18,7 @@ Settings: add, replace or remove a NASA ADS API token for literature searches. T
 
 After updating the application, restart its server and refresh the browser to load new settings endpoints. NASA ADS settings show a restart instruction if the running server does not support token saving.
 
-Bibliography access: both the Wiki and Sources sidebars include a persistent `references.bib` shortcut below their file lists. Select it to open the current workspace's References preview and BibTeX editor.
+Bibliography access: both the Wiki and Sources sidebars include a persistent `references.bib` shortcut below their file lists. Select it to open the current workspace's References preview and BibTeX editor. The BibTeX editor includes a left-hand line-number gutter that updates with edits and follows scrolling, including jumps to individual references.
 
 References preview: papers start collapsed by default. Expand a paper to view its properties, or use Expand all. Select Edit beside a paper to open raw BibTeX, highlight its entry and scroll to it; unsaved edits are retained. Select a `file` field link to open that source in PulsarWiki's document reader, including the PDF reading tools for PDFs.
 

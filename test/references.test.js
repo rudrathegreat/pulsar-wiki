@@ -79,7 +79,7 @@ test('batch imports save full citation metadata before the next download can exp
 function editorClient() {
   const nodes = new Map();
   const node = id => {
-    if (!nodes.has(id)) nodes.set(id, { value: '', textContent: '', innerHTML: '', disabled: false, handlers: {}, setAttribute(name, value) { this[name] = value; }, addEventListener(type, handler) { this.handlers[type] = handler; } });
+    if (!nodes.has(id)) nodes.set(id, { value: '', textContent: '', innerHTML: '', disabled: false, scrollTop: 0, style: { setProperty(name, value) { this[name] = value; } }, handlers: {}, setAttribute(name, value) { this[name] = value; }, addEventListener(type, handler) { this.handlers[type] = handler; } });
     return nodes.get(id);
   };
   let data = { content: '@misc{old, title={Original}}', revision: '1' };
@@ -147,9 +147,15 @@ test('preview preserves entry and property order, nested authors and unsaved Bib
   const source = '@misc{old, title={Earlier source}, year={2020}}\n@article{new, title={A {Pulsar} study}, author={A and B and C and D}, year={2024}, keywords={timing; gravity}, doi={10.1/example}, url={javascript:alert(1)}, custom={keep me}}';
   c.node('references-source-toggle').handlers.click();
   assert.equal(c.node('references-editor').hidden, false);
+  assert.equal(c.node('references-source').hidden, false);
   c.node('references-editor').value = source;
   c.node('references-editor').handlers.input();
+  assert.equal(c.node('references-line-numbers').textContent, '1\n2');
+  c.node('references-editor').scrollTop = 22.1;
+  c.node('references-editor').handlers.scroll();
+  assert.equal(c.node('references-line-numbers').style.transform, 'translateY(-22.1px)');
   c.node('references-preview-toggle').handlers.click();
+  assert.equal(c.node('references-source').hidden, true);
   const markup = c.node('references-tree').innerHTML;
   assert.match(markup, /A Pulsar study/);
   assert.match(markup, /4 authors/);
@@ -255,6 +261,7 @@ test('Edit opens and scrolls to the exact filtered entry, preserving unsaved sou
   assert.equal(editor.selectionStart, prefix.length);
   assert.equal(source.slice(editor.selectionStart, editor.selectionEnd), target);
   assert.equal(editor.scrollTop, 4 * 22.1);
+  assert.equal(c.node('references-line-numbers').style.transform, `translateY(${-4 * 22.1}px)`);
   assert.equal(editor.scrollLeft, 0);
   assert.equal(editor.value, source);
   assert.equal(c.requests.length, 1, 'navigation does not reload or save the bibliography');
