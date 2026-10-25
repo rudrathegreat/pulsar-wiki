@@ -3192,11 +3192,28 @@ button:disabled {
 .source-paper-group { margin-top: 40px; padding-top: 26px; border-top: 1px solid var(--border); }
 .source-paper-page .source-related-empty { margin-top: 16px; }
 /* Workspace bibliography */
+/* Fit the BibTeX source to the space left beneath the Sources controls. */
+#panel-files:has(#source-view-references:not([hidden]) #references-source:not([hidden])) .sources-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 24px;
+}
+#panel-files:has(#references-source:not([hidden])) .sources-header,
+#panel-files:has(#references-source:not([hidden])) .source-tabs,
+#source-view-references > .saved-sources-header,
+#references-status { flex-shrink: 0; }
+#source-view-references:has(#references-source:not([hidden])) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
 .references-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .references-label { display: block; margin: 16px 0 8px; font-size: 13px; color: var(--text-2); }
 #references-status { min-height: 20px; margin-top: 16px; font-size: 13px; color: var(--text-2); }
-#references-source { border-radius: 6px; font: 13px/1.7 var(--mono); }
-#references-editor { display: block; flex: 1; min-width: 0; width: 0; height: 55vh; min-height: 55vh; padding: 16px; resize: vertical; border: 0; border-radius: 0; background: var(--bg); color: var(--text-1); font: inherit; tab-size: 2; white-space: pre; overflow-wrap: normal; }
+#references-source { flex: 1; min-height: 0; border-radius: 6px; font: 13px/1.7 var(--mono); }
+#references-editor { display: block; flex: 1; min-width: 0; width: 0; height: 100%; min-height: 0; padding: 16px; resize: none; overflow: auto; border: 0; border-radius: 0; background: var(--bg); color: var(--text-1); font: inherit; tab-size: 2; white-space: pre; overflow-wrap: normal; }
 #references-editor:focus { outline: none; }
 #references-source[hidden], #references-editor[hidden], #references-preview[hidden] { display: none; }
 .references-view-switch { display: flex; padding: 3px; gap: 2px; background: var(--surface); border-radius: 7px; }
