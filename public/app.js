@@ -447,10 +447,27 @@ function editWikiPage(page, content, editAction, notebookAction) {
   const form = document.createElement('form');
   form.className = 'wiki-editor';
   form.innerHTML = `<label for="wiki-page-editor">Edit page Markdown</label>
-    <textarea id="wiki-page-editor" spellcheck="false"></textarea>
+    <div class="wiki-editor-source">
+      <div class="wiki-editor-gutter" aria-hidden="true"><div class="wiki-editor-line-numbers"></div></div>
+      <textarea id="wiki-page-editor" wrap="off" spellcheck="false"></textarea>
+    </div>
     <div class="wiki-editor-actions"><button class="btn" type="submit">Save</button><button class="btn" type="button" data-cancel>Cancel</button></div>
     <p role="status" aria-live="polite"></p>`;
   const editor = form.querySelector('textarea');
+  const source = form.querySelector('.wiki-editor-source');
+  const lineNumbers = form.querySelector('.wiki-editor-line-numbers');
+  let lineCount = 0;
+  const syncLineNumbers = () => {
+    const count = editor.value.split('\n').length;
+    if (count !== lineCount) {
+      lineCount = count;
+      lineNumbers.textContent = Array.from({ length: count }, (_, index) => index + 1).join('\n');
+      source.style.setProperty('--line-number-digits', Math.max(2, String(count).length));
+    }
+    lineNumbers.style.transform = `translateY(${-editor.scrollTop}px)`;
+  };
+  editor.addEventListener('input', syncLineNumbers);
+  editor.addEventListener('scroll', syncLineNumbers);
   const save = form.querySelector('[type="submit"]');
   const cancel = form.querySelector('[data-cancel]');
   const status = form.querySelector('[role="status"]');
@@ -477,6 +494,7 @@ function editWikiPage(page, content, editAction, notebookAction) {
     }
   });
   dom.wikiBody.append(form);
+  syncLineNumbers();
   editor.focus();
 }
 

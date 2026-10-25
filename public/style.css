@@ -649,17 +649,49 @@ body {
 }
 
 .wiki-editor { display: flex; flex-direction: column; gap: 12px; }
-.wiki-editor textarea {
-  width: 100%;
-  min-height: 60vh;
-  resize: vertical;
-  padding: 16px;
+.wiki-editor-source {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg);
-  color: var(--text-1);
   font: 13px/1.6 var(--mono);
 }
+.wiki-editor-source:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+.wiki-editor-gutter {
+  position: relative;
+  flex: 0 0 calc(var(--line-number-digits, 2) * 1ch + 24px);
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+  user-select: none;
+}
+.wiki-editor-line-numbers {
+  position: absolute;
+  inset: 0 0 auto;
+  padding: 16px 12px;
+  text-align: right;
+  white-space: pre;
+}
+.wiki-editor textarea {
+  flex: 1;
+  min-width: 0;
+  width: 0;
+  height: 60vh;
+  min-height: 60vh;
+  resize: vertical;
+  padding: 16px;
+  border: 0;
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--text-1);
+  font: inherit;
+  overflow-wrap: normal;
+  white-space: pre;
+}
+.wiki-editor textarea:focus { outline: none; }
 .wiki-editor-actions { display: flex; gap: 8px; }
 
 .wiki-breadcrumb .breadcrumb-link {

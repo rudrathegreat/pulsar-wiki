@@ -6,7 +6,7 @@ Application navigation: each main tab and Sources subtab has its own URL, includ
 
 Application branding: the PulsarWiki logo appears at the top of the iconbar and adapts to dark and light themes.
 
-Wiki editing: select Edit to the left of Add page reference to notebook on any page to edit its Markdown. Save applies the changes; Cancel restores the displayed page. Background file refreshes leave the editor open, and failed saves retain the draft.
+Wiki editing: select Edit to the left of Add page reference to notebook on any page to edit its Markdown. A left-hand gutter shows line numbers that update as you type and stay aligned while scrolling; long lines scroll horizontally. Save applies the changes; Cancel restores the displayed page. Background file refreshes leave the editor open, and failed saves retain the draft.
 
 Source authors: search results, paper details, related papers, and the References preview link author names to ORCID profiles when a valid ID is supplied by the paper metadata or found through an ADS or Crossref lookup. Missing or ambiguous matches remain plain text; imported IDs are retained in positional BibTeX `orcid` lists.
 
