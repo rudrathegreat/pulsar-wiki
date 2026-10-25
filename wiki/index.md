@@ -89,6 +89,7 @@ Project handover: project details, searchable autocomplete selection of wiki pag
 - [[pulsar-catalog]]: A directory of physical parameters for known pulsars.
 
 ## Project Continuity
+- Welcome screen: **New project** and **Open project** stay side by side with single-line labels (layout: `public/style.css`).
 - Project creation: **New project** on the welcome screen creates a named subfolder in the selected parent folder, populates a clean research template, and opens it automatically; existing names are rejected without overwriting files. See README.md for the template contents. Restart the running Node server after backend changes so the welcome screen and project API use the same version.
 - [[research-notebooks]]: Embedded JupyterLab for free-form local Python analyses, cited paper and wiki transfers, automatic local history, clean reruns, and on-request recall linked to historical cells; automatic local Python startup with a loading animation until the editor is ready, in a workspace without the extra file sidebar or action bar.
 - [[project-handover]]: A project handover drafted from complete selected file text using backend instructions, displayed as Markdown for researcher review before publication, with aligned form spacing, larger labels and review controls, and simplified review and publication copy.

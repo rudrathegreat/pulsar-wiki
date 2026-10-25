@@ -12,9 +12,11 @@ body.workspace-ready #workspace-welcome { display: none; }
 [data-theme="light"] .welcome-brand img { filter: invert(1); }
 .welcome-content h1 { font-size: 44px; font-weight: 400; letter-spacing: -1.8px; line-height: 1.2; }
 .welcome-tagline { font-size: 20px; opacity: .5; margin-top: 8px; }
-.welcome-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 70px; margin-top: 48px; }
+.welcome-columns { display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(0, 1fr); gap: 70px; margin-top: 48px; }
 .welcome-columns h2 { font-size: 16px; font-weight: 500; margin-bottom: 18px; }
 .welcome-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.welcome-columns > section > .welcome-actions { flex-wrap: nowrap; align-items: center; }
+.welcome-actions > .btn { flex: 0 0 auto; white-space: nowrap; }
 #workspace-create-form { margin-top: 20px; }
 #workspace-create-form label { display: block; font-size: 12px; margin: 14px 0 6px; }
 #workspace-create-form input { width: 100%; min-width: 0; padding: 8px 10px; background: var(--bg); color: var(--text-1); border: 1px solid var(--border); border-radius: 4px; font: inherit; }
