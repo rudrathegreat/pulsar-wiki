@@ -6,7 +6,7 @@ Application navigation: each main tab and Sources subtab has its own URL, includ
 
 Application branding: the PulsarWiki logo appears at the top of the iconbar and adapts to dark and light themes.
 
-Wiki editing: select Edit to the left of Add page reference to notebook on any page to edit its Markdown. The editor uses the available panel width and height, keeping scrolling inside the source area and Save and Cancel visible. A left-hand gutter shows line numbers that update as you type and stay aligned while scrolling; long lines scroll horizontally. Save applies the changes; Cancel restores the displayed page. Background file refreshes leave the editor open, and failed saves retain the draft.
+Wiki editing: select Edit to the left of Add page reference to notebook on any page to edit its Markdown. The editor uses the available panel width and height, keeping scrolling inside the source area and Save and Cancel visible. Long source lines wrap to the available width, and the line-number gutter leaves space for continuation rows so numbers stay aligned through typing, scrolling and resizing. Save applies the changes; Cancel restores the displayed page. Background file refreshes leave the editor open, and failed saves retain the draft.
 
 Source authors: search results, paper details, related papers, and the References preview link author names to ORCID profiles when a valid ID is supplied by the paper metadata or found through an ADS or Crossref lookup. Missing or ambiguous matches remain plain text; imported IDs are retained in positional BibTeX `orcid` lists.
 
@@ -18,7 +18,7 @@ Settings: add, replace or remove a NASA ADS API token for literature searches. T
 
 After updating the application, restart its server and refresh the browser to load new settings endpoints. NASA ADS settings show a restart instruction if the running server does not support token saving.
 
-Bibliography access: both the Wiki and Sources sidebars include a persistent `references.bib` shortcut below their file lists. Select it to open the current workspace's References preview and BibTeX editor. The BibTeX editor fills the available height beneath the Sources controls, keeping long files scrolling inside the editor. It includes a left-hand line-number gutter that updates with edits and follows scrolling, including jumps to individual references.
+Bibliography access: both the Wiki and Sources sidebars include a persistent `references.bib` shortcut below their file lists. Select it to open the current workspace's References preview and BibTeX editor. The BibTeX editor fills the available height beneath the Sources controls, keeping long files scrolling inside the editor. Long source lines wrap without changing the saved text; the line-number gutter expands each row to match its wrapped text, including after resizing and jumps to individual references.
 
 References preview: papers start collapsed by default. Expand a paper to view its properties, or use Expand all. Select Edit beside a paper to open raw BibTeX, highlight its entry and scroll to it; unsaved edits are retained. Select a `file` field link to open that source in PulsarWiki's document reader, including the PDF reading tools for PDFs.
 

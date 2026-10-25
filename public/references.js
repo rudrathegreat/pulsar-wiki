@@ -3,20 +3,9 @@
   const editor = $('references-editor');
   const source = $('references-source');
   const lineNumbers = $('references-line-numbers');
-  let lineCount = 0;
-  function syncGutterScroll() {
-    lineNumbers.style.transform = `translateY(${-editor.scrollTop}px)`;
-  }
-  function syncLineNumbers() {
-    const count = editor.value.split('\n').length;
-    if (count !== lineCount) {
-      lineCount = count;
-      lineNumbers.textContent = Array.from({ length: count }, (_, index) => index + 1).join('\n');
-      source.style.setProperty('--line-number-digits', Math.max(2, String(count).length));
-    }
-    syncGutterScroll();
-  }
-  editor.addEventListener('scroll', syncGutterScroll);
+  const gutter = window.SourceEditor(editor, source, lineNumbers);
+  const syncLineNumbers = gutter.sync;
+  const syncGutterScroll = gutter.syncScroll;
   const save = $('references-save');
   const reload = $('references-reload');
   const status = $('references-status');
@@ -134,10 +123,8 @@
       setView(true);
       editor.focus({ preventScroll: true });
       editor.setSelectionRange(entry.start, entry.end);
-      // The unwrapped source uses one visual line per newline, so even long
-      // abstracts above the target cannot shift its scroll position.
       const line = editor.value.slice(0, entry.start).split('\n').length - 1;
-      editor.scrollTop = line * parseFloat(window.getComputedStyle(editor).lineHeight);
+      editor.scrollTop = gutter.lineOffset(line);
       editor.scrollLeft = 0;
       syncGutterScroll();
       editor.scrollIntoView({ block: 'nearest' });

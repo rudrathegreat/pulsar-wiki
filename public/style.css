@@ -665,6 +665,7 @@ body {
 .wiki-editor > [role="status"] { overflow-wrap: anywhere; }
 .wiki-editor > .wiki-editor-source { flex: 1; min-height: 0; }
 .wiki-editor-source {
+  position: relative;
   display: flex;
   min-width: 0;
   overflow: hidden;
@@ -704,8 +705,17 @@ body {
   background: var(--bg);
   color: var(--text-1);
   font: inherit;
-  overflow-wrap: normal;
-  white-space: pre;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.wiki-editor-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .wiki-editor textarea:focus { outline: none; }
 .wiki-editor-actions { display: flex; gap: 8px; }

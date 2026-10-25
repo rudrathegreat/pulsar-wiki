@@ -449,25 +449,16 @@ function editWikiPage(page, content, editAction, notebookAction) {
   form.innerHTML = `<label for="wiki-page-editor">Edit page Markdown</label>
     <div class="wiki-editor-source">
       <div class="wiki-editor-gutter" aria-hidden="true"><div class="wiki-editor-line-numbers"></div></div>
-      <textarea id="wiki-page-editor" wrap="off" spellcheck="false"></textarea>
+      <textarea id="wiki-page-editor" wrap="soft" spellcheck="false"></textarea>
     </div>
     <div class="wiki-editor-actions"><button class="btn" type="submit">Save</button><button class="btn" type="button" data-cancel>Cancel</button></div>
     <p role="status" aria-live="polite"></p>`;
   const editor = form.querySelector('textarea');
   const source = form.querySelector('.wiki-editor-source');
   const lineNumbers = form.querySelector('.wiki-editor-line-numbers');
-  let lineCount = 0;
-  const syncLineNumbers = () => {
-    const count = editor.value.split('\n').length;
-    if (count !== lineCount) {
-      lineCount = count;
-      lineNumbers.textContent = Array.from({ length: count }, (_, index) => index + 1).join('\n');
-      source.style.setProperty('--line-number-digits', Math.max(2, String(count).length));
-    }
-    lineNumbers.style.transform = `translateY(${-editor.scrollTop}px)`;
-  };
+  const gutter = window.SourceEditor(editor, source, lineNumbers);
+  const syncLineNumbers = gutter.sync;
   editor.addEventListener('input', syncLineNumbers);
-  editor.addEventListener('scroll', syncLineNumbers);
   const save = form.querySelector('[type="submit"]');
   const cancel = form.querySelector('[data-cancel]');
   const status = form.querySelector('[role="status"]');
@@ -475,6 +466,7 @@ function editWikiPage(page, content, editAction, notebookAction) {
   editAction.disabled = true;
   notebookAction.disabled = true;
   cancel.addEventListener('click', () => {
+    gutter.destroy();
     dom.wikiBody.replaceChildren(renderedPage);
     editAction.disabled = false;
     notebookAction.disabled = false;
@@ -487,7 +479,10 @@ function editWikiPage(page, content, editAction, notebookAction) {
     status.textContent = 'Saving...';
     try {
       await api.saveWikiPage(page, editor.value);
-      if (state.currentPage === page && form.isConnected) await openPage(page, { historyMode: 'none' });
+      if (state.currentPage === page && form.isConnected) {
+        gutter.destroy();
+        await openPage(page, { historyMode: 'none' });
+      }
     } catch (error) {
       status.textContent = `Could not save page: ${error.message}`;
       save.disabled = cancel.disabled = editor.disabled = false;

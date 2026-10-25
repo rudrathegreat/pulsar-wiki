@@ -79,7 +79,7 @@ test('batch imports save full citation metadata before the next download can exp
 function editorClient() {
   const nodes = new Map();
   const node = id => {
-    if (!nodes.has(id)) nodes.set(id, { value: '', textContent: '', innerHTML: '', disabled: false, scrollTop: 0, style: { setProperty(name, value) { this[name] = value; } }, handlers: {}, setAttribute(name, value) { this[name] = value; }, addEventListener(type, handler) { this.handlers[type] = handler; } });
+    if (!nodes.has(id)) nodes.set(id, { value: '', textContent: '', innerHTML: '', disabled: false, scrollTop: 0, clientWidth: 500, children: [], append(child) { this.children.push(child); }, replaceChildren(...children) { this.children = children; this.textContent = children.map(child => child.textContent).join('\n'); }, style: { setProperty(name, value) { this[name] = value; } }, handlers: {}, setAttribute(name, value) { this[name] = value; }, addEventListener(type, handler) { this.handlers[type] = handler; } });
     return nodes.get(id);
   };
   let data = { content: '@misc{old, title={Original}}', revision: '1' };
@@ -97,8 +97,9 @@ function editorClient() {
       return data;
     },
   };
+  const layout = require('./source-editor-fixture').installSourceEditor(context);
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../public/references.js'), 'utf8'), context);
-  return { node, context, requests, fail: () => { fail = true; } };
+  return { node, context, requests, layout, fail: () => { fail = true; } };
 }
 
 test('existing References links positional ORCID IDs and requests missing profiles', async () => {
@@ -230,6 +231,33 @@ test('entry and author branches fold independently and keep their state through 
   assert.match(tree.innerHTML, /reference-entry" data-path="0" open/);
   assert.match(tree.innerHTML, /<details data-path="0\/author" open>/);
   assert.equal(c.node('references-editor').value, '@article{paper, title={Pulsars}, author={First and Second}}');
+});
+
+test('wrapped source lines leave gutter space, reflow on resize and preserve reference jumps', async () => {
+  const c = editorClient(); await c.context.window.ReferencesEditor.open();
+  const editor = c.node('references-editor');
+  const long = '% ' + 'Long source text '.repeat(30);
+  editor.value = `${long}\n\n@misc{target, title={Target}}`;
+  c.layout.measureWith(text => text === long ? 66.3 : 22.1);
+  editor.handlers.input();
+  const numbers = c.node('references-line-numbers');
+  assert.equal(numbers.textContent, '1\n2\n3');
+  assert.equal(numbers.children[0].style.height, '66.3px');
+  assert.equal(numbers.children[1].style.height, '22.1px', 'blank lines retain their own row');
+  c.node('references-preview-toggle').handlers.click();
+  editor.focus = () => {};
+  editor.setSelectionRange = () => {};
+  editor.scrollIntoView = () => {};
+  c.node('references-tree').handlers.click({
+    target: { closest: selector => selector === '[data-reference-edit]' ? { dataset: { referenceEdit: '0' } } : null },
+    preventDefault() {},
+  });
+  assert.equal(editor.scrollTop, 88.4);
+  assert.equal(numbers.style.transform, 'translateY(-88.4px)');
+  c.layout.measureWith(text => text === long ? 110.5 : 22.1);
+  c.layout.resize();
+  assert.equal(numbers.children[0].style.height, '110.5px');
+  assert.equal(editor.value, `${long}\n\n@misc{target, title={Target}}`, 'soft wrapping preserves source newlines');
 });
 
 test('Edit opens and scrolls to the exact filtered entry, preserving unsaved source and duplicate keys', async () => {
