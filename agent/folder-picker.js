@@ -1,7 +1,7 @@
 'use strict';
 
 const { execFile } = require('node:child_process');
-
+const path = require('node:path');
 // The browser cannot expose an absolute folder path. Ask the local OS directly;
 // pass the starting path as data, never as executable command text.
 function pickFolder({ initialPath = '', platform = process.platform, execute = execFile } = {}) {
@@ -9,20 +9,7 @@ function pickFolder({ initialPath = '', platform = process.platform, execute = e
   let args;
   if (platform === 'win32') {
     command = 'powershell.exe';
-    args = ['-NoProfile', '-STA', '-Command', `
-      $ErrorActionPreference = 'Stop'
-      [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding
-      Add-Type -AssemblyName System.Windows.Forms
-      $picker = New-Object System.Windows.Forms.FolderBrowserDialog
-      $picker.Description = 'Select research workspace folder'
-      $picker.SelectedPath = $env:PULSARWIKI_PICKER_PATH
-      $picker.ShowNewFolderButton = $true
-      try {
-        if ($picker.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-          [Console]::Write($picker.SelectedPath)
-        }
-      } finally { $picker.Dispose() }
-    `];
+    args = ['-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'windows-folder-picker.ps1')];
   } else if (platform === 'darwin') {
     command = 'osascript';
     args = ['-e', 'POSIX path of (choose folder with prompt "Select research workspace folder")'];

@@ -10,7 +10,8 @@ test('Windows folder dialog returns the absolute path and passes the starting fo
   const result = await pickFolder({ initialPath, platform: 'win32', execute(command, args, options, callback) {
     assert.equal(command, 'powershell.exe');
     assert.ok(args.includes('-STA'));
-    assert.match(args.at(-1), /System.Windows.Forms.FolderBrowserDialog/);
+    assert.ok(args.includes('-File'));
+    assert.match(args.at(-1), /windows-folder-picker\.ps1$/);
     assert.equal(args.at(-1).includes(initialPath), false);
     assert.equal(options.env.PULSARWIKI_PICKER_PATH, initialPath);
     assert.equal(options.windowsHide, true);
@@ -29,8 +30,8 @@ test('cancelling the native dialog returns no selection', async () => {
   }
 });
 
-test('missing or failed native dialogs give a manual-path fallback', async () => {
+test('missing or failed native dialogs give a retry message', async () => {
   await assert.rejects(pickFolder({ platform: 'win32', execute(command, args, options, callback) {
     callback({ code: 'ENOENT' }, '', '');
-  } }), /Enter the folder path and select Open/);
+  } }), /The system folder picker could not open/);
 });
