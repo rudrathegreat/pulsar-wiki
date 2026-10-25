@@ -34,7 +34,7 @@ function pickFolder({ initialPath = '', platform = process.platform, execute = e
     execute(command, args, { windowsHide: true, encoding: 'utf8', timeout: 180000, maxBuffer: 65536, env: { ...process.env, PULSARWIKI_PICKER_PATH: initialPath } }, (error, stdout, stderr) => {
       if (error) {
         if ((platform === 'darwin' && String(stderr).includes('(-128)')) || (platform !== 'win32' && platform !== 'darwin' && error.code === 1)) return resolve(null);
-        return reject(new Error('The system folder picker could not open. Enter the folder path and select Open.'));
+        return reject(new Error('The system folder picker could not open. Please try again.'));
       }
       resolve(String(stdout || '').replace(/^\uFEFF/, '').trim() || null);
     });

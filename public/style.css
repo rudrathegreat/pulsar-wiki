@@ -25,9 +25,6 @@ body.workspace-ready #workspace-welcome { display: none; }
 #workspace-current-name { white-space: nowrap; }
 #workspace-current-path { flex: 1 1 200px; font: 12px var(--mono); overflow-wrap: anywhere; user-select: all; }
 #workspace-close { margin-left: auto; flex-shrink: 0; padding: 3px 8px; background: none; color: var(--button-text) !important; border: 0; font: inherit; cursor: pointer; }
-#workspace-path-form label { display: block; font-size: 12px; margin-bottom: 8px; }
-.workspace-path-row { display: flex; flex-wrap: wrap; gap: 8px; }
-#workspace-path { flex: 1 1 100%; min-width: 0; padding: 10px; font: 12px var(--mono); color: var(--text-1); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; }
 #workspace-status:not([hidden]) { position: fixed; top: 44px; right: 20px; max-width: min(480px, 90vw); padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); z-index: 100; font-size: 13px; }
 #workspace-change { flex-shrink: 0; padding: 3px 8px; font: inherit; cursor: pointer; color: var(--text-1) !important; }
 .workspace-loading .welcome-columns { opacity: .4; pointer-events: none; }
