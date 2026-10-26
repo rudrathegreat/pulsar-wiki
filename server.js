@@ -9,7 +9,7 @@ const crypto = require('node:crypto');
 const { pipeline } = require('node:stream/promises');
 const chokidar = require('chokidar');
 const { AsyncLocalStorage } = require('node:async_hooks');
-const { initializeWorkspace, createWorkspace, describe } = require('./agent/workspaces');
+const { initializeWorkspace, createWorkspace, validateWorkspace, describe } = require('./agent/workspaces');
 const { pickFolder } = require('./agent/folder-picker');
 const { AgentService, AgentServiceError } = require('./agent/agent-service');
 const { ChatGPTAuthError, ChatGPTAuthService } = require('./agent/chatgpt-auth');
@@ -53,7 +53,7 @@ const sourceSettings = new SourceSettings({ dataDir: path.join(ROOT_DIR, '.pulsa
 function openWorkspace(folder) {
   if (typeof folder !== 'string' || !folder.trim() || !path.isAbsolute(folder.trim())) throw new Error('Enter an absolute folder path.');
   folder = folder.trim();
-  const root = fs.realpathSync(folder);
+  const root = validateWorkspace(folder);
   const cached = [...workspaces.values()].find(workspace => workspace.rootDir === root);
   if (cached) return cached;
   const workspace = initializeWorkspace(folder);

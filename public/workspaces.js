@@ -10,6 +10,7 @@
   const showError = error => {
     const target = $(info?.active ? 'workspace-status' : 'workspace-error');
     target.textContent = error.message; target.hidden = false;
+    if (error.message === 'this project is not compatible. Please select a different project') window.alert(error.message);
   };
   const setBusy = busy => {
     for (const id of ['workspace-open', 'workspace-switch', 'workspace-change', 'workspace-close', 'workspace-new', 'workspace-create-browse', 'workspace-create-submit', 'workspace-create-cancel', 'workspace-create-name', 'workspace-create-parent']) $(id).disabled = busy;

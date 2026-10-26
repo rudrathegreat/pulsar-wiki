@@ -6,6 +6,8 @@ Application navigation: each main tab and Sources subtab has its own URL, includ
 
 Application branding: the PulsarWiki logo appears at the top of the iconbar and adapts to dark and light themes.
 
+Project compatibility: Open project checks the selected folder against the project template before opening it. Incompatible folders remain untouched and show "this project is not compatible. Please select a different project" in a popup; the current project stays selected. Use New project to generate a compatible template. See the [workspace guide](../README.md#research-workspaces) for required files and folders.
+
 Wiki editing: select Edit to the left of Add page reference to notebook on any page to edit its Markdown. The editor uses the available panel width and height, keeping scrolling inside the source area and Save and Cancel visible. Long source lines wrap to the available width, and the line-number gutter leaves space for continuation rows so numbers stay aligned through typing, scrolling and resizing. Save applies the changes; Cancel restores the displayed page. Background file refreshes leave the editor open, and failed saves retain the draft.
 
 Source authors: search results, paper details, related papers, and the References preview link author names to ORCID profiles when a valid ID is supplied by the paper metadata or found through an ADS or Crossref lookup. Missing or ambiguous matches remain plain text; imported IDs are retained in positional BibTeX `orcid` lists.

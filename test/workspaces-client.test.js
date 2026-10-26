@@ -183,6 +183,28 @@ test('a failed folder open leaves the current selection intact and displays the 
   assert.deepEqual(c.navigations, []);
 });
 
+test('incompatible projects show a popup and preserve the current project or welcome screen', async () => {
+  const message = 'this project is not compatible. Please select a different project';
+  for (const active of [null, { id: 'current', name: 'Current', path: 'E:\\Research' }]) {
+    const c = client({ active, remembered: active?.id, fetchHandler: async url => {
+      if (url.endsWith('/open')) throw new Error(message);
+      if (url.endsWith('/pick')) return { path: 'E:\\Unrelated' };
+      return { active, recent: [], defaultPath: 'E:\\Research' };
+    } });
+    const alerts = [];
+    c.context.window.alert = text => alerts.push(text);
+    await c.initialize();
+    await c.nodes.get('workspace-open').listeners.click();
+    assert.deepEqual(alerts, [message]);
+    assert.equal(c.stored.get('pw-workspace'), active?.id || 'closed');
+    assert.equal(c.stored.has('pw-recent-workspaces'), false);
+    assert.deepEqual(c.navigations, []);
+    assert.equal(c.document.body.classList.contains('workspace-loading'), false);
+    assert.equal(c.nodes.get('workspace-open').disabled, false);
+    assert.equal(c.nodes.get(active ? 'workspace-status' : 'workspace-error').textContent, message);
+  }
+});
+
 test('all browser requests and document URLs pin the tab workspace', async () => {
   const requests = [];
   const context = { marked: { setOptions() {} }, sessionStorage: { getItem: () => 'tab-project' }, window: {},

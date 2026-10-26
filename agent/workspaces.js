@@ -46,6 +46,32 @@ function existingDirectory(value) {
   return directory;
 }
 
+const INCOMPATIBLE_PROJECT = 'this project is not compatible. Please select a different project';
+
+function validateWorkspace(value) {
+  const rootDir = existingDirectory(value);
+  const layout = [
+    ['wiki', true], ['raw', true], ['notebooks', true],
+    ['GEMINI.md', false], ['AGENTS.md', false], ['CLAUDE.md', false],
+    ['references.bib', false], ['.gitignore', false],
+    ['wiki/index.md', false], ['wiki/log.md', false],
+  ];
+  // Private data is recreated when absent (for example, after cloning a project).
+  if (fs.existsSync(path.join(rootDir, '.pulsarwiki'))) layout.push(['.pulsarwiki', true]);
+  for (const [name, directory] of layout) {
+    try {
+      const target = path.join(rootDir, name);
+      const relative = path.relative(rootDir, fs.realpathSync(target));
+      const stat = fs.statSync(target);
+      if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
+        || (directory ? !stat.isDirectory() : !stat.isFile())) throw new Error(INCOMPATIBLE_PROJECT);
+    } catch {
+      throw new Error(INCOMPATIBLE_PROJECT);
+    }
+  }
+  return rootDir;
+}
+
 function initializeWorkspace(value) {
   const rootDir = existingDirectory(value);
   // Validate the entire layout before creating anything. Existing files are never overwritten.
@@ -97,4 +123,4 @@ function createWorkspace(parentPath, projectName) {
   return workspace;
 }
 
-module.exports = { initializeWorkspace, createWorkspace, describe };
+module.exports = { initializeWorkspace, createWorkspace, validateWorkspace, describe };

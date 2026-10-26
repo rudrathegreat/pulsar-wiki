@@ -7,7 +7,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const test = require('node:test');
 const WebSocket = require('ws');
-const { initializeWorkspace, createWorkspace } = require('../agent/workspaces');
+const { initializeWorkspace, createWorkspace, validateWorkspace } = require('../agent/workspaces');
 
 function createFolder(root, name) { const folder = path.join(root, name); fs.mkdirSync(folder); return folder; }
 
@@ -30,6 +30,33 @@ test('new projects create an independent base template in a named child folder',
   fs.writeFileSync(path.join(workspace.rootDir, 'keep.txt'), 'keep');
   assert.throws(() => createWorkspace(parent, 'Timing study'), /already exists/);
   assert.equal(fs.readFileSync(path.join(workspace.rootDir, 'keep.txt'), 'utf8'), 'keep');
+});
+
+test('opening requires the project template and never repairs incompatible folders', t => {
+  const parent = temporaryDirectory(t);
+  const unrelated = createFolder(parent, 'Unrelated');
+  fs.writeFileSync(path.join(unrelated, 'keep.txt'), 'keep');
+  const message = 'this project is not compatible. Please select a different project';
+  assert.throws(() => validateWorkspace(unrelated), { message });
+  assert.deepEqual(fs.readdirSync(unrelated), ['keep.txt']);
+  const workspace = createWorkspace(parent, 'Valid');
+  assert.equal(validateWorkspace(workspace.rootDir), fs.realpathSync(workspace.rootDir));
+  for (const name of ['wiki', 'raw', 'notebooks', 'GEMINI.md', 'AGENTS.md', 'CLAUDE.md', 'references.bib', '.gitignore', 'wiki/index.md', 'wiki/log.md']) {
+    const target = path.join(workspace.rootDir, name);
+    const backup = path.join(parent, 'backup');
+    fs.renameSync(target, backup);
+    assert.throws(() => validateWorkspace(workspace.rootDir), { message }, `missing ${name}`);
+    assert.equal(fs.existsSync(target), false);
+    const directory = fs.statSync(backup).isDirectory();
+    if (directory) fs.writeFileSync(target, 'wrong type');
+    else fs.mkdirSync(target);
+    assert.throws(() => validateWorkspace(workspace.rootDir), { message }, `wrong type ${name}`);
+    if (directory) fs.unlinkSync(target);
+    else fs.rmdirSync(target);
+    fs.renameSync(backup, target);
+  }
+  fs.rmdirSync(workspace.dataDir);
+  assert.equal(validateWorkspace(workspace.rootDir), fs.realpathSync(workspace.rootDir));
 });
 
 test('new projects reject invalid names and missing parent folders before writing', t => {
@@ -87,8 +114,8 @@ async function startServer(t) {
 
 test('server remembers selections and isolates simultaneous projects across APIs, uploads and sockets', async t => {
   const root = temporaryDirectory(t);
-  const firstPath = createFolder(root, 'Project one');
-  const secondPath = createFolder(root, 'Project two');
+  const firstPath = createWorkspace(root, 'Project one').rootDir;
+  const secondPath = createWorkspace(root, 'Project two').rootDir;
   const url = await startServer(t);
   const page = await fetch(url);
   const cookie = page.headers.getSetCookie()[0].split(';')[0];
@@ -110,6 +137,14 @@ test('server remembers selections and isolates simultaneous projects across APIs
   assert.equal((await (await request('/api/workspaces', { id: created.id })).json()).active.id, created.id);
   assert.equal((await request('/api/wiki', { id: created.id })).status, 200);
   assert.equal((await request('/api/workspaces/create', { method: 'POST', body: { parentPath: root, name: 'New study' } })).status, 400);
+
+  const unrelated = createFolder(root, 'Unrelated');
+  const rejected = await request('/api/workspaces/open', { method: 'POST', body: { path: unrelated } });
+  assert.equal(rejected.status, 400);
+  assert.equal((await rejected.json()).error, 'this project is not compatible. Please select a different project');
+  assert.deepEqual(fs.readdirSync(unrelated), []);
+  assert.ok(!rejected.headers.getSetCookie().some(value => value.startsWith('pulsarwiki_workspace=')));
+  assert.equal((await (await request('/api/workspaces', { id: created.id })).json()).active.id, created.id);
 
   const openResponse = await request('/api/workspaces/open', { method: 'POST', body: { path: firstPath } });
   assert.equal(openResponse.status, 200);
