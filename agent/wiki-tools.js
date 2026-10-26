@@ -219,9 +219,17 @@ class WikiTools {
     } catch {
       throw new WikiToolError('The local PDF text extractor is unavailable.', 'pdf-extractor-unavailable');
     }
+    let document;
     try {
       const data = new Uint8Array(this.fs.readFileSync(filePath));
-      const document = await pdfjs.getDocument({ data, disableWorker: true }).promise;
+      const pdfRoot = path.dirname(require.resolve('pdfjs-dist/package.json'));
+      document = await pdfjs.getDocument({
+        data,
+        isEvalSupported: false,
+        standardFontDataUrl: path.join(pdfRoot, 'standard_fonts').replace(/\\/g, '/') + '/',
+        cMapUrl: path.join(pdfRoot, 'cmaps').replace(/\\/g, '/') + '/',
+        cMapPacked: true,
+      }).promise;
       const pages = [];
       for (let number = 1; number <= document.numPages; number += 1) {
         const page = await document.getPage(number);
@@ -233,6 +241,8 @@ class WikiTools {
       return text;
     } catch (error) {
       throw new WikiToolError('PulsarWiki could not extract text from that PDF.', 'pdf-extraction-failed');
+    } finally {
+      if (document) await document.destroy();
     }
   }
 

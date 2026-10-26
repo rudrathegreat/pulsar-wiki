@@ -62,6 +62,40 @@ test('wiki tools extract notebook code, Markdown, and plain-text outputs for han
   assert.match(notebook.content, /RMS: 1\.2 us/);
 });
 
+test('PDF source extraction loads standard fonts without warnings and preserves the source', async t => {
+  const { raw, tools } = fixture(t);
+  const stream = 'BT /F1 12 Tf 72 720 Td (Standard font paper) Tj ET';
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`,
+  ];
+  let source = '%PDF-1.4\n';
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(Buffer.byteLength(source));
+    source += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = Buffer.byteLength(source);
+  source += `xref\n0 ${offsets.length}\n0000000000 65535 f \n`;
+  source += offsets.slice(1).map(offset => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
+  source += `trailer\n<< /Size ${offsets.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  const bytes = Buffer.from(source);
+  const file = path.join(raw, 'standard-font.pdf');
+  fs.writeFileSync(file, bytes);
+  const warnings = [];
+  t.mock.method(console, 'log', (...args) => warnings.push(args.join(' ')));
+  t.mock.method(console, 'warn', (...args) => warnings.push(args.join(' ')));
+
+  const extracted = await tools.readSource({ name: 'standard-font.pdf' });
+  assert.match(extracted.content, /Standard font paper/);
+  assert.deepEqual(warnings, [], 'PDF extraction must load bundled font data without warnings');
+  assert.deepEqual(fs.readFileSync(file), bytes);
+  assert.equal((await tools.readSource({ name: 'standard-font.pdf' })).content, extracted.content);
+});
+
 test('wiki writes require an index update, preserve raw, append log, and roll back a failed batch', t => {
   const { wiki, raw, tools } = fixture(t);
   assert.throws(

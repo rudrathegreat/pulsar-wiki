@@ -6,6 +6,8 @@ Application navigation: each main tab and Sources subtab has its own URL, includ
 
 Application branding: the PulsarWiki logo appears at the top of the iconbar and adapts to dark and light themes.
 
+Source review notifications: completed background source reviews show a custom notification throughout the application. Open the notification to read and approve the proposed wiki changes in its specific saved chat (`/#chat/<thread-id>`), or dismiss it. Separate reviews have separate notifications; unread reviews return after reconnecting or reloading while the server remains running.
+
 Project compatibility: Open project checks the selected folder against the project template before opening it. Incompatible folders remain untouched and show "this project is not compatible. Please select a different project" in a popup; the current project stays selected. Use New project to generate a compatible template. See the [workspace guide](../README.md#research-workspaces) for required files and folders.
 
 Wiki editing: select Edit to the left of Add page reference to notebook on any page to edit its Markdown. The editor uses the available panel width and height, keeping scrolling inside the source area and Save and Cancel visible. Long source lines wrap to the available width, and the line-number gutter leaves space for continuation rows so numbers stay aligned through typing, scrolling and resizing. Save applies the changes; Cancel restores the displayed page. Background file refreshes leave the editor open, and failed saves retain the draft.
@@ -25,6 +27,8 @@ Bibliography access: both the Wiki and Sources sidebars include a persistent `re
 References preview: papers start collapsed by default. Expand a paper to view its properties, or use Expand all. Select Edit beside a paper to open raw BibTeX, highlight its entry and scroll to it; unsaved edits are retained. Select a `file` field link to open that source in PulsarWiki's document reader, including the PDF reading tools for PDFs.
 
 Bibliography recovery: when source metadata is incomplete, uploads, paper imports and opening References ask the connected AI to extract bibliographic fields from the original PDF (or supported text document). Available fields are saved even when extraction is partial, without overwriting existing metadata, citation keys or comments. The completion note remains only if extraction fails or returns no usable fields. Opening References retries earlier failures; successful extraction is reused during the server session. Sources in `raw/` stay unchanged.
+
+PDF imports: server-side source extraction uses the bundled PDF.js standard fonts and character maps, including papers whose standard fonts are not embedded. Restart the server after updating to apply this fix.
 
 AI-assisted reading workspace: white surfaces with borderless light grey (`#eee`) highlight cards in light mode; `#1c1c1c` surfaces with `#222` inputs and highlight cards in dark mode, with a transparent page number input and borderless sidebar inputs and Find in paper search bar. The filename, file details, back and download header is removed; the reading toolbar remains above the document. The toolbar omits the Record lag button.
 

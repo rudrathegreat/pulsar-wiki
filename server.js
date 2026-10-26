@@ -129,6 +129,11 @@ async function runIngestJob(job) {
     job.error = asPublicError(error).text;
   }
   job.updatedAt = new Date().toISOString();
+  const workspace = currentWorkspace();
+  const payload = JSON.stringify({ type: 'source-job', job: publicIngestJob(job) });
+  wss.clients.forEach(client => {
+    if (client.workspace === workspace && client.readyState === WebSocket.OPEN) client.send(payload);
+  });
 }
 
 async function queueSourceIngest(files) {
@@ -633,6 +638,10 @@ wss.on('connection', (ws, request) => {
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(object));
   };
   send({ type: 'server-hello', protocol: CHAT_PROTOCOL_VERSION, capabilities: ['agent-chat', 'threaded-chat', 'session-cookie'] });
+  // Replay finished reviews after a reload or a temporary disconnection.
+  for (const job of workspace?.ingestJobs.values() || []) {
+    if (['completed', 'failed'].includes(job.status)) send({ type: 'source-job', job: publicIngestJob(job) });
+  }
 
   const stopActiveTurn = () => {
     if (!activeTurn) return;

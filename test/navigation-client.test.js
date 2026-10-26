@@ -44,6 +44,7 @@ function client(initial = '/wiki/timing') {
       context.client.showPanel('wiki', { historyMode: 'none' });
     },
     async openRawFile(name) { opened.push(name); context.client.showPanel('document'); },
+    async selectThread(id) { opened.push(`chat:${id}`); },
   };
   vm.createContext(context);
   const helperStart = source.indexOf('const EMOJI_PATTERN');
@@ -65,6 +66,13 @@ function client(initial = '/wiki/timing') {
     await handlers.popstate({ type: 'popstate' }); await handlers.hashchange({ type: 'hashchange' });
   } };
 }
+
+test('source review links open the specific saved chat even from wiki URLs', async () => {
+  const c = client('/wiki/timing#chat/source-review');
+  assert.equal(await c.handleAppRoute(), true);
+  assert.deepEqual(c.opened, ['chat:source-review']);
+  assert.equal(c.state.panel, 'chat');
+});
 
 for (const panel of ['chat', 'graph', 'handover', 'notebooks']) {
   test(`${panel} has a URL and reload restores that tab`, async () => {

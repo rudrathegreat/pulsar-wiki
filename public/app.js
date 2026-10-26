@@ -1496,11 +1496,63 @@ async function importSourcePapers(ids) {
   }
 }
 
+const notifiedSourceJobs = new Set();
+
+function notifySourceJob(job) {
+  if (!job?.id || !job.threadId || !['completed', 'failed'].includes(job.status)) return;
+  const key = `pw-source-review:${workspaceId}:${job.id}`;
+  if (notifiedSourceJobs.has(key)) return;
+  try { if (sessionStorage.getItem(key)) return; } catch { /* Storage may be unavailable. */ }
+  notifiedSourceJobs.add(key);
+  const card = document.createElement('div');
+  card.className = 'source-notification';
+  const link = document.createElement('a');
+  link.href = `/#chat/${encodeURIComponent(job.threadId)}`;
+  const title = document.createElement('strong');
+  title.textContent = job.status === 'completed' ? 'Source review ready for approval' : 'Source review needs attention';
+  const detail = document.createElement('span');
+  detail.textContent = (job.files || []).map(file => stripEmoji(file.name)).join(', ');
+  const action = document.createElement('span');
+  action.className = 'source-notification-action';
+  action.textContent = 'Open saved chat →';
+  link.append(title, detail, action);
+  const dismiss = () => {
+    card.remove();
+    try { sessionStorage.setItem(key, 'read'); } catch { /* Keep working without storage. */ }
+  };
+  link.addEventListener('click', async event => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    if (state.aiRunning && state.activeThreadId !== job.threadId) {
+      action.textContent = 'Finish or stop the current chat, then open this review.';
+      return;
+    }
+    try {
+      await selectThread(job.threadId);
+      showPanel('chat', { historyMode: 'none' });
+      updateAppHistory(link.href);
+      dismiss();
+    } catch (error) {
+      action.textContent = `Could not open chat: ${stripEmoji(error.message)}. Click to retry.`;
+    }
+  });
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'source-notification-close';
+  close.setAttribute('aria-label', 'Dismiss source review notification');
+  close.textContent = '×';
+  close.addEventListener('click', dismiss);
+  card.append(link, close);
+  $('source-notifications').appendChild(card);
+  void refreshThreads().catch(() => {});
+}
+
 function monitorSourceJob(id) {
   clearInterval(state.sourceJobTimer);
   const update = async () => {
     try {
       const job = await api.getSourceJob(id);
+      notifySourceJob(job);
       const messages = {
         queued: 'PDF saved. Background wiki review is queued.',
         running: 'PDF saved. AI is reviewing the source in the background.',
@@ -1514,7 +1566,7 @@ function monitorSourceJob(id) {
         clearInterval(state.sourceJobTimer);
         if (job.status === 'completed') {
           refreshWiki();
-          loadThreads();
+          void refreshThreads().catch(() => {});
         }
       }
     } catch {
@@ -1869,6 +1921,12 @@ function handleWikiRoute({ migrateLegacyHash = false } = {}) {
 
 async function handleAppRoute() {
   const hash = location.hash;
+  if (hash.startsWith('#chat/')) {
+    const id = decodeURIComponent(hash.slice(6));
+    await selectThread(id);
+    showPanel('chat', { historyMode: 'none' });
+    return true;
+  }
   if (handleWikiRoute({ migrateLegacyHash: true })) return true;
   const sources = /^#sources(?:\/(add|upload|saved|references))?$/.exec(hash);
   if (sources || hash === '#files') {
@@ -2290,6 +2348,7 @@ function connectDirectAgentWS() {
     setTimeout(connectDirectAgentWS, 3000);
   };
   ws.onmessage = ({ data }) => {
+    if (state.ws !== ws) return;
     let message;
     try { message = JSON.parse(data); } catch { return; }
     if (message.type === 'server-hello') {
@@ -2298,6 +2357,7 @@ function connectDirectAgentWS() {
       return;
     }
     if (message.type === 'filechange') { void refreshWiki(); return; }
+    if (message.type === 'source-job') { notifySourceJob(message.job); return; }
     if (message.threadId && message.threadId !== state.activeThreadId) return;
     if (message.type === 'chunk') handleAiChunk(message.text);
     if (message.type === 'tool-status') handleToolStatus(message);
