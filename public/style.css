@@ -2331,7 +2331,8 @@ button:disabled {
 }
 
 .source-result-controls select,
-.source-result-controls input {
+.source-result-controls input,
+.source-result-controls .source-select-trigger {
   width: 100%;
   min-width: 0;
   padding: 9px 10px;
@@ -2344,10 +2345,63 @@ button:disabled {
 }
 
 [data-theme="light"] .source-result-controls select,
-[data-theme="light"] .source-result-controls input {
+[data-theme="light"] .source-result-controls input,
+[data-theme="light"] .source-result-controls .source-select-trigger {
   background: #eee;
   color-scheme: light;
 }
+
+.source-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.source-result-controls .source-select-trigger { background: #222 !important; border: 0 !important; }
+[data-theme="light"] .source-result-controls .source-select-trigger { background: #eee !important; }
+.source-result-controls .source-select-trigger { background: #222 !important; border: 0 !important; }
+[data-theme="light"] .source-result-controls .source-select-trigger { background: #eee !important; }
+.source-select-trigger::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  margin: -3px 2px 0 0;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(45deg);
+}
+.source-select-trigger[aria-expanded="true"]::after { transform: translateY(3px) rotate(225deg); }
+.source-select-trigger:focus-visible { outline: 1px solid var(--focus); outline-offset: 3px; }
+.source-select-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 5px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--bg);
+  color: var(--text-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: 12px var(--font);
+  box-shadow: 0 8px 24px #0002;
+}
+.source-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.source-select-option:hover,
+.source-select-option.is-active { background: var(--surface-3); }
+.source-select-option[aria-selected="true"] { font-weight: 600; }
+.source-select-option[aria-selected="true"]::after { content: '\2713'; }
 
 .source-search-box {
   position: relative;
