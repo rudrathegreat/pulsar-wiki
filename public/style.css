@@ -2335,7 +2335,7 @@ button:disabled {
   width: 100%;
   min-width: 0;
   padding: 9px 10px;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: 6px;
   background: #222;
   color: var(--text-1);
@@ -2345,7 +2345,6 @@ button:disabled {
 
 [data-theme="light"] .source-result-controls select,
 [data-theme="light"] .source-result-controls input {
-  border-color: #ccc;
   background: #eee;
   color-scheme: light;
 }
@@ -2443,7 +2442,7 @@ button:disabled {
 
 .source-search-help button {
   padding: 2px 6px;
-  border-style: dashed !important;
+  border: 0 !important;
   color: var(--text-3) !important;
   font: 10px var(--mono);
   cursor: pointer;

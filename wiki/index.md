@@ -46,7 +46,7 @@ Paper details: Show More opens a dedicated view with the full title, authors, jo
 
 Citation links continue loading when a displayed paper outlives the 30-minute search cache, using its matching ADS, DOI or arXiv identifiers to recover the lookup.
 
-Online search input: no search icon or intent tag; the Search button sits beside the input box at the same height, with filter shortcuts below. In dark mode, the input box has a #222 background and no visible border until it transitions to #fff while the input is focused. The Search button border transitions from #333 to #fff on hover. In light mode, the input background is #eee with theme-aware text and a black focus border; the Search button border transitions from #ccc to #000 on hover. Paper card bottom-row actions have #ccc borders, and keyword tags have transparent backgrounds with #ccc borders in light mode.
+Online search input: no search icon or intent tag; the Search button sits beside the input box at the same height, with borderless filter shortcuts below. The sorting and filter dropdowns and number inputs are also borderless in both themes. In dark mode, the input box has a #222 background and no visible border until it transitions to #fff while the input is focused. The Search button border transitions from #333 to #fff on hover. In light mode, the input background is #eee with theme-aware text and a black focus border; the Search button border transitions from #ccc to #000 on hover. Paper card bottom-row actions have #ccc borders, and keyword tags have transparent backgrounds with #ccc borders in light mode.
 
 Graph key: a borderless box with a light grey (`#eee`) background and black labels in light mode, or a dark grey (`#222`) background and white labels in dark mode.
 
