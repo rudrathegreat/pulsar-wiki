@@ -1472,13 +1472,14 @@ async function importSourcePapers(ids) {
   if (!ids.length || state.sourceImportRunning) return;
   state.sourceImportRunning = true;
   updateSourceSelection();
-  dom.sourceImportSelected.textContent = `Importing ${ids.length}...`;
+  $('source-import-label').textContent = `Importing ${ids.length}...`;
   dom.sourceJobStatus.className = 'source-job-status visible running';
   dom.sourceJobStatus.textContent = 'Downloading selected PDFs to the workspace...';
   try {
     const result = await api.importSources(ids);
     const imported = result.imported?.length || 0;
     const failed = result.failed?.length || 0;
+    for (const file of result.imported || []) notifySourceAdded(file);
     for (const id of ids) state.selectedSourceIds.delete(id);
     renderSourceResults(state.sourceResults);
     await loadFiles();
@@ -1491,9 +1492,43 @@ async function importSourcePapers(ids) {
     dom.sourceJobStatus.textContent = stripEmoji(error.message);
   } finally {
     state.sourceImportRunning = false;
-    dom.sourceImportSelected.innerHTML = 'Import selected <span id="source-selected-count">0</span>';
+    $('source-import-label').textContent = 'Import selected';
     updateSourceSelection();
   }
+}
+
+function notifySourceAdded(file) {
+  if (!file?.name) return;
+  const card = document.createElement('div');
+  card.className = 'source-notification';
+  const link = document.createElement('a');
+  link.href = `/#file/${encodeURIComponent(file.name)}`;
+  const title = document.createElement('strong');
+  title.textContent = 'Source added';
+  const detail = document.createElement('span');
+  detail.textContent = stripEmoji(file.name);
+  const action = document.createElement('span');
+  action.className = 'source-notification-action';
+  action.textContent = 'Open in AI-assisted reading workspace →';
+  link.append(title, detail, action);
+  link.addEventListener('click', async event => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    try {
+      await openRawFile(file.name, file.ext || file.name.split('.').pop(), file);
+      card.remove();
+    } catch (error) {
+      action.textContent = `Could not open source: ${stripEmoji(error.message)}. Click to retry.`;
+    }
+  });
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'source-notification-close';
+  close.setAttribute('aria-label', 'Dismiss source added notification');
+  close.textContent = '×';
+  close.addEventListener('click', () => card.remove());
+  card.append(link, close);
+  $('source-notifications').appendChild(card);
 }
 
 const notifiedSourceJobs = new Set();
@@ -1827,6 +1862,8 @@ async function uploadFiles(files) {
         dom.uploadProgress.textContent = `Uploading ${stripEmoji(file.name)} - ${Math.round(p * 100)}%`;
       });
       latestJob = result.ingestJob || latestJob;
+      notifySourceAdded({ name: result.name || file.name });
+      notifySourceAdded({ name: result.name || file.name });
     }
     dom.uploadProgress.textContent = 'Upload complete';
     await loadFiles();

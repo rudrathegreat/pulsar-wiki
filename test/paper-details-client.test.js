@@ -92,6 +92,42 @@ test('direct import follows nested navigation and rejects unavailable papers', a
   assert.equal(c.element('source-paper-import-current').disabled, false);
   assert.equal(c.element('job-status').textContent, 'Download failed');
 });
+
+test('imports preserve the selected-count element and notify only saved sources on repeated imports', async () => {
+  const c = client();
+  // Replacing a button's contents detaches its count span in the browser.
+  for (const property of ['textContent', 'innerHTML']) {
+    Object.defineProperty(c.context.dom.sourceImportSelected, property, {
+      set() { c.context.dom.sourceSelectedCount = null; },
+    });
+  }
+  const notifications = [], monitored = [];
+  c.context.notifySourceAdded = file => notifications.push(file.name);
+  c.context.monitorSourceJob = id => monitored.push(id);
+  let loads = 0;
+  c.context.loadFiles = async () => { loads++; };
+  c.context.api.importSources = async () => ({
+    imported: [{ name: 'saved.pdf' }], failed: [{ id: 'missing' }], ingestJob: { id: 'review' },
+  });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    c.context.state.selectedSourceIds.add('one');
+    await c.context.importSelectedSources();
+    assert.equal(c.context.dom.sourceSelectedCount.textContent, 0);
+    assert.equal(c.context.state.sourceImportRunning, false);
+    assert.equal(c.element('source-import-label').textContent, 'Import selected');
+    assert.doesNotMatch(c.element('job-status').className, /error/);
+  }
+  assert.deepEqual(notifications, ['saved.pdf', 'saved.pdf']);
+  assert.deepEqual(monitored, ['review', 'review']);
+  assert.equal(loads, 2);
+  c.context.api.importSources = async () => { throw new Error('Download failed'); };
+  c.context.state.selectedSourceIds.add('one');
+  await c.context.importSelectedSources();
+  assert.equal(c.context.state.sourceImportRunning, false);
+  assert.equal(c.context.dom.sourceSelectedCount.textContent, 1);
+  assert.equal(c.element('job-status').textContent, 'Download failed');
+  assert.equal(notifications.length, 2);
+});
 test('paper details show full metadata and the same cards in references and cited in', async () => {
   const related = { ...paper, id: 'two', title: 'Referenced paper' };
   const c = client(async () => ({ groups: [{ key: 'references', results: [related] }, { key: 'citations', results: [] }] }));

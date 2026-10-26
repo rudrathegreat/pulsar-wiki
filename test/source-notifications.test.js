@@ -16,7 +16,7 @@ function client(storage = new Map()) {
     };
   }
   const container = element();
-  const selected = [], routes = [], panels = [];
+  const selected = [], routes = [], panels = [], opened = [];
   const context = {
     document: { createElement: element }, $: () => container,
     workspaceId: 'workspace-a', state: {}, stripEmoji: String,
@@ -24,12 +24,39 @@ function client(storage = new Map()) {
     async selectThread(id) { selected.push(id); },
     showPanel(panel) { panels.push(panel); }, updateAppHistory(route) { routes.push(route); },
     refreshThreads: async () => {},
+    async openRawFile(...args) { opened.push(args); },
   };
   vm.createContext(context);
-  vm.runInContext(source.slice(source.indexOf('const notifiedSourceJobs ='), source.indexOf('function monitorSourceJob(')), context);
-  return { context, container, selected, routes, panels, notify: context.notifySourceJob };
+  vm.runInContext(source.slice(source.indexOf('function notifySourceAdded('), source.indexOf('function monitorSourceJob(')), context);
+  return { context, container, selected, routes, panels, opened, notify: context.notifySourceJob };
 }
 const job = { id: 'job-1', status: 'completed', threadId: 'review-1', files: [{ name: '<paper>.pdf' }] };
+
+test('source added notification opens the exact source in the reading workspace', async () => {
+  const c = client();
+  const file = { name: '<paper> & timing.pdf' };
+  c.context.notifySourceAdded(file);
+  const card = c.container.children[0], link = card.children[0];
+  assert.equal(link.href, `/#file/${encodeURIComponent(file.name)}`);
+  assert.equal(link.children[0].textContent, 'Source added');
+  assert.equal(link.children[1].textContent, file.name);
+  assert.match(link.children[2].textContent, /AI-assisted reading workspace/);
+  await link.handlers.click({ preventDefault() {} });
+  assert.deepEqual(c.opened, [[file.name, 'pdf', file]]);
+  assert.equal(card.removed, true);
+});
+
+test('source added notifications support dismissal and modified link clicks', async () => {
+  const c = client();
+  c.context.notifySourceAdded({ name: 'one.pdf' });
+  c.context.notifySourceAdded({ name: 'two.pdf' });
+  const [first, second] = c.container.children;
+  await first.children[0].handlers.click({ ctrlKey: true, preventDefault() { assert.fail('Keep native link behavior'); } });
+  assert.equal(c.opened.length, 0);
+  assert.ok(!first.removed);
+  second.children[1].handlers.click();
+  assert.equal(second.removed, true);
+});
 
 test('each completed review appears once and opens its exact chat', async () => {
   const c = client();
