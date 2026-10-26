@@ -2426,16 +2426,8 @@ button:disabled {
   color: var(--text-3) !important;
 }
 
-.source-import-button span {
-  display: inline-flex;
-  min-width: 18px;
-  height: 18px;
+#source-selected-count {
   margin-left: 5px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  font: 10px var(--mono);
 }
 
 .source-search-help {
