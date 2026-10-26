@@ -2442,7 +2442,7 @@ button:disabled {
 
 .source-search-help button {
   padding: 2px 6px;
-  border: 0 !important;
+  border-style: dashed !important;
   color: var(--text-3) !important;
   font: 10px var(--mono);
   cursor: pointer;
