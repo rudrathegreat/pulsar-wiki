@@ -8,6 +8,8 @@ Application branding: the PulsarWiki logo appears at the top of the iconbar and 
 
 Source review notifications: completed background source reviews show a custom notification throughout the application. Open the notification to read and approve the proposed wiki changes in its specific saved chat (`/#chat/<thread-id>`), or dismiss it. Separate reviews have separate notifications; unread reviews return after reconnecting or reloading while the server remains running.
 
+Live source updates: adding or importing a source automatically refreshes the saved-source grid and sidebar in connected browsers. Visible References refreshes while preserving unsaved edits. Reconnecting catches up with changes made while offline; bursts of file events are combined into one refresh.
+
 Project compatibility: Open project checks the selected folder against the project template before opening it. Incompatible folders remain untouched and show "this project is not compatible. Please select a different project" in a popup; the current project stays selected. Use New project to generate a compatible template. See the [workspace guide](../README.md#research-workspaces) for required files and folders.
 
 Wiki editing: select Edit to the left of Add page reference to notebook on any page to edit its Markdown. The editor uses the available panel width and height, keeping scrolling inside the source area and Save and Cancel visible. Long source lines wrap to the available width, and the line-number gutter leaves space for continuation rows so numbers stay aligned through typing, scrolling and resizing. Save applies the changes; Cancel restores the displayed page. Background file refreshes leave the editor open, and failed saves retain the draft.

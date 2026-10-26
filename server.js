@@ -70,7 +70,7 @@ function openWorkspace(folder) {
   workspace.notebookService = new NotebookService({ store: notebookStore, runtime: new NotebookRuntime({ store: notebookStore }), wikiTools: workspace.wikiTools, readingService: workspace.readingService, authService: chatgptAuth });
   workspace.handoverService = new HandoverService({ wikiTools: workspace.wikiTools, notebookService: workspace.notebookService, authService: chatgptAuth });
   workspace.notebookRouter = createNotebookRouter({ service: workspace.notebookService, requireLocalSession, requireLocalMutation });
-  workspace.watcher = chokidar.watch([wikiDir, rawDir], { ignoreInitial: true }).on('all', (event, filePath) => {
+  workspace.watcher = chokidar.watch([wikiDir, rawDir, path.join(rootDir, 'references.bib')], { ignoreInitial: true }).on('all', (event, filePath) => {
     const payload = JSON.stringify({ type: 'filechange', event, path: filePath });
     wss.clients.forEach(client => { if (client.workspace === workspace && client.readyState === WebSocket.OPEN) client.send(payload); });
   });

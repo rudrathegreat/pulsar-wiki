@@ -2330,6 +2330,33 @@ async function useAnotherChatGPTAccount() {
   }
 }
 
+let workspaceRefreshTimer = null;
+let workspaceRefreshRunning = false;
+let workspaceRefreshPending = false;
+
+function scheduleWorkspaceRefresh() {
+  workspaceRefreshPending = true;
+  if (workspaceRefreshTimer !== null || workspaceRefreshRunning) return;
+  // Imports can produce several file events; fetch the latest state once per burst.
+  workspaceRefreshTimer = setTimeout(async () => {
+    workspaceRefreshTimer = null;
+    workspaceRefreshRunning = true;
+    try {
+      while (workspaceRefreshPending) {
+        workspaceRefreshPending = false;
+        const tasks = [refreshWiki(), loadFiles()];
+        if (state.panel === 'files' && state.sourceView === 'references') {
+          tasks.push(window.ReferencesEditor?.open());
+        }
+        // A failed wiki request must not prevent the source list from updating.
+        await Promise.allSettled(tasks);
+      }
+    } finally {
+      workspaceRefreshRunning = false;
+    }
+  }, 100);
+}
+
 function connectDirectAgentWS() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(workspaceUrl(proto + '://' + location.host + '/'));
@@ -2339,6 +2366,8 @@ function connectDirectAgentWS() {
     state.backendReady = false;
     ws.send(JSON.stringify({ type: 'client-hello', protocol: 4 }));
     updateAgentUi();
+    // Recover changes missed before connection or while the socket was offline.
+    scheduleWorkspaceRefresh();
   };
   ws.onclose = () => {
     if (state.ws !== ws) return;
@@ -2356,7 +2385,7 @@ function connectDirectAgentWS() {
       updateAgentUi();
       return;
     }
-    if (message.type === 'filechange') { void refreshWiki(); return; }
+    if (message.type === 'filechange') { scheduleWorkspaceRefresh(); return; }
     if (message.type === 'source-job') { notifySourceJob(message.job); return; }
     if (message.threadId && message.threadId !== state.activeThreadId) return;
     if (message.type === 'chunk') handleAiChunk(message.text);

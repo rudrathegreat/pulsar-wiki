@@ -13,6 +13,11 @@ function client() {
   const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
   const nodes = new Map();
   const opened = [];
+  const timers = new Map();
+  const sockets = [];
+  let wikiRefreshes = 0;
+  let referenceRefreshes = 0;
+  let wikiFailure = null;
   let files = [{ name: 'timing.pdf', ext: 'pdf', size: 1024 }, { name: 'notes & "ideas".md', ext: 'md', size: 20 }];
   let failure = null;
   function element(id) {
@@ -32,7 +37,11 @@ function client() {
   const context = {
     document: { getElementById: element, querySelectorAll() { return []; }, body: { classList: { toggle() {} } } },
     api: { async getRawList() { if (failure) throw failure; return files; } },
-    window: { ActiveReading: { close() {}, closeHelper() {}, async open(pdf, name, session) { opened.push({ pdf, name, session }); } } },
+    window: { ReferencesEditor: { async open() { referenceRefreshes++; } }, ActiveReading: { close() {}, closeHelper() {}, async open(pdf, name, session) { opened.push({ pdf, name, session }); } } },
+    WebSocket: class { constructor() { sockets.push(this); } send() {} },
+    setTimeout(callback) { const id = {}; timers.set(id, callback); return id; },
+    updateAgentUi() {},
+    async refreshWiki() { wikiRefreshes++; if (wikiFailure) throw wikiFailure; },
     location: { pathname: '/', search: '', hash: '' },
     wikiPath: name => `/wiki/${name}`,
     history: { pushState(_state, _title, url) { context.hash = url; Object.assign(context.location, { pathname: new URL(url, 'http://localhost').pathname, hash: new URL(url, 'http://localhost').hash }); } },
@@ -48,10 +57,15 @@ function client() {
     ${source.slice(source.indexOf('function fileIcon('), source.indexOf('// Project handover'))}
     ${sourceView}
     ${source.slice(source.indexOf('function setDocumentStatus('), source.indexOf('function clampPdfScale('))}
+    ${source.slice(source.indexOf('let workspaceRefreshTimer ='), source.indexOf('\nfunction sendChat('))}
     getPdfLibrary = async () => ({ getDocument: () => ({ promise: Promise.resolve({ numPages: 3 }) }) });
-    globalThis.client = { state, showPanel, loadFiles, openRawFile };
+    globalThis.client = { state, showPanel, loadFiles, openRawFile, connectDirectAgentWS };
   `, context);
-  return { ...context.client, element, opened, context, setFiles(value) { files = value; }, fail(value) { failure = value; } };
+  return { ...context.client, element, opened, context, sockets,
+    get wikiRefreshes() { return wikiRefreshes; }, get referenceRefreshes() { return referenceRefreshes; },
+    failWiki(value) { wikiFailure = value; },
+    async flushRefresh() { const callbacks = [...timers.values()]; timers.clear(); await Promise.all(callbacks.map(callback => callback())); },
+    setFiles(value) { files = value; }, fail(value) { failure = value; } };
 }
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -118,4 +132,41 @@ test('the sidebar explains empty and failed loads and recovers when Sources is r
   await settle();
   assert.equal(c.element('source-sidebar-status').textContent, '');
   assert.match(c.element('source-sidebar-list').innerHTML, /recovered.pdf/);
+});
+
+test('live file events refresh saved sources in every panel and coalesce import bursts', async () => {
+  const c = client();
+  await c.loadFiles();
+  c.state.panel = 'chat';
+  c.connectDirectAgentWS();
+  c.setFiles([{ name: 'imported.pdf', ext: 'pdf', size: 40 }]);
+  const event = { data: JSON.stringify({ type: 'filechange', event: 'add', path: 'raw/imported.pdf' }) };
+  for (let i = 0; i < 5; i++) c.sockets[0].onmessage(event);
+  await c.flushRefresh();
+  assert.equal(c.wikiRefreshes, 1);
+  assert.equal(c.element('source-sidebar-count').textContent, 1);
+  assert.match(c.element('source-sidebar-list').innerHTML, /imported.pdf/);
+  assert.equal(c.state.panel, 'chat');
+  c.setFiles([]);
+  c.sockets[0].onmessage({ data: JSON.stringify({ type: 'filechange', event: 'unlink' }) });
+  await c.flushRefresh();
+  assert.equal(c.element('source-sidebar-count').textContent, 0);
+});
+
+test('socket reconnection catches up sources and references even if the wiki refresh fails', async () => {
+  const c = client();
+  c.state.panel = 'files';
+  c.state.sourceView = 'references';
+  c.connectDirectAgentWS();
+  c.sockets[0].onopen();
+  await c.flushRefresh();
+  c.sockets[0].onclose();
+  await c.flushRefresh(); // reconnect timer
+  c.setFiles([{ name: 'added-while-offline.pdf', ext: 'pdf', size: 50 }]);
+  c.failWiki(new Error('Wiki unavailable'));
+  c.sockets[1].onopen();
+  await c.flushRefresh();
+  assert.match(c.element('source-sidebar-list').innerHTML, /added-while-offline.pdf/);
+  assert.equal(c.referenceRefreshes, 2);
+  assert.equal(c.state.sourceView, 'references');
 });
