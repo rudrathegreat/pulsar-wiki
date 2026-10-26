@@ -6,7 +6,7 @@ Application navigation: each main tab and Sources subtab has its own URL, includ
 
 Application branding: the PulsarWiki logo appears at the top of the iconbar and adapts to dark and light themes.
 
-Source review notifications: completed background source reviews show a custom notification throughout the application. Open the notification to read and approve the proposed wiki changes in its specific saved chat (`/#chat/<thread-id>`), or dismiss it. Separate reviews have separate notifications; unread reviews return after reconnecting or reloading while the server remains running.
+Source notifications use a white background, dark text and a single rounded outline inside a transparent stack. Cards have no clipped outer shadow, and hovering changes only the border from grey to black while the background stays white. Source review notifications: completed background source reviews show a custom notification throughout the application. Open the notification to read and approve the proposed wiki changes in its specific saved chat (`/#chat/<thread-id>`), or dismiss it. Separate reviews have separate notifications; unread reviews return after reconnecting or reloading while the server remains running.
 
 Source added notifications: each successful paper import or file upload shows a dismissible notification. Click it to open that source in the AI-assisted reading workspace. Import progress preserves the selection count so successful imports no longer show a missing-element error beside the Sources title. The Import selected label and adjacent count appear as plain text without oval or circle outlines.
 
