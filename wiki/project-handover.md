@@ -3,8 +3,8 @@
 **Summary**: This project concerns MeerKAT pulsar timing. This guide records the supplied project context and related background on binary and millisecond pulsars for continuation of the work.
 
 **Sources**:
-- `binary-pulsar` — wiki page
-- `millisecond-pulsar` — wiki page
+- [[binary-pulsar]] — wiki page
+- [[millisecond-pulsar]] — wiki page
 
 **Last updated**: 2026-10-23
 
@@ -27,8 +27,8 @@ The current project state is therefore **not established from the supplied evide
 
 ### Supplied wiki pages
 
-- **`binary-pulsar`**: Background on binary-pulsar companion types, Keplerian and post-Keplerian timing parameters, and recycling. It references `pulsars.md`, `stac3719.pdf`, and `s41550-019-0880-2 (1).pdf`, but those referenced materials were not supplied in this bundle. [[binary-pulsar]]
-- **`millisecond-pulsar`**: Background on MSP formation, precision timing, pulsar timing arrays, mass constraints, and selected catalogue entries. It references `pulsars.md`, `pulsar-info.txt`, `s41550-019-0880-2 (1).pdf`, and `stac3719.pdf`, none of which were supplied in this bundle. [[millisecond-pulsar]]
+- **[[binary-pulsar]]**: Background on binary-pulsar companion types, Keplerian and post-Keplerian timing parameters, and recycling. It references [pulsars.md](/#file/pulsars.md), [stac3719.pdf](/#file/stac3719.pdf), and [s41550-019-0880-2 (1).pdf](/#file/s41550-019-0880-2%20%281%29.pdf), but those referenced materials were not supplied in this bundle. [[binary-pulsar]]
+- **[[millisecond-pulsar]]**: Background on MSP formation, precision timing, pulsar timing arrays, mass constraints, and selected catalogue entries. It references [pulsars.md](/#file/pulsars.md), [pulsar-info.txt](/#file/pulsar-info.txt), [s41550-019-0880-2 (1).pdf](/#file/s41550-019-0880-2%20%281%29.pdf), and [stac3719.pdf](/#file/stac3719.pdf), none of which were supplied in this bundle. [[millisecond-pulsar]]
 
 ### Not supplied
 

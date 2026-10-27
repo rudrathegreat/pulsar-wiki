@@ -261,3 +261,9 @@ All major updates to the wiki are recorded here.
 | 2026-10-27 | Graph initial motion / public | Reduced initial node velocity and pre-settled the strongest layout forces. Updated the wiki index. |
 
 | 2026-10-27 | Graph initial zoom / public | Fitted the graph before its visible settling motion to avoid a sudden zoom afterwards. Updated the wiki index. |
+
+| 2026-10-27 | Agent file links / instructions | Updated the canonical agent guidance to require clickable file references in chat and wiki content, including linked source citations. Updated the wiki index. |
+
+| 2026-10-27 | Wiki file navigation / wiki | Linked saved source files in citations and source lists, corrected wiki page links, and linked file references in the index and handover. |
+
+| 2026-10-27 | Consistent links / application | Applied the wiki-link appearance to links in wiki content and AI chat responses, including app navigation links. Updated the wiki index. |

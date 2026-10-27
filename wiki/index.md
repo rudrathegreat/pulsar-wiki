@@ -2,11 +2,17 @@
 
 Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pulsar science, observational tools, and relativistic physics.
 
-Application navigation: each main tab and Sources subtab has its own URL, including `/#sources/references`, `/#sources/upload`, `/#chat`, `/#graph`, `/#notebooks`, and `/#handover`. Reload restores the selected tab; browser Back and Forward restore earlier views. Existing wiki page, document, reading passage and notebook links remain supported.
+File navigation: source citations and source lists link to the saved files; wiki page references link to their pages.
+
+Agent guidance: [GEMINI.md](../GEMINI.md) requires clickable file references in chat responses and wiki content, including linked source citations.
+
+Application navigation: each main tab and Sources subtab has its own URL, including [References](/#sources/references), [Upload a file](/#sources/upload), [Chat](/#chat), [Graph](/#graph), [Notebooks](/#notebooks), and [Handover](/#handover). Reload restores the selected tab; browser Back and Forward restore earlier views. Existing wiki page, document, reading passage and notebook links remain supported.
+
+Links in wiki pages and AI chat responses share the same styling as related wiki-page links.
 
 The Graph tab starts fitted to the viewport, with gentler node movement that settles quickly to reduce continued jitter; nodes can still be dragged.
 
-The Cite Article button saves search and related-paper metadata to references.bib, without downloading the paper.
+The Cite Article button saves search and related-paper metadata to [references.bib](/#sources/references), without downloading the paper.
 
 Paper details show references and papers citing the paper in separate lists, initially displaying up to five per list with independent Show more controls spaced below the paper lists.
 
@@ -46,7 +52,7 @@ Source filter menus: Sort by, Publication status and Collection use custom dropd
 
 After updating the application, restart its server and refresh the browser to load new settings endpoints. NASA ADS settings show a restart instruction if the running server does not support token saving.
 
-Bibliography access: both the Wiki and Sources sidebars include a persistent `references.bib` shortcut below their file lists. Select it to open the current workspace's References preview and BibTeX editor. The BibTeX editor fills the available height beneath the Sources controls, keeping long files scrolling inside the editor. Long source lines wrap without changing the saved text; the line-number gutter expands each row to match its wrapped text, including after resizing and jumps to individual references.
+Bibliography access: both the Wiki and Sources sidebars include a persistent [references.bib](/#sources/references) shortcut below their file lists. Select it to open the current workspace's References preview and BibTeX editor. The BibTeX editor fills the available height beneath the Sources controls, keeping long files scrolling inside the editor. Long source lines wrap without changing the saved text; the line-number gutter expands each row to match its wrapped text, including after resizing and jumps to individual references.
 
 References preview: papers start collapsed by default. Expand a paper to view its properties, or use Expand all. Select Edit beside a paper to open raw BibTeX, highlight its entry and scroll to it; unsaved edits are retained. Select a `file` field link to open that source in PulsarWiki's document reader, including the PDF reading tools for PDFs.
 
@@ -58,7 +64,7 @@ AI-assisted reading workspace: white surfaces with borderless light grey (`#eee`
 
 Sources sidebar: opening Sources shows saved files from the current workspace. Select a file to open it in the reading space; PDFs open with AI-assisted reading tools. The source list stays visible while reading, with the current file marked and an Add sources action for finding or uploading more documents. Paper result cards show sciX citation counts beneath the authors; records without citation data show “Citations unavailable”.
 
-Source tabs: Search online contains the literature search without the numbered introductory cards. Upload a file has its own adjacent tab, followed by Saved sources and References. References opens the workspace-root `references.bib` as a structured preview in file order. Each collapsible citation-key branch carries an entry-type badge and shows each property on its own row with a visible field name and value. Author and editor fields expand into numbered lists that flow horizontally and wrap; keywords appear as tags, and DOI/arXiv/URL values link to their destinations. Expand all and Collapse all control the hierarchy; search and type filtering retain branch state. The Preview/BibTeX toggle retains the original editable source with Save changes and Reload file actions; unsaved edits can be previewed without rewriting the file. Incomplete entries show a warning while complete entries remain readable. The inspector follows light and dark themes and adapts to narrow screens. Uploads and paper imports automatically append citations using available metadata; files without metadata receive a filename-based entry marked for completion. Opening References also adds entries for existing source files. Edits and comments are preserved, and stale saves are rejected to protect concurrent additions.
+Source tabs: Search online contains the literature search without the numbered introductory cards. Upload a file has its own adjacent tab, followed by Saved sources and References. References opens the workspace-root [references.bib](/#sources/references) as a structured preview in file order. Each collapsible citation-key branch carries an entry-type badge and shows each property on its own row with a visible field name and value. Author and editor fields expand into numbered lists that flow horizontally and wrap; keywords appear as tags, and DOI/arXiv/URL values link to their destinations. Expand all and Collapse all control the hierarchy; search and type filtering retain branch state. The Preview/BibTeX toggle retains the original editable source with Save changes and Reload file actions; unsaved edits can be previewed without rewriting the file. Incomplete entries show a warning while complete entries remain readable. The inspector follows light and dark themes and adapts to narrow screens. Uploads and paper imports automatically append citations using available metadata; files without metadata receive a filename-based entry marked for completion. Opening References also adds entries for existing source files. Edits and comments are preserved, and stale saves are rejected to protect concurrent additions.
 
 Paper search results automatically generate up to six AI topic keywords from each available abstract using the connected ChatGPT model. Keywords appear beneath the authors in place of category codes, with loading and unavailable states. Results remain usable during generation; repeated abstracts reuse keywords during the server session. The Sources view omits the Research workspace, Discover and AI keywords · abstract labels. Search result cards have no outer border, and their bottom-row action borders stay #333 in dark mode and #ccc in light mode.
 
@@ -119,10 +125,10 @@ Project handover: project details, searchable autocomplete selection of wiki pag
 - [[pulsar-catalog]]: A directory of physical parameters for known pulsars.
 
 ## Project Continuity
-- Paper search: results show a Cited tag when a paper matches an entry in references.bib.
-- Reference additions: notifications link directly to the added entry in references.bib.
+- Paper search: results show a Cited tag when a paper matches an entry in [references.bib](/#sources/references).
+- Reference additions: notifications link directly to the added entry in [references.bib](/#sources/references).
 - Welcome screen: **New project** and **Open project** stay side by side with single-line labels (layout: `public/style.css`).
-- Project creation: **New project** on the welcome screen creates a named subfolder in the selected parent folder, populates a clean research template, and opens it automatically; existing names are rejected without overwriting files. See README.md for the template contents. Restart the running Node server after backend changes so the welcome screen and project API use the same version.
+- Project creation: **New project** on the welcome screen creates a named subfolder in the selected parent folder, populates a clean research template, and opens it automatically; existing names are rejected without overwriting files. See [README.md](../README.md) for the template contents. Restart the running Node server after backend changes so the welcome screen and project API use the same version.
 - [[research-notebooks]]: Embedded JupyterLab for free-form local Python analyses, cited paper and wiki transfers, automatic local history, clean reruns, and on-request recall linked to historical cells; automatic local Python startup with a loading animation until the editor is ready, in a workspace without the extra file sidebar or action bar.
 - [[project-handover]]: A project handover drafted from complete selected file text using backend instructions, displayed as Markdown for researcher review before publication, with aligned form spacing, larger labels and review controls, and simplified review and publication copy.
 - [[active-reading]]: PDF reading without a separate Reading Library, with scroll-aware scheduling, bounded nearby-page caching, cancellable text extraction, software-canvas settings and local lag diagnostics, theme-aware highlight helpers that close when leaving the reader, notes and AI requests, wiki-first reference discovery, and automatic agent-written wiki notes with the paper page selected by default and created on Add when missing.
@@ -130,4 +136,4 @@ Project handover: project details, searchable autocomplete selection of wiki pag
 ---
 *Last updated: 2026-10-23*
 
-- [[stac3719]]: Selected reading notes for stac3719.pdf, with quoted highlights and links to the original passages.
+- [[stac3719]]: Selected reading notes for [stac3719.pdf](/#file/stac3719.pdf), with quoted highlights and links to the original passages.

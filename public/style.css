@@ -897,7 +897,10 @@ body {
   border-bottom: 1px solid var(--border-sub);
 }
 
-.md-body a.wiki-link {
+.md-body a[href],
+.md-body a[href]:visited,
+.chat-msg.ai .chat-bubble a[href],
+.chat-msg.ai .chat-bubble a[href]:visited {
   color: var(--text-1);
   text-decoration: none;
   border-bottom: 1px solid var(--border);
@@ -905,27 +908,11 @@ body {
   transition: border-color var(--transition), color var(--transition);
 }
 
-.md-body a.wiki-link:hover {
+.md-body a[href]:hover,
+.md-body a[href]:focus-visible,
+.chat-msg.ai .chat-bubble a[href]:hover,
+.chat-msg.ai .chat-bubble a[href]:focus-visible {
   border-color: var(--text-1);
-}
-
-.chat-msg.ai .chat-bubble a,
-.chat-msg.ai .chat-bubble a:visited {
-  color: var(--text-1) !important;
-  text-decoration: none !important;
-  border-bottom: 1px solid #ccc !important;
-  padding-bottom: 1px;
-  transition: border-color var(--transition), color var(--transition);
-}
-
-.chat-msg.ai .chat-bubble a:hover,
-.chat-msg.ai .chat-bubble a:focus-visible {
-  color: var(--text-1) !important;
-  border-bottom-color: var(--focus) !important;
-}
-
-.md-body a:not(.wiki-link) {
-  color: var(--text-2);
 }
 
 /* ── Chat Panel ──────────────────────────────────────────────────── */

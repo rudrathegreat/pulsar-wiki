@@ -2,20 +2,20 @@
 
 **Summary**: The high-precision technique of accounting for every single rotation of a pulsar over long time periods to build a comprehensive model of its physics and environment.
 
-**Sources**: [[tempo2_manual.pdf]], [[pulsars.md]], [[stac3719.pdf]]
+**Sources**: [tempo2_manual.pdf](/#file/tempo2_manual.pdf), [pulsars.md](/#file/pulsars.md), [stac3719.pdf](/#file/stac3719.pdf)
 
 **Last updated**: 2026-04-27
 
 ---
 
-Pulsar timing is the process of comparing the observed pulse times of arrival (TOAs) with a predictive model. It is the primary tool for precision pulsar astronomy and tests of fundamental physics (source: tempo2_manual.pdf).
+Pulsar timing is the process of comparing the observed pulse times of arrival (TOAs) with a predictive model. It is the primary tool for precision pulsar astronomy and tests of fundamental physics (source: [tempo2_manual.pdf](/#file/tempo2_manual.pdf)).
 
 ## The Timing Model
 The model accounts for all physical effects that influence the arrival time of a pulse, including:
 - **Astrometry**: Position (RA, Dec), Proper Motion, and Parallax.
 - **Spin Dynamics**: Spin frequency ($\nu$), spin-down rate ($\dot{\nu}$), and glitches.
 - **Interstellar Medium**: [[dispersion-measure]] (DM) and its temporal variations.
-- **Binary Motion**: Orbital parameters for pulsars in systems (source: stac3719.pdf).
+- **Binary Motion**: Orbital parameters for pulsars in systems (source: [stac3719.pdf](/#file/stac3719.pdf)).
 
 ## The Timing Equation
 The fundamental goal is to relate the observed time of arrival at the observatory ($t_{obs}$) to the time of emission in the pulsar's frame ($T$):
@@ -31,10 +31,10 @@ Where:
 The difference between the observed TOA and the model's prediction is the **Timing Residual**.
 - **White Noise**: Radiometer noise and jitter.
 - **Red Noise**: Long-term correlated noise, often caused by rotational instabilities or gravitational waves.
-- **DM Noise**: Variations in the electron density of the ISM (source: stac3719.pdf).
+- **DM Noise**: Variations in the electron density of the ISM (source: [stac3719.pdf](/#file/stac3719.pdf)).
 
 ## Tools of the Trade
-Timing analysis is primarily performed using the [[tempo2]] software package, which implements these physical models with relativistic precision (source: tempo2_manual.pdf).
+Timing analysis is primarily performed using the [[tempo2]] software package, which implements these physical models with relativistic precision (source: [tempo2_manual.pdf](/#file/tempo2_manual.pdf)).
 
 ## Related pages
 

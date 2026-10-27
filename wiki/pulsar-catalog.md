@@ -2,7 +2,7 @@
 
 **Summary**: A compiled index of specific pulsars and their observed physical parameters.
 
-**Sources**: [[pulsar-info.txt]]
+**Sources**: [pulsar-info.txt](/#file/pulsar-info.txt)
 
 **Last updated**: 2026-04-27
 
@@ -25,7 +25,7 @@ The current population of known pulsars exceeds 3,000, with the vast majority di
 | **J0024-7204ac**| MSP | 2.74 | 24.46 | MeerKAT TRAPUM | Tight orbit (4.32h) in 47Tuc |
 
 ## Data Sources
-The primary repository for pulsar parameters is the ATNF Pulsar Catalogue. High-cadence timing data is also available via portals like the Swinburne Pulsar Data Portal for many of these sources (source: pulsar-info.txt).
+The primary repository for pulsar parameters is the ATNF Pulsar Catalogue. High-cadence timing data is also available via portals like the Swinburne Pulsar Data Portal for many of these sources (source: [pulsar-info.txt](/#file/pulsar-info.txt)).
 
 ## Related pages
 

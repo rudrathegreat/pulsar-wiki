@@ -42,7 +42,7 @@ When the researcher selects **Add to wiki**, treat Add as authorisation to gener
 
 1. Use only the selected passages and explicitly included comments, visual regions, and AI interpretations. Use the selected destination page as context.
 2. Write a concise note with a descriptive heading, preserving the source's meaning, qualifications, equations, and units. Do not imply the whole paper was read.
-3. Cite the supplied passage references and source filenames. Distinguish evidence from researcher interpretation and AI explanation; mark unsupported interpretations as needing verification.
+3. Cite the supplied passage references and link source filenames as described in File links and citations. Distinguish evidence from researcher interpretation and AI explanation; mark unsupported interpretations as needing verification.
 4. Preserve all existing notes and citations. The application inserts the generated note into the latest page instead of replacing that page with model output.
 5. Create a missing paper notes page when Add is selected. Update its sources, date, wiki index, and append-only log with the saved note.
 6. Append short, topic-focused sections with descriptive headings, the exact highlighted text in Markdown blockquotes, and readable filename/page links. Place the concise explanation below the quoted selections. Keep hashes, internal IDs, AI-use declarations and model names out of published notes. Preserve scientific uncertainty using natural interpretation or open-question wording.
@@ -57,7 +57,7 @@ Every wiki page should follow this structure:
 
 **Summary**: One to two sentences describing this page.
 
-**Sources**: List of raw source files this page draws from.
+**Sources**: Links to the raw source files this page draws from.
 
 **Last updated**: Date of most recent update.
 
@@ -73,10 +73,13 @@ Link to related concepts using [[wiki-links]] throughout the text.
 - [[related-concept-2]]
 ```
 
-## Citation rules
+## File links and citations
 
-- Every factual claim should reference its source file
-- Use the format (source: filename.pdf) after the claim
+- Always make references to existing files clickable in chat responses and wiki content, including source lists, citations, and references to files created or changed. Use descriptive link text rather than a bare filename or path.
+- For wiki pages in the PulsarWiki app, use `[[page-name]]` (without `.md`); these links also work in chat. Link related pages throughout the text and in the index.
+- For a saved file in `raw/`, use a Markdown link to the app's file route, for example `[filename.pdf](/#file/filename.pdf)`. URL-encode the filename in the destination, including spaces and special characters. When an exact passage or page link is supplied, use that more specific link instead.
+- For other existing workspace files, use a Markdown link with a valid destination appropriate to the response or document. In wiki Markdown, use a path relative to the page; encode spaces and special characters where needed. In chat, use the navigation format supported by the client. Do not invent destinations or link to files that do not exist; clearly identify unavailable files as such.
+- Every factual claim should reference its source file with a clickable link, for example `(source: [filename.pdf](/#file/filename.pdf))`.
 - If two sources disagree, note the contradiction explicitly
 - If a claim has no source, mark it as needing verification
 
@@ -86,7 +89,7 @@ When the user asks a question:
 
 1. Read `wiki/index.md` first to find relevant pages
 2. Read those pages and synthesize an answer
-3. Cite specific wiki pages in your response
+3. Cite specific wiki pages in your response using clickable links
 4. If the answer is not in the wiki, say so clearly
 5. If the answer is valuable, offer to save it as a new wiki page
 

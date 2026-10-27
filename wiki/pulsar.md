@@ -2,20 +2,20 @@
 
 **Summary**: A rapidly rotating, highly magnetized neutron star that emits beams of electromagnetic radiation from its magnetic poles.
 
-**Sources**: [[pulsars.md]], [[pulsar-info.txt]], [[tempo2_manual.pdf]]
+**Sources**: [pulsars.md](/#file/pulsars.md), [pulsar-info.txt](/#file/pulsar-info.txt), [tempo2_manual.pdf](/#file/tempo2_manual.pdf)
 
 **Last updated**: 2026-04-27
 
 ---
 
-A pulsar is a [[neutron-star]] that acts as a cosmic lighthouse. The emission is not isotropic; instead, it is confined to narrow beams originating from the magnetic poles. If the magnetic axis is misaligned with the rotation axis, these beams sweep across the observer's line of sight, creating the characteristic periodic pulse (source: pulsars.md).
+A pulsar is a [[neutron-star]] that acts as a cosmic lighthouse. The emission is not isotropic; instead, it is confined to narrow beams originating from the magnetic poles. If the magnetic axis is misaligned with the rotation axis, these beams sweep across the observer's line of sight, creating the characteristic periodic pulse (source: [pulsars.md](/#file/pulsars.md)).
 
 ## Energy Loss & Spin-Down
 Pulsars are primarily "rotation-powered." As they rotate, their intense magnetic fields accelerate particles, creating the emission beam. This process extracts rotational kinetic energy from the star, causing it to slow down over time (measured as the **Period Derivative**, $\dot{P}$).
 
 ## Classification by Power Source
 1. **Rotation-Powered**: Most [[radio-pulsar]]s and [[gamma-ray-pulsar]]s.
-2. **Accretion-Powered**: Mostly [[x-ray-pulsar]]s in binary systems where matter from a companion star falls onto the pulsar, releasing gravitational potential energy (source: pulsars.md).
+2. **Accretion-Powered**: Mostly [[x-ray-pulsar]]s in binary systems where matter from a companion star falls onto the pulsar, releasing gravitational potential energy (source: [pulsars.md](/#file/pulsars.md)).
 3. **Magnetic-Powered**: Magnetars, which have extreme magnetic fields ($10^{14}$–$10^{15}$ G).
 
 ## Key Observables and Metrics
@@ -24,7 +24,7 @@ Pulsars are primarily "rotation-powered." As they rotate, their intense magnetic
 - **[[dispersion-measure]] (DM)**: Used to determine the distance and the state of the interstellar medium between the pulsar and Earth.
 
 ## Study via Timing
-The stability of the pulse arrival times allows for [[pulsar-timing]], a technique used to test General Relativity and search for gravitational waves using tools like [[tempo2]] (source: tempo2_manual.pdf).
+The stability of the pulse arrival times allows for [[pulsar-timing]], a technique used to test General Relativity and search for gravitational waves using tools like [[tempo2]] (source: [tempo2_manual.pdf](/#file/tempo2_manual.pdf)).
 
 ## Related pages
 

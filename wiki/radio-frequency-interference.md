@@ -2,13 +2,13 @@
 
 **Summary**: Terrestrial or satellite-based signals that contaminate astronomical data, requiring sophisticated mitigation techniques in pulsar research.
 
-**Sources**: [[psrchive.pdf]], [[radio-telescope.md]]
+**Sources**: [psrchive.pdf](/#file/psrchive.pdf), [[radio-telescope]]
 
 **Last updated**: 2026-04-27
 
 ---
 
-Radio Frequency Interference (RFI) is one of the greatest challenges for modern [[radio-telescope]]s. Since pulsars are extremely faint, even weak terrestrial signals (from cell phones, satellites, or spark plugs) can overwhelm the astronomical data (source: psrchive.pdf).
+Radio Frequency Interference (RFI) is one of the greatest challenges for modern [[radio-telescope]]s. Since pulsars are extremely faint, even weak terrestrial signals (from cell phones, satellites, or spark plugs) can overwhelm the astronomical data (source: [psrchive.pdf](/#file/psrchive.pdf)).
 
 ## Types of RFI
 1. **Narrow-band**: Signals that affect only a few frequency channels, often from communication devices.
@@ -18,7 +18,7 @@ Radio Frequency Interference (RFI) is one of the greatest challenges for modern 
 ## Mitigation and Excision
 Before [[pulsar-timing]] can be performed, RFI must be identified and removed from the data. Tools like [[psrchive]] provide several methods:
 - **`psrzap`**: Allows observers to interactively "mask" corrupted data.
-- **Automated Algorithms**: Programs like `zap median` use statistical tests (e.g., median absolute deviation) to detect and zero-out corrupted channels (source: psrchive.pdf).
+- **Automated Algorithms**: Programs like `zap median` use statistical tests (e.g., median absolute deviation) to detect and zero-out corrupted channels (source: [psrchive.pdf](/#file/psrchive.pdf)).
 
 ## The Importance of Radio Quiet Zones
 To minimize RFI, major observatories like [[meerkat]] are located in remote areas protected by law as "Radio Quiet Zones."

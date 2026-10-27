@@ -2,7 +2,7 @@
 
 **Summary**: One of the brightest and most famous pulsars, associated with a nearby supernova remnant and a strong source of high-energy emission.
 
-**Sources**: [[pulsars.md]], [[pulsar-info.txt]], [[papers.txt]]
+**Sources**: [pulsars.md](/#file/pulsars.md), [pulsar-info.txt](/#file/pulsar-info.txt), [papers.txt](/#file/papers.txt)
 
 **Last updated**: 2026-04-27
 
@@ -13,7 +13,7 @@ The Vela Pulsar (PSR J0835-4510) is a young, rapidly rotating [[neutron-star]] l
 ## Key Characteristics
 - **Period**: 89 milliseconds.
 - **Distance**: Approximately 280 pc, making it one of our closest neighbors.
-- **Emission**: It is the strongest point source in the gamma-ray sky at 100 MeV (source: pulsars.md).
+- **Emission**: It is the strongest point source in the gamma-ray sky at 100 MeV (source: [pulsars.md](/#file/pulsars.md)).
 
 ## Glitch Activity
 The Vela Pulsar is famous for its frequent and large "glitches"—sudden increases in its rotation frequency. These glitches provide rare insights into the interior physics of neutron stars, specifically the interaction between the crust and the internal superfluid neutrons.
