@@ -213,3 +213,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-27 | Upload button spacing / public | Added top margin to the upload button in the Sources upload tab. Updated the wiki index. |
 
 | 2026-10-27 | Saved sources title spacing / public | Added top margin above the Saved sources sidebar title. Updated the wiki index. |
+
+| 2026-10-27 | Downloaded papers default / public | Defaulted source search to hide already downloaded papers while retaining the option to show all papers. Updated the wiki index. |
