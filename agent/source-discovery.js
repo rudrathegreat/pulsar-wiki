@@ -383,7 +383,7 @@ class SourceDiscoveryService {
     }
     if (!source) throw new Error('This paper preview expired. Search for it again.');
     const fields = 'bibcode,title,author,orcid_pub,orcid_user,year,pub,pubdate,abstract,doi,identifier,citation_count,reference_count';
-    const limit = 10;
+    const limit = 5;
     const groupKey = identity.group;
     const start = identity.start === undefined ? 0 : Number(identity.start);
     if ((groupKey !== undefined && !['references', 'citations'].includes(groupKey)) ||

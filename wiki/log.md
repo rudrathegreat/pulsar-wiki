@@ -245,3 +245,7 @@ All major updates to the wiki are recorded here.
 | 2026-10-27 | Reading selection helper / public | Removed the helper's drop shadow. Updated the wiki index. |
 
 | 2026-10-27 | Related paper lists / public | Added independent ten-paper pagination for references and citing papers. Updated the wiki index. |
+
+| 2026-10-27 | Related paper list spacing / public | Increased the space above each Show more button. Updated the wiki index. |
+
+| 2026-10-27 | Related paper list size / public | Reduced each references and citing papers page to five records. Updated the wiki index. |

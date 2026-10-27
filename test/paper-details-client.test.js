@@ -213,20 +213,20 @@ test('show more loads only the chosen group and keeps the other group intact', a
   const c = client(async (id, identity, page) => {
     calls.push(page);
     if (!page) return { groups: [
-      { key: 'references', results: make('ref', 10), hasMore: true, nextStart: 10 },
-      { key: 'citations', results: make('cite', 10), hasMore: true, nextStart: 10 },
+      { key: 'references', results: make('ref', 5), hasMore: true, nextStart: 5 },
+      { key: 'citations', results: make('cite', 5), hasMore: true, nextStart: 5 },
     ] };
-    return { groups: [{ key: page.group, results: make('extra', 2), hasMore: false, nextStart: 12 }] };
+    return { groups: [{ key: page.group, results: make('extra', 2), hasMore: false, nextStart: 7 }] };
   });
   await c.context.showSourceDetail('one');
   assert.match(c.element('source-paper-relations').innerHTML, /data-related-more="references"/);
   assert.match(c.element('source-paper-relations').innerHTML, /data-related-more="citations"/);
   await c.context.state.loadMoreRelated('references');
   assert.equal(calls[1].group, 'references');
-  assert.equal(calls[1].start, 10);
+  assert.equal(calls[1].start, 5);
   const markup = c.element('source-paper-relations').innerHTML;
   assert.match(markup, /extra1/);
-  assert.match(markup, /cite9/);
+  assert.match(markup, /cite4/);
   assert.doesNotMatch(markup, /data-related-more="references"/);
   assert.match(markup, /data-related-more="citations"/);
 });
