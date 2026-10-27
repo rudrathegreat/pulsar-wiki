@@ -217,3 +217,7 @@ All major updates to the wiki are recorded here.
 | 2026-10-27 | Downloaded papers default / public | Defaulted source search to hide already downloaded papers while retaining the option to show all papers. Updated the wiki index. |
 
 | 2026-10-27 | Search filter menu styling / public | Matched search filter popovers to the chat sidebar menu with compact separated rows, borders and theme-aware hover colours. Updated the wiki index. |
+
+| 2026-10-27 | References save button / public | Set the enabled Save changes button border to black on hover. Updated the wiki index. |
+
+| 2026-10-27 | References save button disabled state / public | Greyed out Save changes while it is disabled. Updated the wiki index. |

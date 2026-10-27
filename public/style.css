@@ -3302,6 +3302,8 @@ button:disabled {
   min-height: 0;
 }
 .references-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+#references-save:disabled { opacity: .45; }
+#references-save:hover:not(:disabled) { border-color: #000 !important; }
 .references-label { display: block; margin: 16px 0 8px; font-size: 13px; color: var(--text-2); }
 #references-status { min-height: 20px; margin-top: 16px; font-size: 13px; color: var(--text-2); }
 #references-source { flex: 1; min-height: 0; border-radius: 6px; font: 13px/1.7 var(--mono); }
