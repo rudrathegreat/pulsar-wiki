@@ -85,7 +85,6 @@
   function renderPreview() {
     const query = search.value.trim().toLocaleLowerCase();
     const entries = parsed.entries.filter(entry => (!typeFilter.value || entry.type === typeFilter.value) && (!query || BibTeX.text([entry.key, entry.type, ...Object.values(entry.fields)].join(' ')).toLocaleLowerCase().includes(query)));
-    $('references-count').textContent = `${entries.length}${entries.length !== parsed.entries.length ? ` of ${parsed.entries.length}` : ''} reference${(entries.length !== parsed.entries.length ? parsed.entries.length : entries.length) === 1 ? '' : 's'}`;
     tree.innerHTML = entries.map(entryTree).join('') || `<div class="references-empty"><h3>${query || typeFilter.value ? 'No matching references' : 'No entries'}</h3><p>${query || typeFilter.value ? 'Try another search or reference type.' : 'Add entries in BibTeX or import a paper.'}</p></div>`;
     void window.AuthorOrcids?.hydrate(tree, entries.map(authorPaper));
   }

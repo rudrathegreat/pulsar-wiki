@@ -223,3 +223,15 @@ All major updates to the wiki are recorded here.
 | 2026-10-27 | References save button disabled state / public | Greyed out Save changes while it is disabled. Updated the wiki index. |
 
 | 2026-10-27 | References view switch / public | Removed the switch background and styled the active view and hover borders. Updated the wiki index. |
+
+| 2026-10-27 | References preview tags / public | Removed borders around paper tags. Updated the wiki index. |
+
+| 2026-10-27 | References preview / public | Removed the displayed reference count. Updated the wiki index. |
+
+| 2026-10-27 | References preview hover / public | Added a background transition to reference rows on hover. Updated the wiki index. |
+
+| 2026-10-27 | References preview hover colour / public | Changed the reference row hover background to #fcfcfc. Updated the wiki index. |
+
+| 2026-10-27 | References preview hover theme / public | Set the light-mode hover background to #f9f9f9 and restored the dark-mode surface colour. Updated the wiki index. |
+
+| 2026-10-27 | References tag dark mode / public | Changed paper tag backgrounds to #222 in dark mode. Updated the wiki index. |

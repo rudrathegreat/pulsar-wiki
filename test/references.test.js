@@ -174,7 +174,6 @@ test('preview preserves entry and property order, nested authors and unsaved Bib
   assert.equal(c.node('references-save').disabled, false);
   c.node('references-search').value = 'gravity';
   c.node('references-search').handlers.input();
-  assert.equal(c.node('references-count').textContent, '1 of 2 references');
   assert.doesNotMatch(c.node('references-tree').innerHTML, /Earlier source/);
   c.node('references-type').value = 'misc';
   c.node('references-type').handlers.change();

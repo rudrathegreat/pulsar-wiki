@@ -6,7 +6,7 @@ Application navigation: each main tab and Sources subtab has its own URL, includ
 
 Application branding: the PulsarWiki logo appears at the top of the iconbar and adapts to dark and light themes.
 
-The Sources upload tab adds space above its upload button, and the sidebar adds space above the Saved sources title. The References tab Save changes button is greyed out when disabled and has a black border on hover when enabled. The active Preview or BibTeX button has a light grey background and border, with black borders on hover.
+The Sources upload tab adds space above its upload button, and the sidebar adds space above the Saved sources title. The References tab Save changes button is greyed out when disabled and has a black border on hover when enabled. The active Preview or BibTeX button has a light grey background and border, with black borders on hover. Paper tags in the References preview have no borders and use a #222 background in dark mode, the preview does not display a reference count, and reference rows transition to a #f9f9f9 background on hover in light mode and use the surface colour in dark mode.
 
 Source notifications use a white background, dark text and a single rounded outline inside a transparent stack. Cards have no clipped outer shadow, and hovering changes only the border from grey to black while the background stays white. Source review notifications: completed background source reviews show a custom notification throughout the application. Open the notification to read and approve the proposed wiki changes in its specific saved chat (`/#chat/<thread-id>`), or dismiss it. Separate reviews have separate notifications; unread reviews return after reconnecting or reloading while the server remains running.
 
