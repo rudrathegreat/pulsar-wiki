@@ -1320,11 +1320,15 @@ function renderSourceResults(results) {
   }
   dom.sourceResultsSection.hidden = false;
   $('source-results-header').hidden = false;
-  $('source-results-title').textContent = `${state.sourceResults.length} paper${state.sourceResults.length === 1 ? '' : 's'} found`;
-  dom.sourceResults.innerHTML = state.sourceResults.length
-    ? state.sourceResults.map(paper => resultPaperMarkup(paper)).join('')
-    : '<div class="source-empty"><strong>No matching papers found</strong><p>Try fewer terms, a broader date range, or remove a filter.</p></div>';
-  void window.AuthorOrcids?.hydrate(dom.sourceResults, state.sourceResults);
+  const visible = $('source-downloaded-filter').value === 'hide'
+    ? state.sourceResults.filter(paper => !paper.downloaded) : state.sourceResults;
+  $('source-results-title').textContent = `${visible.length} paper${visible.length === 1 ? '' : 's'} found`;
+  dom.sourceResults.innerHTML = visible.length
+    ? visible.map(paper => resultPaperMarkup(paper)).join('')
+    : state.sourceResults.length
+      ? '<div class="source-empty"><strong>No papers to show</strong><p>All results are already downloaded. Change the downloaded papers filter to show them.</p></div>'
+      : '<div class="source-empty"><strong>No matching papers found</strong><p>Try fewer terms, a broader date range, or remove a filter.</p></div>';
+  void window.AuthorOrcids?.hydrate(dom.sourceResults, visible);
   updateSourceSelection();
 }
 
@@ -1654,6 +1658,7 @@ function monitorSourceJob(id) {
 
 document.querySelectorAll('[data-source-view]').forEach(button => button.addEventListener('click', () => setSourceView(button.dataset.sourceView)));
 dom.sourceSearchForm.addEventListener('submit', event => { event.preventDefault(); void runSourceSearch(); });
+$('source-downloaded-filter').addEventListener('change', () => renderSourceResults(state.sourceResults));
 for (const id of ['source-sort', 'source-refereed', 'source-collection', 'source-year', 'source-min-citations']) {
   $(id).addEventListener('change', () => {
     if (dom.sourceSearchInput.value.trim()) void runSourceSearch();

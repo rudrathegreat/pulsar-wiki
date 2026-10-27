@@ -58,3 +58,27 @@ test('late searches cannot replace newer filtered results or errors', async () =
   assert.equal(c.context.rendered[0], 'newest');
   assert.doesNotMatch(c.element('status').textContent, /Stale error/);
 });
+
+ test('downloaded filter updates visible results without losing search results', () => {
+  const nodes = new Map();
+  const element = id => {
+    if (!nodes.has(id)) nodes.set(id, { value: '', hidden: false, textContent: '' });
+    return nodes.get(id);
+  };
+  const results = [{ id: 'saved', downloaded: true }, { id: 'new', downloaded: false }];
+  const context = { $: element, state: { selectedSourceIds: new Set(), sourcePapers: new Map() },
+    dom: { sourceResultsSection: {}, sourceResults: {} }, window: {},
+    resultPaperMarkup: paper => paper.id, updateSourceSelection() {} };
+  vm.createContext(context);
+  vm.runInContext(app.slice(app.indexOf('function renderSourceResults('), app.indexOf('function updateSourceSelection(')), context);
+  element('source-downloaded-filter').value = 'hide';
+  context.renderSourceResults(results);
+  assert.equal(context.dom.sourceResults.innerHTML, 'new');
+  assert.equal(element('source-results-title').textContent, '1 paper found');
+  assert.equal(context.state.sourceResults.length, 2);
+  context.renderSourceResults([results[0]]);
+  assert.match(context.dom.sourceResults.innerHTML, /All results are already downloaded/);
+  element('source-downloaded-filter').value = 'all';
+  context.renderSourceResults(context.state.sourceResults);
+  assert.equal(context.dom.sourceResults.innerHTML, 'saved');
+ });
