@@ -209,3 +209,7 @@ All major updates to the wiki are recorded here.
 | 2026-10-27 | Downloaded papers filter / application | Added a local search-results filter to hide already downloaded papers, with an accurate visible count and an empty-state message. Updated the wiki index. |
 
 | 2026-10-27 | Publication year filter / application | Removed the extended publication year input while retaining the year: search shortcut. Updated the wiki index and workspace guide. |
+
+| 2026-10-27 | Upload button spacing / public | Added top margin to the upload button in the Sources upload tab. Updated the wiki index. |
+
+| 2026-10-27 | Saved sources title spacing / public | Added top margin above the Saved sources sidebar title. Updated the wiki index. |

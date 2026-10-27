@@ -428,6 +428,10 @@ body {
   color: var(--text-3);
 }
 
+#sidebar-sources .nav-section-title {
+  margin-top: 16px;
+}
+
 #sidebar .nav-item {
   width: 100%;
   display: flex;
@@ -1531,6 +1535,10 @@ body {
 .upload-btn:hover {
   color: var(--text-1);
   border-color: var(--text-2);
+}
+
+#files-upload-btn {
+  margin-top: 16px;
 }
 
 .upload-btn svg {
