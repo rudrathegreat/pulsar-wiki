@@ -55,6 +55,26 @@ test('paper cards show citation counts and distinguish missing counts from zero'
   }
 });
 
+test('cite button saves the displayed paper and reports success or failure', async () => {
+  const c = client();
+  const markup = c.context.resultPaperMarkup(paper);
+  assert.match(markup, /<button type="button" data-source-cite="one">Cite Article<\/button>/);
+  let id;
+  c.context.api.citeSource = async value => { id = value; return { added: true }; };
+  const button = { disabled: false, textContent: '' };
+  await c.context.citeSource('one', button);
+  assert.equal(id, 'one');
+  assert.equal(button.textContent, 'Added to references');
+  c.context.api.citeSource = async () => ({ added: false });
+  await c.context.citeSource('one', button);
+  assert.equal(button.textContent, 'Already in references');
+  c.context.window.alert = message => { c.alert = message; };
+  c.context.api.citeSource = async () => { throw new Error('Save failed'); };
+  await c.context.citeSource('one', button);
+  assert.equal(button.disabled, false);
+  assert.match(c.alert, /Save failed/);
+});
+
 test('direct import uses only the open paper and preserves other selections', async () => {
   const c = client();
   c.context.state.selectedSourceIds.add('other');

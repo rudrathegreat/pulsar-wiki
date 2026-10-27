@@ -172,6 +172,11 @@ const api = {
     if (page.group) { identity.set('group', page.group); identity.set('start', String(page.start)); }
     return readJsonResponse(await workspaceFetch(`/api/sources/${encodeURIComponent(id)}/related?${identity}`), 'Related papers');
   },
+  async citeSource(id) {
+    return readJsonResponse(await workspaceFetch(`/api/sources/${encodeURIComponent(id)}/cite`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    }), 'Save reference');
+  },
   async getSourceKeywords(id) {
     return readJsonResponse(await workspaceFetch(`/api/sources/${encodeURIComponent(id)}/keywords`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
@@ -1310,13 +1315,24 @@ function resultPaperMarkup(paper, keywordPrefix = 'source-keywords') {
           ${identifier && identifierUrl
             ? `<a href="${escHtml(identifierUrl)}" target="_blank" rel="noreferrer">${escHtml(identifierLabel)}</a>`
             : `<span class="disabled" aria-disabled="true">${escHtml(identifierLabel)}</span>`}
-          ${paper.recordUrl
-            ? `<a href="${escHtml(paper.recordUrl)}" target="_blank" rel="noreferrer">Cite Article</a>`
-            : '<span class="disabled" aria-disabled="true">Cite Article</span>'}
+          <button type="button" data-source-cite="${escHtml(paper.id)}">Cite Article</button>
           <button class="source-result-preview" type="button" data-source-preview="${escHtml(paper.id)}">Show More</button>
         </div>
       </div>
     </article>`;
+}
+
+async function citeSource(id, button) {
+  button.disabled = true;
+  button.textContent = 'Saving?';
+  try {
+    const result = await api.citeSource(id);
+    button.textContent = result.added ? 'Added to references' : 'Already in references';
+  } catch (error) {
+    button.textContent = 'Cite Article';
+    button.disabled = false;
+    window.alert(`Could not save reference: ${stripEmoji(error.message)}`);
+  }
 }
 
 function renderSourceResults(results) {
@@ -1723,6 +1739,8 @@ $('panel-files').addEventListener('change', event => {
 $('panel-files').addEventListener('click', event => {
   const more = event.target.closest('[data-related-more]');
   if (more) { void state.loadMoreRelated?.(more.dataset.relatedMore); return; }
+  const cite = event.target.closest('[data-source-cite]');
+  if (cite) { void citeSource(cite.dataset.sourceCite, cite); return; }
   const preview = event.target.closest('[data-source-preview]');
   if (preview) void showSourceDetail(preview.dataset.sourcePreview, preview.dataset.sourcePreview !== state.activeSourceId);
 });

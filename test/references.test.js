@@ -32,6 +32,22 @@ test('references retain paper metadata, manual edits and unique keys without dup
   assert.match(refs.read().content, /@misc\{myKey-2,/);
 });
 
+test('citing discovered papers preserves metadata, avoids duplicates, and connects later imports', t => {
+  const { refs } = fixture(t);
+  const paper = { title: 'Pulsars & Timing', authors: ['Doe, Jane'], published: '2025-01-01', publication: 'ApJ', doi: '10.1234/TEST', bibcode: '2025ApJ...1', arxivId: '2501.12345', recordUrl: 'https://example.com' };
+  assert.equal(refs.addPaper(paper).added, true);
+  const first = refs.read().content;
+  assert.match(first, /title = \{Pulsars \\& Timing\}/);
+  assert.match(first, /bibcode = \{2025ApJ\.\.\.1\}/);
+  assert.doesNotMatch(first, /file =/);
+  assert.equal(refs.addPaper({ ...paper, doi: 'https://doi.org/10.1234/test' }).added, false);
+  assert.equal(refs.read().content, first);
+  refs.add([{ ...paper, name: 'paper.pdf' }]);
+  const final = refs.read().content;
+  assert.equal(require('../public/bibtex').parse(final).entries.length, 1);
+  assert.match(final, /file = \{raw\/paper.pdf\}/);
+});
+
 test('existing sources get editable placeholders without source changes, isolated by workspace', t => {
   const { refs, rawDir } = fixture(t);
   fs.writeFileSync(path.join(rawDir, 'notes.txt'), 'immutable');

@@ -45,6 +45,13 @@ class References {
       // The file field associates a citation with its immutable source even after a key is edited.
       const escapedFile = file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       if (new RegExp(`\\bfile\\s*=\\s*(?:\\{\\s*${escapedFile}\\s*\\}|"\\s*${escapedFile}\\s*")`, 'i').test(content)) continue;
+      const existing = this.findPaper(source, content);
+      if (existing && !existing.fields.file) {
+        const lastValueEnd = Math.max(...Object.values(existing.fieldLocations).map(location => location.end));
+        const tail = content.slice(lastValueEnd, existing.end - 1).replace(/%[^\n]*/g, '').trim();
+        content = content.slice(0, existing.end - 1) + `${tail === ',' ? '' : ','}\n  file = {${file}}\n` + content.slice(existing.end - 1);
+        continue;
+      }
       const stem = source.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-|-$/g, '') || 'source';
       let key = stem;
       for (let suffix = 2; keys.has(key); suffix++) key = `${stem}-${suffix}`;
@@ -66,6 +73,42 @@ class References {
     }
     if (content !== this.read().content || !fs.existsSync(this.file)) this.write(content);
     return this.read();
+  }
+
+  findPaper(source, content) {
+    const norm = value => text(value || '').trim().toLowerCase();
+    const doi = value => norm(value).replace(/^https?:\/\/(?:dx\.)?doi\.org\//, '');
+    const title = value => norm(value).replace(/[^\p{L}\p{N}]/gu, '');
+    return parse(content, { locations: true }).entries.find(entry =>
+      (source.doi && doi(entry.fields.doi) === doi(source.doi)) ||
+      (source.bibcode && norm(entry.fields.bibcode || entry.fields.adsbibcode) === norm(source.bibcode)) ||
+      (source.arxivId && norm(entry.fields.eprint) === norm(source.arxivId)) ||
+      (source.title && title(entry.fields.title) === title(source.title)));
+  }
+
+  addPaper(source) {
+    const { content } = this.read();
+    const entries = parse(content).entries;
+    const duplicate = this.findPaper(source, content);
+    if (duplicate) return { added: false };
+    const keys = new Set(entries.map(entry => entry.key));
+    const stem = String(source.bibcode || source.arxivId || source.doi || source.title || 'paper')
+      .replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-|-$/g, '').slice(0, 100) || 'paper';
+    let key = stem;
+    for (let suffix = 2; keys.has(key); suffix++) key = `${stem}-${suffix}`;
+    const fields = { title: source.title };
+    if (source.authors?.length) fields.author = source.authors.map(bibText).join(' and ');
+    if (source.authorOrcids?.some(id => normalizeOrcid(id))) fields.orcid = source.authors.map((_, i) => normalizeOrcid(source.authorOrcids[i]) || '-').join(' and ');
+    const year = String(source.published || source.year || '').match(/^\d{4}/)?.[0];
+    if (year) fields.year = year;
+    if (source.publication && !['arXiv preprint', 'NASA ADS record'].includes(source.publication)) fields.journal = source.publication;
+    if (source.doi) fields.doi = source.doi;
+    if (source.bibcode) fields.bibcode = source.bibcode;
+    if (source.arxivId) { fields.eprint = source.arxivId; fields.archivePrefix = 'arXiv'; }
+    if (source.recordUrl) fields.url = source.recordUrl;
+    const encoded = Object.entries(fields).filter(([, value]) => value).map(([name, value]) => `  ${name} = {${name === 'author' ? value : bibText(value)}}`).join(',\n');
+    this.write(`${content}${content && !content.endsWith('\n') ? '\n' : ''}\n@${fields.journal ? 'article' : 'misc'}{${key},\n${encoded}\n}\n`);
+    return { added: true, key };
   }
 
   sync() {

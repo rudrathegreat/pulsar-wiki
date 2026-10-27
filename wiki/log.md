@@ -249,3 +249,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-27 | Related paper list spacing / public | Increased the space above each Show more button. Updated the wiki index. |
 
 | 2026-10-27 | Related paper list size / public | Reduced each references and citing papers page to five records. Updated the wiki index. |
+
+| 2026-10-27 | Paper citations / public | Made Cite Article save paper metadata to references.bib and avoid duplicate references. Updated the wiki index. |

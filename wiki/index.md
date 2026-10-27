@@ -4,6 +4,8 @@ Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pul
 
 Application navigation: each main tab and Sources subtab has its own URL, including `/#sources/references`, `/#sources/upload`, `/#chat`, `/#graph`, `/#notebooks`, and `/#handover`. Reload restores the selected tab; browser Back and Forward restore earlier views. Existing wiki page, document, reading passage and notebook links remain supported.
 
+The Cite Article button saves search and related-paper metadata to references.bib, without downloading the paper.
+
 Paper details show references and papers citing the paper in separate lists, initially displaying up to five per list with independent Show more controls spaced below the paper lists.
 
 Application branding: the PulsarWiki logo appears at the top of the iconbar and adapts to dark and light themes.

@@ -508,6 +508,14 @@ app.post('/api/sources/search', requireLocalSession, async (req, res) => {
   }
 });
 
+app.post('/api/sources/:id/cite', requireLocalMutation, (req, res) => {
+  const workspace = currentWorkspace();
+  const paper = workspace.sourceDiscovery.cached(req.params.id);
+  if (!paper) return res.status(404).json({ error: 'This paper preview expired. Search for it again.' });
+  try { return res.json(workspace.references.addPaper(paper)); }
+  catch (error) { return res.status(500).json({ error: error.message || 'The reference could not be saved.' }); }
+});
+
 app.post('/api/sources/:id/keywords', requireLocalMutation, async (req, res) => {
   const paper = currentWorkspace().sourceDiscovery.cached(req.params.id);
   if (!paper) return res.status(404).json({ error: 'This paper preview expired. Search for it again.' });
