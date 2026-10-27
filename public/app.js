@@ -451,7 +451,8 @@ function editWikiPage(page, content, editAction, notebookAction) {
       <div class="wiki-editor-gutter" aria-hidden="true"><div class="wiki-editor-line-numbers"></div></div>
       <textarea id="wiki-page-editor" wrap="soft" spellcheck="false"></textarea>
     </div>
-    <div class="wiki-editor-actions"><button class="btn" type="submit">Save</button><button class="btn" type="button" data-cancel>Cancel</button></div>
+    <div class="wiki-editor-preview md-body" aria-label="Page preview" hidden></div>
+    <div class="wiki-editor-actions"><button class="btn" type="submit">Save</button><button class="btn" type="button" data-preview aria-pressed="false">Preview</button><button class="btn" type="button" data-cancel>Cancel</button></div>
     <p role="status" aria-live="polite"></p>`;
   const editor = form.querySelector('textarea');
   const source = form.querySelector('.wiki-editor-source');
@@ -461,10 +462,30 @@ function editWikiPage(page, content, editAction, notebookAction) {
   editor.addEventListener('input', syncLineNumbers);
   const save = form.querySelector('[type="submit"]');
   const cancel = form.querySelector('[data-cancel]');
+  const previewButton = form.querySelector('[data-preview]');
+  const preview = form.querySelector('.wiki-editor-preview');
   const status = form.querySelector('[role="status"]');
   editor.value = content;
   editAction.disabled = true;
   notebookAction.disabled = true;
+  previewButton.addEventListener('click', () => {
+    const previewing = preview.hidden;
+    if (previewing) {
+      preview.innerHTML = renderMd(editor.value);
+      typesetMath(preview);
+    }
+    source.hidden = previewing;
+    preview.hidden = !previewing;
+    previewButton.textContent = previewing ? 'Edit' : 'Preview';
+    previewButton.setAttribute('aria-pressed', String(previewing));
+    if (!previewing) {
+      syncLineNumbers();
+      editor.focus();
+    }
+  });
+  preview.addEventListener('click', event => {
+    if (event.target.closest('a')) event.preventDefault();
+  });
   cancel.addEventListener('click', () => {
     gutter.destroy();
     dom.wikiBody.replaceChildren(renderedPage);
@@ -475,7 +496,7 @@ function editWikiPage(page, content, editAction, notebookAction) {
   form.addEventListener('submit', async event => {
     event.preventDefault();
     if (save.disabled) return;
-    save.disabled = cancel.disabled = editor.disabled = true;
+    save.disabled = cancel.disabled = previewButton.disabled = editor.disabled = true;
     status.textContent = 'Saving...';
     try {
       await api.saveWikiPage(page, editor.value);
@@ -485,7 +506,7 @@ function editWikiPage(page, content, editAction, notebookAction) {
       }
     } catch (error) {
       status.textContent = `Could not save page: ${error.message}`;
-      save.disabled = cancel.disabled = editor.disabled = false;
+      save.disabled = cancel.disabled = previewButton.disabled = editor.disabled = false;
     }
   });
   dom.wikiBody.append(form);

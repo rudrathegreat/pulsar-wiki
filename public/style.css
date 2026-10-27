@@ -669,7 +669,10 @@ body {
 .wiki-editor-actions,
 .wiki-editor > [role="status"] { flex-shrink: 0; }
 .wiki-editor > [role="status"] { overflow-wrap: anywhere; }
-.wiki-editor > .wiki-editor-source { flex: 1; min-height: 0; }
+.wiki-editor > .wiki-editor-source,
+.wiki-editor > .wiki-editor-preview { flex: 1; min-height: 0; }
+.wiki-editor-preview { overflow: auto; }
+.wiki-editor-source[hidden], .wiki-editor-preview[hidden] { display: none; }
 .wiki-editor-source {
   position: relative;
   display: flex;
