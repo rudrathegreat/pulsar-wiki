@@ -36,6 +36,7 @@ function client(initial = '/wiki/timing') {
       replaceState(_state, _title, url) { entries[position] = url; visit(url); },
     },
     api: { getRawList: async () => [{ name: 'paper ?#.md', ext: 'md' }] },
+    renderChatGPTSettings() {}, refreshChatGPTStatus: async () => {}, refreshAdsSettings: async () => {},
     renderSourceSidebar() {}, loadFiles: async () => {}, showGraph() {}, loadHandoverWorkspace() {}, highlightSidebarItem() {},
     async openPage(page, options = {}) {
       opened.push(page);
@@ -74,7 +75,7 @@ test('source review links open the specific saved chat even from wiki URLs', asy
   assert.equal(c.state.panel, 'chat');
 });
 
-for (const panel of ['chat', 'graph', 'handover', 'notebooks']) {
+for (const panel of ['chat', 'graph', 'handover', 'notebooks', 'settings']) {
   test(`${panel} has a URL and reload restores that tab`, async () => {
     const c = client(); c.showPanel(panel);
     assert.equal(c.entries.at(-1), `/#${panel}`);

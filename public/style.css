@@ -124,7 +124,7 @@ body.workspace-loading #workspace-loading { position: fixed; inset: 0; z-index: 
   color: #111 !important;
 }
 
-[data-theme="light"] #chatgpt-settings-modal {
+[data-theme="light"] #panel-settings {
   --text-1: #111;
   --text-2: #111;
   --text-3: #111;
@@ -132,7 +132,7 @@ body.workspace-loading #workspace-loading { position: fixed; inset: 0; z-index: 
   color: #111;
 }
 
-[data-theme="light"] #chatgpt-settings-modal option {
+[data-theme="light"] #panel-settings option {
   color: #111;
   background: #fff;
 }
@@ -1680,8 +1680,30 @@ body {
   font-size: 13px;
 }
 
-.chatgpt-settings-dialog {
-  width: min(520px, 100%);
+#sidebar.settings-mode { width: 0; }
+
+#panel-settings.active {
+  display: block !important;
+  overflow-y: auto;
+}
+
+.settings-shell {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 40px 44px 72px;
+}
+
+.settings-shell h2 {
+  margin-bottom: 24px;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+.settings-shell h3 { font-size: 16px; }
+.settings-shell > *:not(h2) { max-width: 520px; }
+
+@media (max-width: 600px) {
+  .settings-shell { padding: 24px 20px 48px; }
 }
 
 .chatgpt-field {
@@ -1722,10 +1744,6 @@ body {
   font-size: 12px;
 }
 
-.chatgpt-settings-dialog {
-  max-height: calc(100vh - 40px);
-  overflow-y: auto;
-}
 
 .chatgpt-account {
   margin-top: 18px;
@@ -1781,6 +1799,12 @@ body {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 4px;
+}
+
+.settings-shell .setup-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: 40px;
 }
 
 .setup-actions .btn:disabled {

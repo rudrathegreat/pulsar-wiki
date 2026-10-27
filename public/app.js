@@ -273,9 +273,7 @@ const dom = {
   get chatNewThread() { return $('chat-new-thread'); },
   get chatThreadList() { return $('chat-thread-list'); },
   get wsDot() { return $('ws-dot'); },
-  get chatgptSettingsButton() { return $('chatgpt-settings-button'); },
   get chatgptSettingsLabel() { return $('chatgpt-settings-label'); },
-  get chatgptSettingsModal() { return $('chatgpt-settings-modal'); },
   get chatgptAccount() { return $('chatgpt-account'); },
   get chatgptConnectionStatus() { return $('chatgpt-connection-status'); },
   get chatgptConnect() { return $('chatgpt-connect'); },
@@ -285,7 +283,6 @@ const dom = {
   get chatgptModelSave() { return $('chatgpt-model-save'); },
   get chatgptDisconnect() { return $('chatgpt-disconnect'); },
   get chatgptForget() { return $('chatgpt-forget'); },
-  get chatgptClose() { return $('chatgpt-close'); },
   get chatgptError() { return $('chatgpt-error'); },
   get filesGrid() { return $('files-grid'); },
   get filesCount() { return $('files-count'); },
@@ -330,15 +327,24 @@ function panelUrl(name) {
 function showPanel(name, { historyMode = 'push' } = {}) {
   // Documents and individual notebooks manage their more specific URLs themselves.
   if (name !== 'document') updateAppHistory(panelUrl(name), historyMode);
-  if (name !== state.panel) window.ActiveReading?.closeHelper();
+  if (name !== state.panel) {
+    window.ActiveReading?.closeHelper();
+    if (state.panel === 'settings') $('ads-token').value = '';
+  }
   state.panel = name;
   document.body.classList.toggle('notebook-mode', name === 'notebooks');
   const navigationPanel = name === 'document' ? 'files' : name;
   $('sidebar').classList.toggle('chat-mode', name === 'chat');
   $('sidebar').classList.toggle('sources-mode', navigationPanel === 'files');
+  $('sidebar').classList.toggle('settings-mode', name === 'settings');
   document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === `panel-${name}`));
   document.querySelectorAll('.tab-btn').forEach(button => button.classList.toggle('active', button.dataset.panel === navigationPanel));
   document.querySelectorAll('.icon-btn[data-panel]').forEach(button => button.classList.toggle('active', button.dataset.panel === navigationPanel));
+  if (name === 'settings') {
+    renderChatGPTSettings();
+    void refreshChatGPTStatus();
+    void refreshAdsSettings();
+  }
   if (name === 'graph') showGraph();
   if (navigationPanel === 'files') {
     renderSourceSidebar();
@@ -1988,7 +1994,7 @@ window.openRawFile = openRawFile;
 
 function handleWikiRoute({ migrateLegacyHash = false } = {}) {
   // Older document/source links can have a wiki pathname: the explicit hash wins.
-  if (/^#(?:sources|files|chat|graph|handover|notebooks|notebook|file|reading)(?:[/?]|$)/.test(location.hash)) return false;
+  if (/^#(?:sources|files|chat|graph|handover|notebooks|notebook|file|reading|settings)(?:[/?]|$)/.test(location.hash)) return false;
   let page = wikiPageFromPath(location.pathname);
   if (page && location.pathname !== wikiPath(page)) history.replaceState(null, '', wikiPath(page));
   if (!page && location.hash.startsWith('#wiki/')) {
@@ -2015,7 +2021,7 @@ async function handleAppRoute() {
     showPanel('files', { historyMode: 'none' });
     return true;
   }
-  if (['#chat', '#graph', '#handover', '#notebooks'].includes(hash)) {
+  if (['#chat', '#graph', '#handover', '#notebooks', '#settings'].includes(hash)) {
     showPanel(hash.slice(1), { historyMode: 'none' });
     return true;
   }
@@ -2285,15 +2291,8 @@ function renderChatGPTSettings() {
 }
 
 function openChatGPTSettings(message = '') {
-  renderChatGPTSettings();
+  showPanel('settings');
   dom.chatgptError.textContent = stripEmoji(message || state.chatgpt?.error?.message || '');
-  dom.chatgptSettingsModal.style.display = 'flex';
-  void refreshAdsSettings();
-}
-
-function closeChatGPTSettings() {
-  $('ads-token').value = '';
-  dom.chatgptSettingsModal.style.display = 'none';
 }
 
 async function readAdsSettingsResponse(response) {
@@ -2345,10 +2344,12 @@ async function refreshChatGPTStatus({ open = false, message = '' } = {}) {
   try {
     state.chatgpt = await api.getChatGPTStatus();
     updateAgentUi();
+    if (state.panel === 'settings') renderChatGPTSettings();
     if (open) openChatGPTSettings(message);
   } catch (error) {
     state.chatgpt = state.chatgpt || { connected: false, savedAccount: false, ready: false, models: [] };
     updateAgentUi();
+    if (state.panel === 'settings') renderChatGPTSettings();
     if (open) openChatGPTSettings(stripEmoji(error.message));
   }
 }
@@ -2566,8 +2567,6 @@ document.addEventListener('keydown', event => {
 dom.chatThreadList.addEventListener('scroll', closeThreadMenus);
 window.addEventListener('resize', closeThreadMenus);
 
-dom.chatgptSettingsButton.addEventListener('click', () => { void refreshChatGPTStatus({ open: true }); });
-dom.chatgptClose.addEventListener('click', closeChatGPTSettings);
 $('ads-settings-form').addEventListener('submit', event => { event.preventDefault(); void updateAdsSettings(); });
 $('ads-token-remove').addEventListener('click', () => { void updateAdsSettings(true); });
 dom.chatgptModelSave.addEventListener('click', () => { void saveChatGPTModel(); });
@@ -2575,9 +2574,6 @@ dom.chatgptConnect.addEventListener('click', () => { window.location.assign('/au
 dom.chatgptNewAccount.addEventListener('click', () => { void useAnotherChatGPTAccount(); });
 dom.chatgptDisconnect.addEventListener('click', () => { void disconnectChatGPT(); });
 dom.chatgptForget.addEventListener('click', () => { void forgetChatGPTAccount(); });
-dom.chatgptSettingsModal.addEventListener('click', event => {
-  if (event.target === dom.chatgptSettingsModal) closeChatGPTSettings();
-});
 dom.chatNewThread.addEventListener('click', () => { void createThread(); });
 dom.chatMessages.addEventListener('click', handleChatWikiLink);
 dom.chatInput.addEventListener('input', () => {
