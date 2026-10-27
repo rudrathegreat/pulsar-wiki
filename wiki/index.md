@@ -20,6 +20,8 @@ Source added notifications: each successful paper import or file upload shows a 
 
 Saved source documents open in the AI-assisted reading workspace, including text-based files. Files whose text cannot be extracted show an unavailable preview; the References bibliography keeps its separate editor.
 
+The AI-assisted reading selection helper has no drop shadow.
+
 Live source updates: adding or importing a source automatically refreshes the saved-source grid and sidebar in connected browsers. Visible References refreshes while preserving unsaved edits. Reconnecting catches up with changes made while offline; bursts of file events are combined into one refresh.
 
 Project compatibility: Open project checks the selected folder against the project template before opening it. Incompatible folders remain untouched and show "this project is not compatible. Please select a different project" in a popup; the current project stays selected. Use New project to generate a compatible template. See the [workspace guide](../README.md#research-workspaces) for required files and folders.
