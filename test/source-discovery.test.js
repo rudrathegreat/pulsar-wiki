@@ -102,8 +102,33 @@ test('search caches previews and import writes a validated PDF without overwriti
   assert.equal(fs.readFileSync(path.join(rawDir, first.imported[0].name), 'utf8').startsWith('%PDF-'), true);
 
   const second = await service.import([search.results[0].id]);
-  assert.equal(second.imported[0].existed, true);
+  assert.equal(second.imported.length, 0);
+  assert.match(second.failed[0].error, /already downloaded/);
+  const again = await service.search('pulsar', { filters: { refereed: 'all' } });
+  assert.equal(again.results[0].downloaded, true);
   assert.equal(calls.filter(url => url.startsWith('https://arxiv.org/pdf/')).length, 1);
+});
+
+test('saved bibliography identifies renamed PDFs and prevents cross-provider duplicate imports', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pulsarwiki-duplicates-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const rawDir = path.join(root, 'raw'); fs.mkdirSync(rawDir);
+  fs.writeFileSync(path.join(rawDir, 'renamed.pdf'), '%PDF-1.4');
+  const { References } = require('../agent/references');
+  const refs = new References({ rootDir: root, rawDir });
+  refs.add([{ name: 'renamed.pdf', title: 'Precision & pulsar timing', doi: '10.1234/example.1', arxivId: '2401.01234' }]);
+  let downloads = 0;
+  const service = new SourceDiscoveryService({ rawDir, references: refs, adsToken: '', fetchImpl: async url => {
+    if (String(url).includes('/api/query')) return new Response(ARXIV_FEED);
+    downloads++; throw new Error('Unexpected download');
+  } });
+  const search = await service.search('pulsar', { filters: { refereed: 'all' } });
+  assert.equal(search.results[0].downloaded, true);
+  const result = await service.import([search.results[0].id]);
+  assert.match(result.failed[0].error, /already downloaded/);
+  assert.equal(downloads, 0);
+  fs.unlinkSync(path.join(rawDir, 'renamed.pdf'));
+  assert.equal((await service.search('pulsar', { filters: { refereed: 'all' } })).results[0].downloaded, false);
 });
 
 test('default search uses sciX without requesting arXiv when matches exist', async () => {

@@ -3354,3 +3354,12 @@ button:disabled {
 .source-notification-close { margin: 8px 8px 0 0; padding: 4px 8px; border: 0 !important; background: none; color: #111 !important; cursor: pointer; font-size: 20px; }
 .source-notification-close:hover:not(:disabled) { color: #111 !important; }
 .source-notification :focus-visible { outline: 2px solid #111; outline-offset: -3px; }
+
+.source-downloaded-tag {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+}

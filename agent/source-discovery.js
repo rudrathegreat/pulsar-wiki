@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { normalize: normalizeOrcid, matchAuthors } = require('../public/orcid');
+const { parse, text } = require('../public/bibtex');
 
 const ARXIV_API = 'https://export.arxiv.org/api/query';
 const ADS_API = 'https://api.adsabs.harvard.edu/v1/search/query';
@@ -209,7 +210,7 @@ function safeFileName(result) {
 }
 
 class SourceDiscoveryService {
-  constructor({ rawDir, fetchImpl = globalThis.fetch, adsToken = process.env.NASA_ADS_API_TOKEN, now = Date.now, onImport = () => {} } = {}) {
+  constructor({ rawDir, fetchImpl = globalThis.fetch, adsToken = process.env.NASA_ADS_API_TOKEN, now = Date.now, onImport = () => {}, references = null } = {}) {
     if (!rawDir) throw new Error('rawDir is required');
     if (typeof fetchImpl !== 'function') throw new Error('fetch implementation is required');
     this.rawDir = rawDir;
@@ -219,6 +220,33 @@ class SourceDiscoveryService {
     this.cache = new Map();
     this.orcidCache = new Map();
     this.onImport = onImport;
+    this.references = references;
+    this.importQueue = Promise.resolve();
+  }
+
+  downloaded(result) {
+    const direct = path.join(this.rawDir, safeFileName(result));
+    if (fs.existsSync(direct) && fs.statSync(direct).isFile()) return true;
+    if (!this.references) return false;
+    const entries = parse(this.references.read().content).entries;
+    const normalizeDoi = value => text(value || '').trim().replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '').toLowerCase();
+    const normalizeTitle = value => text(value || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+    return entries.some(entry => {
+      const file = text(entry.fields.file || '').replace(/\\/g, '/');
+      if (!file.startsWith('raw/') || file.slice(4).includes('/') || !/\.pdf$/i.test(file)) return false;
+      const local = path.join(this.rawDir, file.slice(4));
+      if (!fs.existsSync(local) || !fs.statSync(local).isFile()) return false;
+      const doi = normalizeDoi(entry.fields.doi);
+      const arxiv = arxivIdFromValue(text(entry.fields.eprint || entry.fields.url || ''));
+      const title = normalizeTitle(entry.fields.title);
+      return Boolean((result.doi && doi && normalizeDoi(result.doi) === doi)
+        || (result.arxivId && arxiv && result.arxivId.toLowerCase() === arxiv.toLowerCase())
+        || (result.title && title && title === normalizeTitle(result.title)));
+    });
+  }
+
+  markDownloaded(results) {
+    return results.map(result => ({ ...result, downloaded: this.downloaded(result) }));
   }
 
   remember(results) {
@@ -334,7 +362,7 @@ class SourceDiscoveryService {
       settled.push(await this.fetchText(url, { headers: { 'User-Agent': 'PulsarWiki/1.0 source discovery' } }, 'arXiv')
         .then(parseArxivFeed).then(results => ({ source: 'arXiv', results })).catch(error => ({ source: 'arXiv', results: [], error: error.message })));
     }
-    const results = deduplicate(settled.flatMap(item => item.results)).slice(0, rows);
+    const results = this.markDownloaded(deduplicate(settled.flatMap(item => item.results)).slice(0, rows));
     this.remember(results);
     const warnings = settled.filter(item => item.error).map(item => `${item.source}: ${item.error}`);
     if (!this.adsToken && sourceFilter !== 'arxiv') warnings.push(`NASA ADS is unavailable until a NASA ADS API token is added in Settings; ${sourceFilter || requiresAds ? 'no results are shown for the selected filters' : 'arXiv results are shown'}.`);
@@ -380,7 +408,7 @@ class SourceDiscoveryService {
       const params = new URLSearchParams({ q: `${search.operator}(bibcode:"${escapeQueryValue(bibcode)}")`, fl: fields, rows: String(limit), sort: 'date desc' });
       try {
         const payload = JSON.parse(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` } }, 'NASA ADS'));
-        const results = parseAdsResponse(payload).filter(result => result.bibcode !== bibcode);
+        const results = this.markDownloaded(parseAdsResponse(payload).filter(result => result.bibcode !== bibcode));
         this.remember(results);
         return { key: search.key, label: search.label, results, limit };
       } catch (error) {
@@ -396,7 +424,7 @@ class SourceDiscoveryService {
     if (url.protocol !== 'https:' || !ALLOWED_PDF_HOSTS.has(url.hostname.toLowerCase())) throw new Error('Only trusted arXiv PDF downloads can be imported.');
     const fileName = safeFileName(result);
     const destination = path.join(this.rawDir, fileName);
-    if (fs.existsSync(destination)) return { name: fileName, existed: true, source: result };
+    if (this.downloaded(result)) throw new Error(`${result.title || 'Paper'} is already downloaded.`);
     const response = await this.fetch(url, { redirect: 'error', signal: AbortSignal.timeout(30000), headers: { 'User-Agent': 'PulsarWiki/1.0 source import' } });
     if (!response.ok) throw new Error(`PDF download returned ${response.status}.`);
     const type = String(response.headers.get('content-type') || '').toLowerCase();
@@ -419,6 +447,12 @@ class SourceDiscoveryService {
   }
 
   async import(ids) {
+    const operation = this.importQueue.then(() => this.importQueued(ids));
+    this.importQueue = operation.catch(() => {});
+    return operation;
+  }
+
+  async importQueued(ids) {
     const uniqueIds = [...new Set(Array.isArray(ids) ? ids.map(String) : [])];
     if (!uniqueIds.length || uniqueIds.length > 25) throw new Error('Select between 1 and 25 papers to import.');
     const results = uniqueIds.map(id => this.cached(id));

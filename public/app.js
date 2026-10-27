@@ -1273,7 +1273,7 @@ async function loadSourceKeywords(results, isCurrent) {
 
 function resultPaperMarkup(paper, keywordPrefix = 'source-keywords') {
   const selected = state.selectedSourceIds.has(paper.id);
-  const unavailable = !paper.canImport;
+  const unavailable = paper.downloaded || !paper.canImport;
   const citations = Number.isInteger(paper.citationCount) && paper.citationCount >= 0
     ? `${paper.citationCount.toLocaleString()} citation${paper.citationCount === 1 ? '' : 's'}`
     : 'Citations unavailable';
@@ -1286,7 +1286,8 @@ function resultPaperMarkup(paper, keywordPrefix = 'source-keywords') {
         <header class="source-result-kicker">
           <span class="source-result-publication">${escHtml(paper.publication || sourceProviderMark(paper.provider))}</span>
           <span class="source-result-date">${escHtml(formatPaperDate(paper.published))}</span>
-          <label class="source-result-check${unavailable ? ' disabled' : ''}" title="${unavailable ? 'No open arXiv PDF is available for import' : 'Select paper for import'}">
+          ${paper.downloaded ? '<span class="source-downloaded-tag">Downloaded</span>' : ''}
+          <label class="source-result-check${unavailable ? ' disabled' : ''}" title="${paper.downloaded ? 'Already downloaded' : unavailable ? 'No open arXiv PDF is available for import' : 'Select paper for import'}">
             <input type="checkbox" data-source-select="${escHtml(paper.id)}" ${selected ? 'checked' : ''} ${unavailable ? 'disabled' : ''}/>
             <span aria-hidden="true"></span>
             <small>${selected ? 'Selected' : 'Select'}</small>
@@ -1313,7 +1314,10 @@ function resultPaperMarkup(paper, keywordPrefix = 'source-keywords') {
 
 function renderSourceResults(results) {
   state.sourceResults = Array.isArray(results) ? results : [];
-  for (const paper of state.sourceResults) state.sourcePapers.set(paper.id, paper);
+  for (const paper of state.sourceResults) {
+    state.sourcePapers.set(paper.id, paper);
+    if (paper.downloaded) state.selectedSourceIds.delete(paper.id);
+  }
   dom.sourceResultsSection.hidden = false;
   $('source-results-header').hidden = false;
   $('source-results-title').textContent = `${state.sourceResults.length} paper${state.sourceResults.length === 1 ? '' : 's'} found`;
@@ -1333,8 +1337,8 @@ function updateSourceSelection() {
   $('source-paper-import').textContent = `Import selected (${count})`;
   const paper = state.sourcePapers.get(state.activeSourceId);
   const currentImport = $('source-paper-import-current');
-  currentImport.disabled = Boolean(state.sourceImportRunning || !paper?.canImport);
-  currentImport.title = paper && !paper.canImport ? 'No open arXiv PDF is available for import' : '';
+  currentImport.disabled = Boolean(state.sourceImportRunning || paper?.downloaded || !paper?.canImport);
+  currentImport.title = paper?.downloaded ? 'Already downloaded' : paper && !paper.canImport ? 'No open arXiv PDF is available for import' : '';
 }
 
 function closeSourceDetail() {
@@ -1385,6 +1389,7 @@ async function showSourceDetail(id, remember = true) {
         const existing = state.sourcePapers.get(item.id);
         if (existing?.keywords) item.keywords = existing.keywords;
         state.sourcePapers.set(item.id, item);
+        if (item.downloaded) state.selectedSourceIds.delete(item.id);
         related.push(item);
       }
       return `<section class="source-paper-group"><h3>${key === 'references' ? 'References' : 'Cited in'}</h3>
@@ -1392,6 +1397,7 @@ async function showSourceDetail(id, remember = true) {
         ${papers.length ? `<div class="source-results">${papers.map(item => resultPaperMarkup(item, `${key}-keywords`)).join('')}</div>` : !group?.error ? '<p class="source-related-empty">No records available.</p>' : ''}
         ${group?.limit && papers.length >= group.limit ? `<p class="source-related-empty">Showing the ${group.limit} most recent records.</p>` : ''}</section>`;
     }).join('');
+    updateSourceSelection();
     void window.AuthorOrcids?.hydrate(relations, related);
     void loadSourceKeywords(related, current);
   } catch (error) {
@@ -1485,7 +1491,7 @@ async function importSelectedSources() {
 
 async function importCurrentSource() {
   const paper = state.sourcePapers.get(state.activeSourceId);
-  if (!paper?.canImport) return;
+  if (!paper?.canImport || paper.downloaded) return;
   await importSourcePapers([paper.id]);
 }
 
@@ -1500,13 +1506,26 @@ async function importSourcePapers(ids) {
     const result = await api.importSources(ids);
     const imported = result.imported?.length || 0;
     const failed = result.failed?.length || 0;
-    for (const file of result.imported || []) notifySourceAdded(file);
+    for (const file of result.imported || []) {
+      notifySourceAdded(file);
+      for (const paper of state.sourcePapers.values()) {
+        const source = file.source || {};
+        if (paper.id === source.id || (paper.arxivId && source.arxivId && paper.arxivId.toLowerCase() === source.arxivId.toLowerCase()) || (paper.doi && source.doi && paper.doi.toLowerCase() === source.doi.toLowerCase())) paper.downloaded = true;
+      }
+    }
+    for (const failure of result.failed || []) {
+      if (/already downloaded/i.test(failure.error || '')) {
+        const paper = state.sourcePapers.get(failure.id);
+        if (paper) paper.downloaded = true;
+      }
+    }
     for (const id of ids) state.selectedSourceIds.delete(id);
     renderSourceResults(state.sourceResults);
+    if (state.activeSourceId) void showSourceDetail(state.activeSourceId, false);
     await loadFiles();
     setSourceView('saved');
     dom.sourceJobStatus.className = `source-job-status visible${failed ? ' warning' : ''}`;
-    dom.sourceJobStatus.textContent = `${imported} paper${imported === 1 ? '' : 's'} saved${failed ? `; ${failed} could not be imported` : ''}. Background wiki review queued.`;
+    dom.sourceJobStatus.textContent = `${imported} paper${imported === 1 ? '' : 's'} saved${failed ? `; ${failed} could not be imported` : ''}.${result.ingestJob?.id ? ' Background wiki review queued.' : ''}`;
     if (result.ingestJob?.id) monitorSourceJob(result.ingestJob.id);
   } catch (error) {
     dom.sourceJobStatus.className = 'source-job-status visible error';
