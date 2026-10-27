@@ -3310,9 +3310,10 @@ button:disabled {
 #references-editor { display: block; flex: 1; min-width: 0; width: 0; height: 100%; min-height: 0; padding: 16px; resize: none; overflow: auto; border: 0; border-radius: 0; background: var(--bg); color: var(--text-1); font: inherit; tab-size: 2; white-space: pre; overflow-wrap: normal; }
 #references-editor:focus { outline: none; }
 #references-source[hidden], #references-editor[hidden], #references-preview[hidden] { display: none; }
-.references-view-switch { display: flex; padding: 3px; gap: 2px; background: var(--surface); border-radius: 7px; }
-.references-view-switch .btn { border: 0; background: transparent; padding: 6px 12px; }
-.references-view-switch .btn[aria-pressed="true"] { background: var(--bg); color: var(--text-1); box-shadow: inset 0 0 0 1px var(--border); }
+.references-view-switch { display: flex; gap: 2px; }
+.references-view-switch .btn { padding: 6px 12px; }
+.references-view-switch .btn[aria-pressed="true"] { background: #eee !important; border-color: #eee !important; color: #111 !important; }
+.references-view-switch .btn:hover:not(:disabled) { border-color: #000 !important; }
 .references-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 4px 0 32px; }
 .references-tools input, .references-tools select { min-width: 0; border: 0; border-radius: 6px; padding: 11px 14px; font: 13px var(--font); color: var(--text-1); background: var(--surface); }
 .references-tools input { flex: 1 1 240px; }

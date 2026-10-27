@@ -221,3 +221,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-27 | References save button / public | Set the enabled Save changes button border to black on hover. Updated the wiki index. |
 
 | 2026-10-27 | References save button disabled state / public | Greyed out Save changes while it is disabled. Updated the wiki index. |
+
+| 2026-10-27 | References view switch / public | Removed the switch background and styled the active view and hover borders. Updated the wiki index. |
