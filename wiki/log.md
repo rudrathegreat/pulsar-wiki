@@ -235,3 +235,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-27 | References preview hover theme / public | Set the light-mode hover background to #f9f9f9 and restored the dark-mode surface colour. Updated the wiki index. |
 
 | 2026-10-27 | References tag dark mode / public | Changed paper tag backgrounds to #222 in dark mode. Updated the wiki index. |
+
+| 2026-10-27 | Project Handover layout / public | Aligned the handover content width, responsive padding, and text sizes with Sources. Updated the wiki index. |
