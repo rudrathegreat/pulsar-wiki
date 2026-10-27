@@ -3133,6 +3133,8 @@ button:disabled {
   width: 100%;
   margin-top: 6px;
   border: 0;
+  appearance: none;
+  box-shadow: none;
   border-radius: var(--radius-sm);
   outline: none;
   background: #1c1c1c;

@@ -237,3 +237,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-27 | References tag dark mode / public | Changed paper tag backgrounds to #222 in dark mode. Updated the wiki index. |
 
 | 2026-10-27 | Project Handover layout / public | Aligned the handover content width, responsive padding, and text sizes with Sources. Updated the wiki index. |
+
+| 2026-10-27 | Project Handover inputs / public | Removed native input decorations and shadows while retaining focus outlines. Updated the wiki index. |
