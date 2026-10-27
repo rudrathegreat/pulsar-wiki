@@ -253,3 +253,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-27 | Paper citations / public | Made Cite Article save paper metadata to references.bib and avoid duplicate references. Updated the wiki index. |
 
 | 2026-10-27 | Reference notifications / public | Added notifications linking new BibTeX entries to their location in references.bib. Updated the wiki index. |
+
+| 2026-10-27 | Paper search citations / public | Added Cited tags for papers already present in references.bib. Updated the wiki index. |

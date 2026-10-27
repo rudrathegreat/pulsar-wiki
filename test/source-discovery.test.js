@@ -131,6 +131,25 @@ test('saved bibliography identifies renamed PDFs and prevents cross-provider dup
   assert.equal((await service.search('pulsar', { filters: { refereed: 'all' } })).results[0].downloaded, false);
 });
 
+test('search marks bibliography matches as cited without requiring a downloaded PDF', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pulsarwiki-cited-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const rawDir = path.join(root, 'raw'); fs.mkdirSync(rawDir);
+  const { References } = require('../agent/references');
+  const refs = new References({ rootDir: root, rawDir });
+  const service = new SourceDiscoveryService({ rawDir, references: refs, adsToken: '', fetchImpl: async () => new Response(ARXIV_FEED) });
+  for (const field of ['doi = {https://doi.org/10.1234/EXAMPLE.1}', 'eprint = {2401.01234v3}', 'title = {Precision \\& pulsar timing}']) {
+    fs.writeFileSync(refs.file, `@article{example, ${field}}`);
+    const paper = (await service.search('pulsar', { filters: { refereed: 'all' } })).results[0];
+    assert.equal(paper.cited, true, field);
+    assert.equal(paper.downloaded, false, field);
+  }
+  fs.writeFileSync(refs.file, '@article{other, title = {Another paper}}');
+  assert.equal((await service.search('pulsar', { filters: { refereed: 'all' } })).results[0].cited, false);
+  fs.writeFileSync(refs.file, '@article{ads, adsbibcode = {2024ApJ...123..456A}}');
+  assert.equal(service.markDownloaded([{ bibcode: '2024ApJ...123..456A', title: 'Different' }])[0].cited, true);
+});
+
 test('default search uses sciX without requesting arXiv when matches exist', async () => {
   const calls = [];
   const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', fetchImpl: async url => {

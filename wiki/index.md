@@ -117,6 +117,7 @@ Project handover: project details, searchable autocomplete selection of wiki pag
 - [[pulsar-catalog]]: A directory of physical parameters for known pulsars.
 
 ## Project Continuity
+- Paper search: results show a Cited tag when a paper matches an entry in references.bib.
 - Reference additions: notifications link directly to the added entry in references.bib.
 - Welcome screen: **New project** and **Open project** stay side by side with single-line labels (layout: `public/style.css`).
 - Project creation: **New project** on the welcome screen creates a named subfolder in the selected parent folder, populates a clean research template, and opens it automatically; existing names are rejected without overwriting files. See README.md for the template contents. Restart the running Node server after backend changes so the welcome screen and project API use the same version.

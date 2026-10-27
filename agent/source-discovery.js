@@ -209,6 +209,18 @@ function safeFileName(result) {
   return `${cleaned || 'paper'}.pdf`;
 }
 
+function matchesReference(result, entry) {
+  const fields = entry.fields;
+  const normalized = value => text(value || '').trim().toLowerCase();
+  const doi = value => normalized(value).replace(/^https?:\/\/(?:dx\.)?doi\.org\//, '').replace(/^doi:\s*/, '');
+  const title = value => normalized(value).replace(/[^\p{L}\p{N}]/gu, '');
+  const arxiv = value => arxivIdFromValue(text(value || ''))?.toLowerCase();
+  return Boolean((result.doi && doi(fields.doi) && doi(result.doi) === doi(fields.doi))
+    || (result.bibcode && normalized(fields.bibcode || fields.adsbibcode) === normalized(result.bibcode))
+    || (result.arxivId && [fields.eprint, fields.url].some(value => arxiv(value) && arxiv(value) === arxiv(result.arxivId)))
+    || (result.title && title(fields.title) && title(fields.title) === title(result.title)));
+}
+
 class SourceDiscoveryService {
   constructor({ rawDir, fetchImpl = globalThis.fetch, adsToken = process.env.NASA_ADS_API_TOKEN, now = Date.now, onImport = () => {}, references = null } = {}) {
     if (!rawDir) throw new Error('rawDir is required');
@@ -246,7 +258,8 @@ class SourceDiscoveryService {
   }
 
   markDownloaded(results) {
-    return results.map(result => ({ ...result, downloaded: this.downloaded(result) }));
+    const entries = this.references ? parse(this.references.read().content).entries : [];
+    return results.map(result => ({ ...result, downloaded: this.downloaded(result), cited: entries.some(entry => matchesReference(result, entry)) }));
   }
 
   remember(results) {

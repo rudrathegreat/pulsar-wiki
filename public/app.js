@@ -1299,6 +1299,7 @@ function resultPaperMarkup(paper, keywordPrefix = 'source-keywords') {
           <span class="source-result-publication">${escHtml(paper.publication || sourceProviderMark(paper.provider))}</span>
           <span class="source-result-date">${escHtml(formatPaperDate(paper.published))}</span>
           ${paper.downloaded ? '<span class="source-downloaded-tag">Downloaded</span>' : ''}
+          ${paper.cited ? '<span class="source-downloaded-tag source-cited-tag">Cited</span>' : ''}
           <label class="source-result-check${unavailable ? ' disabled' : ''}" title="${paper.downloaded ? 'Already downloaded' : unavailable ? 'No open arXiv PDF is available for import' : 'Select paper for import'}">
             <input type="checkbox" data-source-select="${escHtml(paper.id)}" ${selected ? 'checked' : ''} ${unavailable ? 'disabled' : ''}/>
             <span aria-hidden="true"></span>
@@ -1328,6 +1329,13 @@ async function citeSource(id, button) {
   try {
     const result = await api.citeSource(id);
     button.textContent = result.added ? 'Added to references' : 'Already in references';
+    const paper = state.sourcePapers.get(id);
+    if (paper) paper.cited = true;
+    for (const item of state.sourceResults) if (item.id === id) item.cited = true;
+    for (const card of document.querySelectorAll('.source-result')) {
+      if (card.dataset.sourceId !== id || card.querySelector('.source-cited-tag')) continue;
+      card.querySelector('.source-result-kicker')?.insertAdjacentHTML('beforeend', '<span class="source-downloaded-tag source-cited-tag">Cited</span>');
+    }
   } catch (error) {
     button.textContent = 'Cite Article';
     button.disabled = false;
@@ -1565,7 +1573,7 @@ async function importSourcePapers(ids) {
       notifySourceAdded(file);
       for (const paper of state.sourcePapers.values()) {
         const source = file.source || {};
-        if (paper.id === source.id || (paper.arxivId && source.arxivId && paper.arxivId.toLowerCase() === source.arxivId.toLowerCase()) || (paper.doi && source.doi && paper.doi.toLowerCase() === source.doi.toLowerCase())) paper.downloaded = true;
+        if (paper.id === source.id || (paper.arxivId && source.arxivId && paper.arxivId.toLowerCase() === source.arxivId.toLowerCase()) || (paper.doi && source.doi && paper.doi.toLowerCase() === source.doi.toLowerCase())) { paper.downloaded = true; paper.cited = true; }
       }
     }
     for (const failure of result.failed || []) {
