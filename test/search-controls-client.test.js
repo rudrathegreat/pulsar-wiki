@@ -31,11 +31,12 @@ test('search sends default and changed controls to the API', async () => {
   assert.equal(requests[0][2].filters.refereed, 'refereed');
   c.element('source-sort').value = 'citations';
   c.element('source-refereed').value = 'all';
-  c.element('source-year').value = '2024';
+  c.element('source-search-input').value = 'pulsar year:2024';
   c.element('source-min-citations').value = '10';
   await c.context.runSourceSearch();
   assert.equal(requests[1][2].sort, 'citations');
-  assert.equal(requests[1][2].filters.year, '2024');
+  assert.equal(requests[1][0], 'pulsar year:2024');
+  assert.equal(requests[1][2].filters.year, undefined);
   assert.equal(requests[1][2].filters.minCitations, '10');
 });
 

@@ -1425,7 +1425,6 @@ async function runSourceSearch() {
     filters: {
       refereed: $('source-refereed').value,
       collection: $('source-collection').value,
-      year: $('source-year').value,
       minCitations: $('source-min-citations').value,
     },
   };
@@ -1659,7 +1658,7 @@ function monitorSourceJob(id) {
 document.querySelectorAll('[data-source-view]').forEach(button => button.addEventListener('click', () => setSourceView(button.dataset.sourceView)));
 dom.sourceSearchForm.addEventListener('submit', event => { event.preventDefault(); void runSourceSearch(); });
 $('source-downloaded-filter').addEventListener('change', () => renderSourceResults(state.sourceResults));
-for (const id of ['source-sort', 'source-refereed', 'source-collection', 'source-year', 'source-min-citations']) {
+for (const id of ['source-sort', 'source-refereed', 'source-collection', 'source-min-citations']) {
   $(id).addEventListener('change', () => {
     if (dom.sourceSearchInput.value.trim()) void runSourceSearch();
   });
