@@ -251,7 +251,7 @@ test('related resolves arXiv records in ADS and keeps real citation groups cache
   for (const group of data.groups) {
     assert.equal(group.results[0].abstract, 'Full abstract');
     assert.equal(service.cached(group.results[0].id).publication, 'Journal');
-    assert.equal(group.limit, 25);
+    assert.equal(group.limit, 10);
   }
 });
 
@@ -298,4 +298,27 @@ test('related recovers expired and lost search entries from matching citation id
   assert.ok(queries.includes('references(bibcode:"known")'));
   await assert.rejects(service.related(arxiv.id, { ...arxiv, doi: '10.1234/different' }), /preview expired/);
   await assert.rejects(service.related(arxiv.id), /preview expired/);
+});
+
+
+test('related pages each citation group independently using ADS totals', async () => {
+  const calls = [];
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', fetchImpl: async url => {
+    const params = new URL(String(url)).searchParams;
+    calls.push(params);
+    const start = Number(params.get('start'));
+    const total = params.get('q').startsWith('references(') ? 12 : 10;
+    return Response.json({ response: { numFound: total, docs: Array.from({ length: Math.min(10, total - start) }, (_, i) => ({ bibcode: `paper-${start + i}`, title: ['Related'] })) } });
+  } });
+  const [paper] = parseArxivFeed(ARXIV_FEED);
+  service.remember([{ ...paper, bibcode: 'main' }]);
+  const first = await service.related(paper.id);
+  assert.deepEqual(first.groups.map(g => [g.results.length, g.hasMore, g.nextStart]), [[10, true, 10], [10, false, 10]]);
+  const next = await service.related(paper.id, { group: 'references', start: '10' });
+  assert.equal(next.groups.length, 1);
+  assert.equal(next.groups[0].results.length, 2);
+  assert.equal(next.groups[0].hasMore, false);
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2].get('rows'), '10');
+  await assert.rejects(service.related(paper.id, { group: 'invalid', start: '10' }), /Invalid/);
 });

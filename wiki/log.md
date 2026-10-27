@@ -243,3 +243,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-27 | Source reading workspace / public | Opened non-PDF source documents in the assisted reader, with selectable extracted text and preserved passage links. Updated the wiki index. |
 
 | 2026-10-27 | Reading selection helper / public | Removed the helper's drop shadow. Updated the wiki index. |
+
+| 2026-10-27 | Related paper lists / public | Added independent ten-paper pagination for references and citing papers. Updated the wiki index. |

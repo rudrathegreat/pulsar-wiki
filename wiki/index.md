@@ -4,6 +4,8 @@ Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pul
 
 Application navigation: each main tab and Sources subtab has its own URL, including `/#sources/references`, `/#sources/upload`, `/#chat`, `/#graph`, `/#notebooks`, and `/#handover`. Reload restores the selected tab; browser Back and Forward restore earlier views. Existing wiki page, document, reading passage and notebook links remain supported.
 
+Paper details show references and papers citing the paper in separate lists, initially displaying up to ten per list with independent Show more controls.
+
 Application branding: the PulsarWiki logo appears at the top of the iconbar and adapts to dark and light themes.
 
 Project Handover uses the same content width, responsive padding, and comparable text sizes as Sources. Its text inputs have no resting borders and retain visible focus outlines.

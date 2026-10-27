@@ -164,11 +164,12 @@ const api = {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, limit, ...options }),
     }), 'Paper search');
   },
-  async getRelatedSources(id, paper = {}) {
+  async getRelatedSources(id, paper = {}, page = {}) {
     const identity = new URLSearchParams();
     for (const key of ['provider', 'bibcode', 'doi', 'arxivId']) {
       if (paper[key]) identity.set(key, paper[key]);
     }
+    if (page.group) { identity.set('group', page.group); identity.set('start', String(page.start)); }
     return readJsonResponse(await workspaceFetch(`/api/sources/${encodeURIComponent(id)}/related?${identity}`), 'Related papers');
   },
   async getSourceKeywords(id) {
@@ -1391,25 +1392,54 @@ async function showSourceDetail(id, remember = true) {
   try {
     const data = await api.getRelatedSources(id, paper);
     if (!current()) return;
-    const related = [];
-    relations.innerHTML = ['references', 'citations'].map(key => {
-      const group = (data.groups || []).find(item => item.key === key);
-      const papers = group?.results || [];
+    const groups = Object.fromEntries(['references', 'citations'].map(key => [key, (data.groups || []).find(item => item.key === key) || { key, results: [] }]));
+    const addPapers = papers => {
       for (const item of papers) {
         const existing = state.sourcePapers.get(item.id);
         if (existing?.keywords) item.keywords = existing.keywords;
         state.sourcePapers.set(item.id, item);
         if (item.downloaded) state.selectedSourceIds.delete(item.id);
-        related.push(item);
       }
-      return `<section class="source-paper-group"><h3>${key === 'references' ? 'References' : 'Cited in'}</h3>
-        ${group?.error ? `<p class="source-related-empty">${escHtml(group.error)}</p>` : ''}
-        ${papers.length ? `<div class="source-results">${papers.map(item => resultPaperMarkup(item, `${key}-keywords`)).join('')}</div>` : !group?.error ? '<p class="source-related-empty">No records available.</p>' : ''}
-        ${group?.limit && papers.length >= group.limit ? `<p class="source-related-empty">Showing the ${group.limit} most recent records.</p>` : ''}</section>`;
-    }).join('');
-    updateSourceSelection();
-    void window.AuthorOrcids?.hydrate(relations, related);
-    void loadSourceKeywords(related, current);
+    };
+    const render = () => {
+      const related = Object.values(groups).flatMap(group => group.results || []);
+      relations.innerHTML = ['references', 'citations'].map(key => {
+        const group = groups[key];
+        const papers = group.results || [];
+        return `<section class="source-paper-group"><h3>${key === 'references' ? 'References' : 'Cited in'}</h3>
+          ${group.error ? `<p class="source-related-empty">${escHtml(group.error)}</p>` : ''}
+          ${papers.length ? `<div class="source-results">${papers.map(item => resultPaperMarkup(item, `${key}-keywords`)).join('')}</div>` : !group.error ? '<p class="source-related-empty">No records available.</p>' : ''}
+          ${group.hasMore ? `<button class="btn" type="button" data-related-more="${key}" ${group.loading ? 'disabled' : ''}>${group.loading ? 'Loading?' : 'Show more'}</button>` : ''}</section>`;
+      }).join('');
+      updateSourceSelection();
+      void window.AuthorOrcids?.hydrate(relations, related);
+    };
+    for (const group of Object.values(groups)) addPapers(group.results || []);
+    render();
+    void loadSourceKeywords(Object.values(groups).flatMap(group => group.results || []), current);
+    state.loadMoreRelated = async key => {
+      const group = groups[key];
+      if (!current() || !group?.hasMore || group.loading) return;
+      group.loading = true;
+      group.error = '';
+      render();
+      try {
+        const page = await api.getRelatedSources(id, paper, { group: key, start: group.nextStart });
+        if (!current()) return;
+        const next = (page.groups || []).find(item => item.key === key);
+        if (!next || next.error) throw new Error(next?.error || 'Could not load more papers.');
+        addPapers(next.results || []);
+        group.results.push(...(next.results || []));
+        group.nextStart = next.nextStart;
+        group.hasMore = next.hasMore;
+        void loadSourceKeywords(next.results || [], current);
+      } catch (error) {
+        if (current()) group.error = stripEmoji(error.message);
+      } finally {
+        group.loading = false;
+        if (current()) render();
+      }
+    };
   } catch (error) {
     if (current()) relations.innerHTML = `<p class="source-related-empty">${escHtml(stripEmoji(error.message))}</p><button class="btn" type="button" data-source-preview="${escHtml(id)}">Retry</button>`;
   }
@@ -1691,6 +1721,8 @@ $('panel-files').addEventListener('change', event => {
   updateSourceSelection();
 });
 $('panel-files').addEventListener('click', event => {
+  const more = event.target.closest('[data-related-more]');
+  if (more) { void state.loadMoreRelated?.(more.dataset.relatedMore); return; }
   const preview = event.target.closest('[data-source-preview]');
   if (preview) void showSourceDetail(preview.dataset.sourcePreview, preview.dataset.sourcePreview !== state.activeSourceId);
 });

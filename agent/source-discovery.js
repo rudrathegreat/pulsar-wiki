@@ -383,7 +383,11 @@ class SourceDiscoveryService {
     }
     if (!source) throw new Error('This paper preview expired. Search for it again.');
     const fields = 'bibcode,title,author,orcid_pub,orcid_user,year,pub,pubdate,abstract,doi,identifier,citation_count,reference_count';
-    const limit = 25;
+    const limit = 10;
+    const groupKey = identity.group;
+    const start = identity.start === undefined ? 0 : Number(identity.start);
+    if ((groupKey !== undefined && !['references', 'citations'].includes(groupKey)) ||
+        !Number.isSafeInteger(start) || start < 0 || (start && !groupKey)) throw new Error('Invalid related paper page.');
     const unavailable = error => ({ sourceId: source.id, groups: [
       { key: 'references', label: 'References', results: [], error },
       { key: 'citations', label: 'Cited in', results: [], error },
@@ -404,13 +408,17 @@ class SourceDiscoveryService {
     const groups = await Promise.all([
       { key: 'references', label: 'References', operator: 'references' },
       { key: 'citations', label: 'Cited in', operator: 'citations' },
-    ].map(async search => {
-      const params = new URLSearchParams({ q: `${search.operator}(bibcode:"${escapeQueryValue(bibcode)}")`, fl: fields, rows: String(limit), sort: 'date desc' });
+    ].filter(search => !groupKey || search.key === groupKey).map(async search => {
+      const params = new URLSearchParams({ q: `${search.operator}(bibcode:"${escapeQueryValue(bibcode)}")`, fl: fields, rows: String(limit), start: String(start), sort: 'date desc' });
       try {
         const payload = JSON.parse(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` } }, 'NASA ADS'));
         const results = this.markDownloaded(parseAdsResponse(payload).filter(result => result.bibcode !== bibcode));
         this.remember(results);
-        return { key: search.key, label: search.label, results, limit };
+        const fetched = Array.isArray(payload.response?.docs) ? payload.response.docs.length : 0;
+        const nextStart = start + fetched;
+        const total = payload.response?.numFound;
+        const hasMore = Number.isSafeInteger(total) ? nextStart < total : fetched === limit;
+        return { key: search.key, label: search.label, results, limit, nextStart, hasMore };
       } catch (error) {
         return { key: search.key, label: search.label, results: [], error: `Could not load ${search.label.toLowerCase()}: ${error.message}` };
       }
