@@ -2390,27 +2390,31 @@ button:disabled {
   position: fixed;
   inset: auto;
   margin: 0;
-  padding: 5px;
+  padding: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text-1);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid #ccc;
+  border-radius: var(--radius-sm);
   font: 12px var(--font);
-  box-shadow: 0 8px 24px #0002;
+  box-shadow: none;
 }
+[data-theme="light"] .source-select-menu { background: #fff; }
+[data-theme="dark"] .source-select-menu { border-color: #333; }
 .source-select-option {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 10px;
-  border-radius: 4px;
+  padding: 7px 8px;
   cursor: pointer;
 }
+.source-select-option + .source-select-option { border-top: 1px solid var(--border); }
 .source-select-option:hover,
-.source-select-option.is-active { background: var(--surface-3); }
+.source-select-option.is-active { background: #eee; }
+[data-theme="dark"] .source-select-option:hover,
+[data-theme="dark"] .source-select-option.is-active { background: #222; }
 .source-select-option[aria-selected="true"] { font-weight: 600; }
 .source-select-option[aria-selected="true"]::after { content: '\2713'; }
 
