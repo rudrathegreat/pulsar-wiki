@@ -695,12 +695,20 @@ function drawGraph(data) {
   const isConnected = d => (linkCount[d.id] || 0) > 0;
 
   const simulation = d3.forceSimulation(nodes)
+    // Settle in roughly 80 frames instead of D3's default 300; collision
+    // forces otherwise keep nudging nodes long after the initial layout.
+    .alphaDecay(0.08)
+    .velocityDecay(0.7)
     .force('link', d3.forceLink(links).id(d => d.id).distance(145).strength(0.42))
     .force('charge', d3.forceManyBody().strength(d => isConnected(d) ? -750 : -120))
     .force('center', d3.forceCenter(W / 2, H / 2))
     .force('x', d3.forceX(W / 2).strength(d => isConnected(d) ? 0.014 : 0.3))
     .force('y', d3.forceY(H / 2).strength(d => isConnected(d) ? 0.014 : 0.3))
     .force('collision', d3.forceCollide(collisionRadius).strength(1).iterations(2));
+
+  // Resolve the strongest initial forces before showing the layout, leaving
+  // the remaining cooling ticks to provide a gentler visible settling motion.
+  simulation.tick(40);
 
   const zoom = d3.zoom().scaleExtent([0.2, 6]).on('zoom', e => g.attr('transform', e.transform));
   svg.call(zoom);
@@ -761,7 +769,7 @@ function drawGraph(data) {
     .attr('paint-order', 'stroke')
     .attr('pointer-events', 'none');
 
-  simulation.on('tick', () => {
+  function renderGraph() {
     link
       .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
       .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
@@ -769,7 +777,9 @@ function drawGraph(data) {
     label
       .attr('x', d => (d.x < W / 2 ? -1 : 1) * (nodeRadius(d) + 7))
       .attr('text-anchor', d => d.x < W / 2 ? 'end' : 'start');
-  });
+  }
+  simulation.on('tick', renderGraph);
+  renderGraph();
 
   function fitGraph(animate = true) {
     const width = state.graph.width;
@@ -792,13 +802,6 @@ function drawGraph(data) {
     target.call(zoom.transform, transform);
   }
 
-  let initialFitPending = true;
-  simulation.on('end', () => {
-    if (!initialFitPending) return;
-    initialFitPending = false;
-    fitGraph(false);
-  });
-
   const resizeObserver = new ResizeObserver(entries => {
     const size = entries[0]?.contentRect;
     const nextWidth = Math.round(size?.width || 0);
@@ -814,6 +817,7 @@ function drawGraph(data) {
   });
 
   state.graph = { simulation, resizeObserver, svg, zoom, width: W, height: H };
+  fitGraph(false);
   resizeObserver.observe(panel);
 
   // Graph control buttons

@@ -255,3 +255,9 @@ All major updates to the wiki are recorded here.
 | 2026-10-27 | Reference notifications / public | Added notifications linking new BibTeX entries to their location in references.bib. Updated the wiki index. |
 
 | 2026-10-27 | Paper search citations / public | Added Cited tags for papers already present in references.bib. Updated the wiki index. |
+
+| 2026-10-27 | Graph settling / public | Shortened the force layout's settling time to reduce continued node jitter. Updated the wiki index. |
+
+| 2026-10-27 | Graph initial motion / public | Reduced initial node velocity and pre-settled the strongest layout forces. Updated the wiki index. |
+
+| 2026-10-27 | Graph initial zoom / public | Fitted the graph before its visible settling motion to avoid a sudden zoom afterwards. Updated the wiki index. |
