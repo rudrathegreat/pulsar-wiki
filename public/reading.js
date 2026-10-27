@@ -52,6 +52,7 @@
     if (!p.rendering && p.page) p.needsCleanup = p.page.cleanup() === false;
   }
   function releaseDistantPages() {
+    if (!r.pdf) return;
     // Keep recently viewed pages for direction changes, within both a page and
     // pixel budget. Visible/near pages and active selections take precedence.
     let count = 0; let pixels = 0; const cached = [];
@@ -278,6 +279,7 @@
     for (const p of r.pages.values()) { p.task?.cancel(); p.buildingTextLayer?.cancel(); p.textLayer?.cancel(); void p.textReader?.cancel().catch(() => {}); }
     if (r.pdf) { const previous = r.pdf; r.pdf = null; void previous.destroy().catch(() => {}); }
     r.pages.clear(); r.document = null; r.pending = null; r.historical = null; r.findText = null;
+    el('panel-document').classList.remove('reading-text-document');
     closeHelper(); el('reading-notes').hidden = true; el('reading-thumbnails').hidden = true;
     el('document-stage').classList.remove('reading-region-mode', 'reading-highlights-disabled');
   }
@@ -313,6 +315,30 @@
     await navigate(r.document.position?.page || 1, state.pdf.fitWidth);
     if (result.changedDocuments.length) notify('This filename previously contained a different PDF. Its earlier highlights and notes are preserved locally.', true);
     else if (result.extractionChanged) notify('The PDF text extractor has changed. Existing highlights retain their original coordinates and quotes; reattach any selection that no longer matches.', true);
+  }
+  async function openText(name, session) {
+    const generation = ++r.generation;
+    r.rotation = 0; r.region = false; r.findQuery = ''; r.findResults = []; r.findText = null;
+    el('panel-document').classList.add('reading-text-document');
+    setHighlightsEnabled(r.highlightsEnabled);
+    const result = await request('/documents', 'POST', { name });
+    if (session !== state.documentSession || generation !== r.generation) return;
+    r.document = result.document;
+    const content = await request(`/documents/${r.document.id}/pages/1`);
+    await refresh();
+    if (session !== state.documentSession || generation !== r.generation) return;
+    r.filter = { document: r.document.id, color: '', category: '', query: '', annotated: false };
+    el('reading-notes').hidden = false; el('reading-notes-toggle').setAttribute('aria-expanded', 'true');
+    const stage = el('document-stage'); stage.innerHTML = '';
+    const wrap = document.createElement('div'); wrap.className = 'reading-page reading-text-page'; wrap.dataset.readingPage = '1';
+    wrap.innerHTML = '<div class="reading-overlays"></div><div class="textLayer"><pre><span data-text-start="0"></span></pre></div>';
+    const span = wrap.querySelector('span'); span.textContent = content.unsupported ? 'Preview and text extraction are not available for this file type.' : content.text;
+    span.dataset.textLength = String(content.text.length);
+    stage.append(wrap);
+    const viewport = { convertToPdfPoint: (x, y) => [x, y], convertToViewportRectangle: rect => rect };
+    r.pages.set(1, { number: 1, wrap, layer: wrap.querySelector('.textLayer'), overlay: wrap.querySelector('.reading-overlays'), text: content.text, textLayer: { textDivs: [span] }, viewport, rendered: true, near: true, textDocument: true });
+    renderWorkspace(); paintHighlights(r.pages.get(1));
+    if (result.changedDocuments.length) notify('This filename previously contained a different document. Its earlier highlights and notes are preserved locally.', true);
   }
   function layout() {
     if (!r.pdf || !r.defaultSize) return;
@@ -485,7 +511,16 @@
     const highlights = live('highlights').filter(h => h.documentId === r.document.id && h.id !== r.historical?.highlight.id);
     if (r.historical?.highlight.documentId === r.document.id) highlights.push(r.historical.highlight);
     for (const h of highlights) {
-      const rectangles = h.anchors.filter(a => a.page === p.number).flatMap(a => a.rects.map(rect => p.viewport.convertToViewportRectangle(rect)));
+      const rectangles = h.anchors.filter(a => a.page === p.number).flatMap(a => {
+        if (p.textDocument && a.start !== null && a.end !== null) {
+          const node = p.layer.querySelector('span').firstChild;
+          if (!node || a.end > node.length) return [];
+          const range = document.createRange(); range.setStart(node, a.start); range.setEnd(node, a.end);
+          const box = p.wrap.getBoundingClientRect();
+          return [...range.getClientRects()].map(rect => [rect.left - box.left, rect.top - box.top, rect.right - box.left, rect.bottom - box.top]);
+        }
+        return a.rects.map(rect => p.viewport.convertToViewportRectangle(rect));
+      });
       for (const coords of h.kind === 'region' ? rectangles : joinHighlightRects(rectangles, r.rotation % 180 !== 0)) {
         const mark = document.createElement('div'); mark.className = `reading-mark${r.active === h.id ? ' active' : ''}${h.kind === 'region' ? ' region' : ''}`; mark.dataset.color = highlightColor(h); mark.dataset.highlightId = h.id;
         Object.assign(mark.style, { left: `${Math.min(coords[0], coords[2])}px`, top: `${Math.min(coords[1], coords[3])}px`, width: `${Math.abs(coords[2] - coords[0])}px`, height: `${Math.abs(coords[3] - coords[1])}px` });
@@ -503,7 +538,7 @@
     el('pdf-fit').classList.toggle('active', state.pdf.fitWidth);
   }
   async function navigate(number, fitWidth = state.pdf.fitWidth) {
-    if (!r.pdf) return;
+    if (!r.pdf) { r.pages.get(1)?.wrap.scrollIntoView({ block: 'start' }); return; }
     const changed = r.lastScale !== state.pdf.scale || state.pdf.fitWidth !== fitWidth || r.lastRotation !== r.rotation;
     state.pdf.fitWidth = fitWidth;
     const page = Math.max(1, Math.min(r.pdf.numPages, Number(number) || 1));
@@ -629,8 +664,8 @@
     const passage = await request(`/passages/${id}?${query}`); const h = passage.highlight;
     r.active = id;
     const doc = passage.document;
-    if (!doc.available) { throw new Error('The original PDF is missing or changed. Your passage and notes are preserved locally.'); }
-    if (r.document?.id !== doc.id || !r.pdf) await openRawFile(doc.currentName, 'pdf', {}, false);
+    if (!doc.available) { throw new Error('The original source is missing or changed. Your passage and notes are preserved locally.'); }
+    if (r.document?.id !== doc.id) await openRawFile(doc.currentName, doc.currentName.split('.').pop().toLowerCase(), {}, false);
     else showPanel('document');
     r.active = id; r.filter.document = doc.id; r.historical = passage.historical ? passage : null;
     history.replaceState(null, '', `/#reading/${doc.id}/${id}?revision=${h.revision}`);
@@ -650,7 +685,7 @@
       else {
         const doc = await request(`/documents/${match[1]}`);
         if (!doc.available) throw new Error('The original source file is missing or changed.');
-        await openRawFile(doc.currentName, 'pdf', {}, false);
+        await openRawFile(doc.currentName, doc.currentName.split('.').pop().toLowerCase(), {}, false);
         await navigate(Number(new URLSearchParams(hashValue.split('?')[1]).get('page')) || 1);
       }
       return true;
@@ -951,6 +986,7 @@
   el('document-stage').addEventListener('keyup', () => { if (!r.region) captureSelection(); });
   el('document-stage').addEventListener('scroll', pauseForScroll, { passive: true });
   el('document-stage').addEventListener('wheel', pauseForScroll, { passive: true });
+  window.addEventListener('resize', () => { const page = r.pages.get(1); if (page?.textDocument) paintHighlights(page); });
   document.addEventListener('selectionchange', () => {
     clearTimeout(r.selectionTimer);
     r.selectionTimer = setTimeout(releaseDistantPages, 100);
@@ -999,5 +1035,5 @@
     const helperObserver = new ResizeObserver(positionHelper);
     helperObserver.observe(el('reading-selection-toolbar'));
   }
-  window.ActiveReading = { open, close, closeHelper, navigate, route, sanitizeHtml, isOpen: () => Boolean(r.pdf && r.document), backlinks: guard(backlinks) };
+  window.ActiveReading = { open, openText, close, closeHelper, navigate, route, sanitizeHtml, isOpen: () => Boolean(r.document), backlinks: guard(backlinks) };
 })();

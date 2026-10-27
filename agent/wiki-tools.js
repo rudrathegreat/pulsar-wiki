@@ -187,7 +187,7 @@ class WikiTools {
     const filePath = this.sourcePath(name);
     if (!this.fs.existsSync(filePath)) throw new WikiToolError('Source file not found.', 'source-not-found');
     const extension = path.extname(filePath).toLowerCase();
-    if (['.txt', '.md', '.markdown', '.csv', '.tsv', '.json', '.yaml', '.yml', '.log', '.tex', '.py', '.r'].includes(extension)) {
+    if (['.txt', '.md', '.markdown', '.csv', '.tsv', '.json', '.xml', '.yaml', '.yml', '.log', '.tex', '.py', '.r'].includes(extension)) {
       return this.fs.readFileSync(filePath, 'utf8');
     }
     if (extension === '.ipynb') {
@@ -208,7 +208,15 @@ class WikiTools {
         throw new WikiToolError('PulsarWiki could not extract text from that notebook.', 'notebook-extraction-failed');
       }
     }
-    if (extension !== '.pdf') throw new WikiToolError('This source type cannot be read as text.', 'unsupported-source');
+    if (extension !== '.pdf') {
+      const bytes = this.fs.readFileSync(filePath);
+      const decoded = new TextDecoder('utf-8', { fatal: true });
+      try {
+        const content = decoded.decode(bytes);
+        if (!content.includes('\0')) return content;
+      } catch { /* Binary or non-UTF-8 source. */ }
+      throw new WikiToolError('This source type cannot be read as text.', 'unsupported-source');
+    }
 
     const stat = this.fs.statSync(filePath);
     const cached = this.pdfCache.get(filePath);

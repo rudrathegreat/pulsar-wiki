@@ -1727,12 +1727,17 @@ async function openRawFile(name, ext, file = {}, updateHash = true) {
 
   showPanel('document');
   if (updateHash) updateAppHistory(`/#file/${encodeURIComponent(name)}`);
-  dom.pdfToolbar.hidden = normalizedExt !== 'pdf';
+  dom.pdfToolbar.hidden = normalizedExt !== 'pdf' && (!window.ActiveReading?.openText || name.toLowerCase() === 'references.bib');
   setDocumentStatus(`Opening ${normalizedExt ? normalizedExt.toUpperCase() : 'document'}...`);
 
   try {
     if (normalizedExt === 'pdf') {
       await openPdf(url, session);
+      return;
+    }
+
+    if (window.ActiveReading?.openText && name.toLowerCase() !== 'references.bib') {
+      await window.ActiveReading.openText(name, session);
       return;
     }
 

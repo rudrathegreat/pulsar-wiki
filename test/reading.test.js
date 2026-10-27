@@ -40,6 +40,18 @@ async function completed(service, id) {
   throw new Error('Task did not finish');
 }
 
+test('non-PDF source text can be selected and unsupported files still open', async t => {
+  const f = fixture(t);
+  fs.writeFileSync(path.join(f.rawDir, 'source.xml'), '<note>Pulsar timing</note>');
+  const { document } = await f.service.openDocument('source.xml');
+  assert.equal((await f.service.pageText(document.id, 1)).text, '<note>Pulsar timing</note>');
+  const h = await f.service.createHighlight({ documentId: document.id, kind: 'text', anchors: [{ page: 1, exact: 'Pulsar timing', start: 6, end: 19, rects: [[1, 2, 30, 12]] }] });
+  assert.equal(h.text, 'Pulsar timing');
+  fs.writeFileSync(path.join(f.rawDir, 'binary.docx'), Buffer.from([0xff, 0x00, 0x01]));
+  const binary = await f.service.openDocument('binary.docx');
+  assert.equal((await f.service.pageText(binary.document.id, 1)).unsupported, true);
+});
+
 test('Add automatically creates a cited paper note using explicit agent instructions and only selected inputs', async t => {
   const f = fixture(t); const h = await highlight(f);
   const included = f.service.saveAnnotation({ highlightId: h.id, text: 'Selected interpretation' });

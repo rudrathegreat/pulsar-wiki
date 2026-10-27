@@ -69,6 +69,16 @@
 .reading-page .textLayer .markedContent { display:contents; }
 .reading-page .textLayer ::selection { background:color-mix(in srgb, var(--highlight-blue) 55%, transparent); }
 .reading-overlays { position:absolute; inset:0; pointer-events:none; z-index:1; mix-blend-mode:multiply; }
+.reading-text-document #pdf-toolbar > .toolbar-group:first-child,
+.reading-text-document #pdf-toolbar > .toolbar-divider,
+.reading-text-document #pdf-zoom-out, .reading-text-document #pdf-zoom-in,
+.reading-text-document #pdf-zoom-value, .reading-text-document #pdf-fit,
+.reading-text-document #reading-rotate, .reading-text-document #reading-region,
+.reading-text-document #reading-thumbnails-toggle { display:none; }
+.reading-page.reading-text-page { width:min(900px, 100%); min-height:100%; padding:32px; box-sizing:border-box; overflow:visible; contain:none; content-visibility:visible; }
+.reading-text-page .textLayer { position:relative; inset:auto; overflow:visible; line-height:1.6; }
+.reading-page.reading-text-page .textLayer pre { white-space:pre-wrap; overflow-wrap:anywhere; margin:0; font:inherit; transform:none; }
+.reading-text-page .textLayer pre span { position:static; color:inherit; white-space:pre-wrap; font:inherit; transform:none; }
 .reading-mark { position:absolute; border:0; border-radius:1px; opacity:1; pointer-events:none; }
 [data-color="yellow"], [data-selection-color="yellow"] { --mark:var(--highlight-yellow); }
 [data-color="green"], [data-selection-color="green"] { --mark:var(--highlight-green); }

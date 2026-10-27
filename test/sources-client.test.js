@@ -37,7 +37,7 @@ function client() {
   const context = {
     document: { getElementById: element, querySelectorAll() { return []; }, body: { classList: { toggle() {} } } },
     api: { async getRawList() { if (failure) throw failure; return files; } },
-    window: { ReferencesEditor: { async open() { referenceRefreshes++; } }, ActiveReading: { close() {}, closeHelper() {}, async open(pdf, name, session) { opened.push({ pdf, name, session }); } } },
+    window: { ReferencesEditor: { async open() { referenceRefreshes++; } }, ActiveReading: { close() {}, closeHelper() {}, async open(pdf, name, session) { opened.push({ pdf, name, session }); }, async openText(name, session) { opened.push({ name, session }); } } },
     WebSocket: class { constructor() { sockets.push(this); } send() {} },
     setTimeout(callback) { const id = {}; timers.set(id, callback); return id; },
     updateAgentUi() {},
@@ -104,6 +104,13 @@ test('clicking a sidebar PDF opens the AI-assisted reader and keeps the source l
   assert.equal(c.state.panel, 'files');
   assert.equal(c.state.sourceView, 'add');
   await settle();
+});
+
+test('non-PDF sources open the assisted reader', async () => {
+  const c = client();
+  await c.openRawFile('notes.md', 'md', {}, false);
+  assert.equal(c.opened[0].name, 'notes.md');
+  assert.equal(c.element('pdf-toolbar').hidden, false);
 });
 
 test('opening a document directly populates the source sidebar and newly saved files appear on refresh', async () => {

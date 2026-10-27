@@ -111,7 +111,10 @@ class ReadingService {
           throw new ReadingError('The PDF cannot be read. Check whether it is damaged or password protected.', 'pdf-extraction-failed', 422);
         } finally { if (pdf) await pdf.destroy(); }
       } else {
-        result = { hash: digest, pages: [{ page: 1, label: '1', text: await this.wikiTools.sourceText(name) }], labels: ['1'], extractionVersion: EXTRACTION_VERSION };
+        let content;
+        try { content = await this.wikiTools.sourceText(name); }
+        catch (error) { if (error.code !== 'unsupported-source') throw error; content = null; }
+        result = { hash: digest, pages: [{ page: 1, label: '1', text: content || '', unsupported: content === null }], labels: ['1'], extractionVersion: EXTRACTION_VERSION };
       }
       this.extractions.set(digest, result);
       if (this.extractions.size > 25) this.extractions.delete(this.extractions.keys().next().value);
