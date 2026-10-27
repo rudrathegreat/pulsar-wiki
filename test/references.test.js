@@ -311,3 +311,18 @@ test('Edit opens and scrolls to the exact filtered entry, preserving unsaved sou
   assert.equal(c.node('references-save').disabled, false);
   assert.match(c.node('references-status').textContent, /Editing same · Unsaved changes/);
 });
+
+
+test('opening a reference selects its exact BibTeX entry and preserves a draft', async () => {
+  const c = editorClient();
+  await c.context.window.ReferencesEditor.open();
+  const editor = c.node('references-editor');
+  editor.focus = () => {};
+  editor.setSelectionRange = (start, end) => { editor.selectionStart = start; editor.selectionEnd = end; };
+  editor.scrollIntoView = () => {};
+  editor.value = '@misc{first, title={First}}\n@article{target, title={Target}}';
+  editor.handlers.input();
+  await c.context.window.ReferencesEditor.openEntry('target');
+  assert.equal(editor.value.slice(editor.selectionStart, editor.selectionEnd), '@article{target, title={Target}}');
+  assert.equal(c.node('references-save').disabled, false);
+});

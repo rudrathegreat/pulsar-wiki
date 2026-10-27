@@ -28,6 +28,7 @@ const { NotebookService } = require('./agent/notebook-service');
 const { createNotebookRouter } = require('./agent/notebook-router');
 const { HandoverService } = require('./agent/handover-service');
 const { References } = require('./agent/references');
+const { parse: parseBibtex, text: bibtexText } = require('./public/bibtex');
 const { PaperMetadata } = require('./agent/paper-metadata');
 
 const app = express();
@@ -70,7 +71,20 @@ function openWorkspace(folder) {
   workspace.notebookService = new NotebookService({ store: notebookStore, runtime: new NotebookRuntime({ store: notebookStore }), wikiTools: workspace.wikiTools, readingService: workspace.readingService, authService: chatgptAuth });
   workspace.handoverService = new HandoverService({ wikiTools: workspace.wikiTools, notebookService: workspace.notebookService, authService: chatgptAuth });
   workspace.notebookRouter = createNotebookRouter({ service: workspace.notebookService, requireLocalSession, requireLocalMutation });
+  let referenceKeys = new Set(parseBibtex(workspace.references.read().content).entries.map(entry => entry.key));
   workspace.watcher = chokidar.watch([wikiDir, rawDir, path.join(rootDir, 'references.bib')], { ignoreInitial: true }).on('all', (event, filePath) => {
+    if (filePath === workspace.references.file && event !== 'unlink') {
+      try {
+        const parsed = parseBibtex(workspace.references.read().content);
+        const nextKeys = new Set(parsed.entries.map(entry => entry.key));
+        for (const entry of parsed.entries) {
+          if (referenceKeys.has(entry.key)) continue;
+          const notification = JSON.stringify({ type: 'reference-added', key: entry.key, title: bibtexText(entry.fields.title || entry.key) });
+          wss.clients.forEach(client => { if (client.workspace === workspace && client.readyState === WebSocket.OPEN) client.send(notification); });
+        }
+        referenceKeys = parsed.warnings.length ? new Set([...referenceKeys, ...nextKeys]) : nextKeys;
+      } catch { /* A transient filesystem error will be retried on the next event. */ }
+    }
     const payload = JSON.stringify({ type: 'filechange', event, path: filePath });
     wss.clients.forEach(client => { if (client.workspace === workspace && client.readyState === WebSocket.OPEN) client.send(payload); });
   });

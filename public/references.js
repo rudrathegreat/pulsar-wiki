@@ -112,6 +112,17 @@
   sourceToggle.addEventListener('click', () => setView(true));
   search.addEventListener('input', renderPreview);
   typeFilter.addEventListener('change', renderPreview);
+  function selectEntry(entry) {
+    setView(true);
+    editor.focus({ preventScroll: true });
+    editor.setSelectionRange(entry.start, entry.end);
+    const line = editor.value.slice(0, entry.start).split('\n').length - 1;
+    editor.scrollTop = gutter.lineOffset(line);
+    editor.scrollLeft = 0;
+    syncGutterScroll();
+    editor.scrollIntoView({ block: 'nearest' });
+    status.textContent = `Editing ${entry.key}${dirty() ? ' \u00b7 Unsaved changes' : ''}`;
+  }
   tree.addEventListener('click', event => {
     const edit = event.target.closest('[data-reference-edit]');
     if (edit) {
@@ -119,15 +130,7 @@
       if (busy || revision === null) return;
       const entry = parsed.entries[Number(edit.dataset.referenceEdit)];
       if (!entry) return;
-      setView(true);
-      editor.focus({ preventScroll: true });
-      editor.setSelectionRange(entry.start, entry.end);
-      const line = editor.value.slice(0, entry.start).split('\n').length - 1;
-      editor.scrollTop = gutter.lineOffset(line);
-      editor.scrollLeft = 0;
-      syncGutterScroll();
-      editor.scrollIntoView({ block: 'nearest' });
-      status.textContent = `Editing ${entry.key}${dirty() ? ' · Unsaved changes' : ''}`;
+      selectEntry(entry);
       return;
     }
     const link = event.target.closest('[data-reference-file]');
@@ -162,6 +165,7 @@
   async function request(options) {
     return readJsonResponse(await workspaceFetch('/api/references', options), 'References');
   }
+  let loading = null;
   async function load() {
     if (busy) return;
     busy = true; render(); status.textContent = 'Loading references.bib…';
@@ -200,5 +204,15 @@
   window.addEventListener('beforeunload', event => {
     if (dirty()) { event.preventDefault(); event.returnValue = ''; }
   });
-  window.ReferencesEditor = { open: () => dirty() ? Promise.resolve() : load() };
+  function open() {
+    if (dirty()) return Promise.resolve();
+    if (!loading) loading = load().finally(() => { loading = null; });
+    return loading;
+  }
+  window.ReferencesEditor = { open, async openEntry(key) {
+    await open();
+    const entry = BibTeX.parse(editor.value, { locations: true }).entries.find(item => item.key === key);
+    if (!entry) throw new Error(`Reference ${key} was not found in references.bib.`);
+    selectEntry(entry);
+  } };
 })();

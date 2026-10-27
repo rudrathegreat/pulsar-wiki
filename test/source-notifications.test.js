@@ -155,3 +155,42 @@ test('background review events bypass the active-chat message filter', () => {
   assert.equal(received.length, 1);
   assert.equal(received[0].threadId, 'review-1');
 });
+
+
+test('reference notification links to and opens the exact entry', async () => {
+  const c = client();
+  const opened = [];
+  c.context.openReferenceEntry = async key => opened.push(key);
+  c.context.notifyReferenceAdded({ key: 'timing/2024', title: '<Timing>' });
+  const card = c.container.children[0], link = card.children[0];
+  assert.equal(link.href, '/#sources/references/timing%2F2024');
+  assert.equal(link.children[1].textContent, '<Timing>');
+  await link.handlers.click({ preventDefault() {} });
+  assert.deepEqual(opened, ['timing/2024']);
+  assert.equal(card.removed, true);
+});
+
+
+test('reference watcher reports new keys once and only within their workspace', () => {
+  const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const start = server.indexOf('  let referenceKeys =');
+  const end = server.indexOf('  workspaces.set(', start);
+  let callback, content = '@misc{old, title={Old}}';
+  const workspace = { references: { file: 'references.bib', read: () => ({ content }) } };
+  const received = [], other = [];
+  const { parse, text } = require('../public/bibtex');
+  vm.runInNewContext(server.slice(start, end), {
+    workspace, wikiDir: 'wiki', rawDir: 'raw', rootDir: '.', path: { join: () => 'references.bib' },
+    chokidar: { watch: () => ({ on: (_event, fn) => { callback = fn; } }) },
+    parseBibtex: parse, bibtexText: text, WebSocket: { OPEN: 1 },
+    wss: { clients: [
+      { workspace, readyState: 1, send: data => received.push(JSON.parse(data)) },
+      { workspace: {}, readyState: 1, send: data => other.push(data) },
+    ] },
+  });
+  content += '\n@article{new, title={New paper}}\n@misc{another, title={Another}}';
+  callback('change', 'references.bib');
+  callback('change', 'references.bib');
+  assert.deepEqual(received.filter(event => event.type === 'reference-added').map(event => event.key), ['new', 'another']);
+  assert.equal(other.length, 0);
+});

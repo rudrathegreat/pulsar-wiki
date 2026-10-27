@@ -1626,6 +1626,47 @@ function notifySourceAdded(file) {
   $('source-notifications').appendChild(card);
 }
 
+function notifyReferenceAdded(reference) {
+  if (!reference?.key) return;
+  const card = document.createElement('div');
+  card.className = 'source-notification';
+  const link = document.createElement('a');
+  link.href = `/#sources/references/${encodeURIComponent(reference.key)}`;
+  const title = document.createElement('strong');
+  title.textContent = 'Reference added';
+  const detail = document.createElement('span');
+  detail.textContent = stripEmoji(reference.title || reference.key);
+  const action = document.createElement('span');
+  action.className = 'source-notification-action';
+  action.textContent = 'Open in references.bib \u2192';
+  link.append(title, detail, action);
+  link.addEventListener('click', async event => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    try {
+      await openReferenceEntry(reference.key);
+      updateAppHistory(link.href);
+      card.remove();
+    } catch (error) {
+      action.textContent = `Could not open reference: ${stripEmoji(error.message)}. Click to retry.`;
+    }
+  });
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'source-notification-close';
+  close.setAttribute('aria-label', 'Dismiss reference added notification');
+  close.textContent = '\u00d7';
+  close.addEventListener('click', () => card.remove());
+  card.append(link, close);
+  $('source-notifications').appendChild(card);
+}
+
+async function openReferenceEntry(key) {
+  setSourceView('references', { historyMode: 'none' });
+  showPanel('files', { historyMode: 'none' });
+  await window.ReferencesEditor.openEntry(key);
+}
+
 const notifiedSourceJobs = new Set();
 
 function notifySourceJob(job) {
@@ -2070,6 +2111,12 @@ async function handleAppRoute() {
     return true;
   }
   if (handleWikiRoute({ migrateLegacyHash: true })) return true;
+  if (hash.startsWith('#sources/references/')) {
+    let key;
+    try { key = decodeURIComponent(hash.slice('#sources/references/'.length)); } catch { return false; }
+    await openReferenceEntry(key);
+    return true;
+  }
   const sources = /^#sources(?:\/(add|upload|saved|references))?$/.exec(hash);
   if (sources || hash === '#files') {
     setSourceView(sources?.[1] || 'add', { historyMode: 'none' });
@@ -2523,6 +2570,7 @@ function connectDirectAgentWS() {
       return;
     }
     if (message.type === 'filechange') { scheduleWorkspaceRefresh(); return; }
+    if (message.type === 'reference-added') { notifyReferenceAdded(message); return; }
     if (message.type === 'source-job') { notifySourceJob(message.job); return; }
     if (message.threadId && message.threadId !== state.activeThreadId) return;
     if (message.type === 'chunk') handleAiChunk(message.text);
