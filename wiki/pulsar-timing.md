@@ -2,9 +2,9 @@
 
 **Summary**: The high-precision technique of accounting for every single rotation of a pulsar over long time periods to build a comprehensive model of its physics and environment.
 
-**Sources**: [tempo2_manual.pdf](/#file/tempo2_manual.pdf), [pulsars.md](/#file/pulsars.md), [stac3719.pdf](/#file/stac3719.pdf)
+**Sources**: [tempo2_manual.pdf](/#file/tempo2_manual.pdf), [pulsars.md](/#file/pulsars.md), [stac3719.pdf](/#file/stac3719.pdf), [1011.0718.pdf](/#file/1011.0718.pdf)
 
-**Last updated**: 2026-04-27
+**Last updated**: 2026-10-23
 
 ---
 
@@ -15,7 +15,7 @@ The model accounts for all physical effects that influence the arrival time of a
 - **Astrometry**: Position (RA, Dec), Proper Motion, and Parallax.
 - **Spin Dynamics**: Spin frequency ($\nu$), spin-down rate ($\dot{\nu}$), and glitches.
 - **Interstellar Medium**: [[dispersion-measure]] (DM) and its temporal variations.
-- **Binary Motion**: Orbital parameters for pulsars in systems (source: [stac3719.pdf](/#file/stac3719.pdf)).
+- **Binary Motion**: Orbital parameters and [[post-keplerian-parameters]] for pulsars in systems (source: [stac3719.pdf](/#file/stac3719.pdf); [1011.0718.pdf](/#file/1011.0718.pdf)).
 
 ## The Timing Equation
 The fundamental goal is to relate the observed time of arrival at the observatory ($t_{obs}$) to the time of emission in the pulsar's frame ($T$):
@@ -27,6 +27,10 @@ Where:
 - **$\Delta_{Einstein}$**: Time dilation due to the pulsar's motion and the gravitational field of companions.
 - **$\Delta_{DM}$**: Frequency-dependent delay due to the interstellar medium (source: [[dispersion-measure]]).
 
+## Relativistic timing example
+
+The long-baseline timing of [[psr-b1913-16]] demonstrates how pulse arrival times constrain [[post-keplerian-parameters]], neutron-star masses, and orbital-period decay. In that analysis, 7,650 five-minute Arecibo integrations from 1981–2006 were reduced to TOAs and fitted with the Damour–Deruelle relativistic model (source: [1011.0718.pdf](/#file/1011.0718.pdf)).
+
 ## Residual Analysis
 The difference between the observed TOA and the model's prediction is the **Timing Residual**.
 - **White Noise**: Radiometer noise and jitter.
@@ -34,7 +38,7 @@ The difference between the observed TOA and the model's prediction is the **Timi
 - **DM Noise**: Variations in the electron density of the ISM (source: [stac3719.pdf](/#file/stac3719.pdf)).
 
 ## Tools of the Trade
-Timing analysis is primarily performed using the [[tempo2]] software package, which implements these physical models with relativistic precision (source: [tempo2_manual.pdf](/#file/tempo2_manual.pdf)).
+Timing analysis is primarily performed using the [[tempo2]] software package, which implements these physical models with relativistic precision (source: [tempo2_manual.pdf](/#file/tempo2_manual.pdf)). The PSR B1913+16 analysis used TEMPO and the Damour–Deruelle model (source: [1011.0718.pdf](/#file/1011.0718.pdf)).
 
 ## Related pages
 
@@ -43,4 +47,6 @@ Timing analysis is primarily performed using the [[tempo2]] software package, wh
 - [[shapiro-delay]]
 - [[dispersion-measure]]
 - [[binary-pulsar]]
+- [[post-keplerian-parameters]]
+- [[psr-b1913-16]]
 - [[meerkat]]

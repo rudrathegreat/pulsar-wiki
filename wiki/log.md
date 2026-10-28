@@ -267,3 +267,10 @@ All major updates to the wiki are recorded here.
 | 2026-10-27 | Wiki file navigation / wiki | Linked saved source files in citations and source lists, corrected wiki page links, and linked file references in the index and handover. |
 
 | 2026-10-27 | Consistent links / application | Applied the wiki-link appearance to links in wiki content and AI chat responses, including app navigation links. Updated the wiki index. |
+
+| 2026-10-28 | Reading assistance / application | Added an option to include a displayed AI response in a wiki note; updated the reading guide and wiki index. |
+
+| 2026-10-28 | Reading citations / application | Accepted linked citations to selected files and passages in AI responses while retaining source validation. Updated the wiki index. |
+
+| 2026-10-28 | Reading assistance / application | Preserved answers that omit internal passage references and attached selected passage links automatically. Updated the wiki index. |
+- 2026-10-28: Ingested 1011.0718.pdf after user approval: added a source summary and concept pages for PSR B1913+16, post-Keplerian timing, gravitational-radiation damping, geodetic spin precession, and systemic velocity; updated binary-pulsar, pulsar-timing, pulsar-glitches, astrometry, shapiro-delay, neutron-star, and the wiki index.

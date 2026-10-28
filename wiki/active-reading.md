@@ -4,7 +4,7 @@
 
 **Sources**: [README.md](../README.md) (application documentation; no scientific source ingestion).
 
-**Last updated**: 2026-10-18
+**Last updated**: 2026-10-28
 
 ---
 
@@ -25,6 +25,8 @@ Filter widths remain stable when the researcher-comments toggle changes the resu
 ## Request assistance
 
 Choose Ask AI from a selected passage or its saved highlight menu. Enter a question or instructions in Ask AI; there are no action or additional-wiki-page selectors. Inspect the selected inputs if needed, choose Send to submit the request, and read the response within the same expanded helper. Existing automatic ingestion on upload/import is retained separately. (source: [README.md](../README.md))
+
+After the response appears, choose Add to wiki to include the explanation in a note based on the selected passage. (source: [README.md](../README.md))
 
 Completed assistance displays a blue highlight and an AI-generated comment beside its source passage and researcher comments. The colour filter includes AI assistance, and text search includes its question and response. Shared responses are labelled when they cover several selected passages. Reattached highlights retain earlier AI responses with their preserved original inputs in local storage. (source: [README.md](../README.md))
 

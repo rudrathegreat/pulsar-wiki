@@ -279,6 +279,11 @@ test('Send submits AI inputs directly and keeps the completed response in the ex
   assert.equal(submitted.question, 'Why are these residuals important?');
   assert.deepEqual(submitted.wikiPages, []); assert.deepEqual(submitted.highlightIds, ['highlight-one']);
   assert.match(c.nodes.get('reading-task-complete').innerHTML, /inline timing explanation/);
+  assert.match(c.nodes.get('reading-task-complete').innerHTML, /Would you like to add this explanation/);
+  c.context.api = { getWikiList: async () => [{ name: 'paper' }] };
+  await c.nodes.get('reading-task-add-note').listeners.click();
+  assert.ok(c.r.assistanceIds.has(task.id));
+  assert.match(c.nodes.get('reading-helper-body').innerHTML, /Add highlighted passage to wiki|reading-new-artifact-create/);
   assert.equal(c.r.helper.expanded, true); assert.ok(!c.nodes.get('reading-dialog')?.open);
 });
 

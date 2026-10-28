@@ -2,9 +2,9 @@
 
 **Summary**: The ultra-dense remnants of massive stars that have collapsed after a supernova explosion, governed by the physics of degenerate matter and extreme gravitation.
 
-**Sources**: [pulsars.md](/#file/pulsars.md), [s41550-019-0880-2 (1).pdf](/#file/s41550-019-0880-2%20%281%29.pdf), [stac3719.pdf](/#file/stac3719.pdf)
+**Sources**: [pulsars.md](/#file/pulsars.md), [s41550-019-0880-2 (1).pdf](/#file/s41550-019-0880-2%20%281%29.pdf), [stac3719.pdf](/#file/stac3719.pdf), [1011.0718.pdf](/#file/1011.0718.pdf)
 
-**Last updated**: 2026-04-27
+**Last updated**: 2026-10-23
 
 ---
 
@@ -14,6 +14,10 @@ Neutron stars are the progenitors of [[pulsar]]s and represent the densest form 
 - **Atmosphere and Crust**: A thin iron-rich atmosphere above a solid crust of nuclei and degenerate electrons.
 - **Outer Core**: Composed of neutron-rich nuclei and a "superfluid" of neutrons.
 - **Inner Core**: The state of matter here remains one of the great mysteries of modern physics. It may contain hyperons, deconfined quarks, or meson condensates (source: [s41550-019-0880-2 (1).pdf](/#file/s41550-019-0880-2%20%281%29.pdf)).
+
+## PSR B1913+16 mass measurements
+
+The relativistic timing solution for [[psr-b1913-16]] gives component masses of \(1.4398\pm0.0002\,M_\odot\) and \(1.3886\pm0.0002\,M_\odot\), with total mass \(2.828378\pm0.000007\,M_\odot\). These are dynamical masses inferred from the binary timing model, not a general neutron-star maximum-mass measurement (source: [1011.0718.pdf](/#file/1011.0718.pdf)).
 
 ## The Equation of State (EoS)
 The EoS describes the relationship between pressure and density in the neutron star interior. 
@@ -29,6 +33,7 @@ The EoS describes the relationship between pressure and density in the neutron s
 ## Related pages
 
 - [[pulsar]]
-- [[psr-j0740+6620]]
+- [[psr-b1913-16]]
+- [[binary-pulsar]]
 - [[millisecond-pulsar]]
 - [[shapiro-delay]]

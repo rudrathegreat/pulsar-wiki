@@ -430,6 +430,30 @@ test('filename citations support parentheses and concept updates retain existing
   assert.equal(f.service.publishArtifact(artifact.id, { revision: updated.revision, reviewed: true }).page, 'timing');
 });
 
+test('reading responses accept links to selected sources while rejecting unrelated links', async t => {
+  const f = fixture(t, { providerFactory: () => ({ async runTurn(input) {
+    const id = input.messages[0].text.match(/\[H:([^\]]+)\]/)[1];
+    return { text: `Explanation [H:${id}] (source: [paper.txt](/#file/paper.txt)).` };
+  } }) });
+  const h = await highlight(f);
+  const task = await f.service.createTask({ action: 'question', highlightIds: [h.id] });
+  const result = await completed(f.service, task.id);
+  assert.equal(result.status, 'completed');
+  assert.match(result.response, /Explanation/);
+  assert.throws(() => f.service.checkCitations(`Claim [H:${h.id}] (source: [paper.txt](/#file/other.txt)).`, result.snapshot, true), /does not belong/);
+  assert.doesNotThrow(() => f.service.checkCitations(`Claim [H:${h.id}] (source: [passage](/#reading/${h.documentId}/${h.id}?revision=${h.revision})).`, result.snapshot, true));
+});
+
+test('reading assistance retains an answer when the model omits passage reference syntax', async t => {
+  const f = fixture(t, { providerFactory: () => ({ async runTurn() { return { text: 'The selected passage describes stable rotation.' }; } }) });
+  const h = await highlight(f);
+  const task = await f.service.createTask({ action: 'question', highlightIds: [h.id] });
+  const result = await completed(f.service, task.id);
+  assert.equal(result.status, 'completed');
+  assert.match(result.response, /stable rotation/);
+  assert.ok(result.response.includes(`[H:${h.id}]`));
+});
+
 test('real PDF extraction preserves page inventory and anchors across zoom and rotation', async t => {
   const f = fixture(t);
   fs.copyFileSync(path.join(__dirname, '..', 'raw', 'psrchive.pdf'), path.join(f.rawDir, 'real.pdf'));

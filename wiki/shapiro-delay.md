@@ -2,9 +2,9 @@
 
 **Summary**: A post-Keplerian relativistic effect where pulse arrival times are delayed as signals pass through the curved spacetime of a companion star.
 
-**Sources**: [s41550-019-0880-2 (1).pdf](/#file/s41550-019-0880-2%20%281%29.pdf), [stac3719.pdf](/#file/stac3719.pdf), [tempo2_manual.pdf](/#file/tempo2_manual.pdf)
+**Sources**: [s41550-019-0880-2 (1).pdf](/#file/s41550-019-0880-2%20%281%29.pdf), [stac3719.pdf](/#file/stac3719.pdf), [tempo2_manual.pdf](/#file/tempo2_manual.pdf), [1011.0718.pdf](/#file/1011.0718.pdf)
 
-**Last updated**: 2026-04-27
+**Last updated**: 2026-10-23
 
 ---
 
@@ -16,6 +16,10 @@ In general relativity, the delay ($\Delta_S$) is parameterized by:
 - **Shape ($s$)**: Defined as $\sin(i)$, where $i$ is the orbital inclination.
 \[ \Delta_S(\Phi) = -2r \ln(1 - s \sin\Phi) \]
 Where $\Phi$ is the orbital phase (source: [stac3719.pdf](/#file/stac3719.pdf)).
+
+## PSR B1913+16
+
+The 2010 timing analysis includes Shapiro delay in the relativistic timing framework and discusses future prospects for measuring its range and shape as periastron precession changes the viewing geometry. At the time of that analysis, robust values for those parameters were not yet reported in the paper (source: [1011.0718.pdf](/#file/1011.0718.pdf)).
 
 ## Orthometric Parameters ($h_3$ and $\varsigma$)
 In systems with low to moderate orbital inclination, $r$ and $s$ are highly correlated, leading to large uncertainties in the individual masses. Modern analyses use the **Orthometric Parameterization**:
@@ -32,6 +36,8 @@ These parameters allow for a more stable and accurate extraction of the companio
 
 - [[pulsar-timing]]
 - [[binary-pulsar]]
+- [[post-keplerian-parameters]]
+- [[psr-b1913-16]]
 - [[psr-j0740+6620]]
 - [[neutron-star]]
 - [[meerkat]]

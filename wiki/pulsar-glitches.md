@@ -2,9 +2,9 @@
 
 **Summary**: Pulsar glitches are abrupt increases in a pulsar’s rotation rate. They are identified through precision timing and provide a way to investigate the otherwise inaccessible interior of a [[neutron-star]].
 
-**Sources**: [pulsar-basics.txt](/#file/pulsar-basics.txt)
+**Sources**: [pulsar-basics.txt](/#file/pulsar-basics.txt), [1011.0718.pdf](/#file/1011.0718.pdf)
 
-**Last updated**: 2026-04-27
+**Last updated**: 2026-10-23
 
 ---
 
@@ -14,7 +14,11 @@ A pulsar normally spins down gradually as it loses rotational energy. A **glitch
 
 Because the spin frequency and rotation period are inversely related, an increase in spin frequency corresponds to a decrease in the rotation period (source: [pulsars.md](/#file/pulsars.md)). In timing data, the event appears as a sudden change in the predicted pulse phase or in the measured pulse arrival times, followed by a revised timing model (source: [pulsar-basics.txt](/#file/pulsar-basics.txt)).
 
-The term is sometimes compared with a “starquake,” but the wiki source material does not establish that crustal failure is the general cause. The underlying mechanism is described as unknown and remains a subject for verification (source: [pulsar-basics.txt](/#file/pulsar-basics.txt)).
+## PSR B1913+16 example
+
+The long timing record contains a confirmed May 2003 glitch with \(\Delta f/f=3.7\times10^{-11}\). The paper also discusses a possible mid-1992 timing event, but does not treat it as secure because higher-order frequency derivatives or timing-noise models provide comparably good fits (source: [1011.0718.pdf](/#file/1011.0718.pdf)).
+
+The distinction illustrates why an apparent change in timing behaviour must be separated from a securely measured rotational glitch (source: [1011.0718.pdf](/#file/1011.0718.pdf)).
 
 ## How glitches are detected
 
@@ -35,6 +39,7 @@ The available wiki sources do not specify a complete physical model for the trig
 ## Related pages
 
 - [[pulsar-timing]]
+- [[psr-b1913-16]]
 - [[vela-pulsar]]
 - [[neutron-star]]
 - [[pulsar]]

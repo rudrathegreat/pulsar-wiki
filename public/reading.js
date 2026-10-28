@@ -854,9 +854,13 @@
         if (el('reading-task-complete')) {
           el('reading-task-complete').innerHTML = automatic
             ? current.publication ? `<p>Note added to <a href="/wiki/${encodeURIComponent(current.publication.page)}">${e(current.publication.page)}</a>.</p>${current.warning ? `<p>${e(current.warning)}</p>` : ''}` : `<p>${e(current.error || 'The wiki was not updated.')}</p><button type="button" id="reading-task-retry">Try again</button>`
-            : current.response ? safeMarkdown(current.response, current.snapshot) : `<p>${e(current.error || 'The request did not complete.')}</p>`;
+            : current.response ? `${safeMarkdown(current.response, current.snapshot)}<div class="reading-actions"><span>Would you like to add this explanation to a wiki note?</span><button type="button" id="reading-task-add-note">Add to wiki</button></div>` : `<p>${e(current.error || 'The request did not complete.')}</p>`;
           typesetMath(el('reading-task-complete'));
           if (automatic && !current.publication) el('reading-task-retry').addEventListener('click', guard(async () => { await watchTask(await request(`/tasks/${task.id}/retry`, 'POST', {})); }));
+          if (!automatic && current.response) el('reading-task-add-note').addEventListener('click', guard(async () => {
+            r.assistanceIds.add(current.id);
+            await newArtifactDialog();
+          }));
         }
         positionHelper();
       } catch (error) { report(error); }
