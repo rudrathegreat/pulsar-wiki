@@ -464,22 +464,25 @@ function editWikiPage(page, content, editAction, notebookAction) {
       <textarea id="wiki-page-editor" wrap="soft" spellcheck="false"></textarea>
     </div>
     <div class="wiki-editor-preview md-body" aria-label="Page preview" hidden></div>
-    <div class="wiki-editor-actions"><button class="btn" type="submit">Save</button><button class="btn" type="button" data-preview aria-pressed="false">Preview</button><button class="btn" type="button" data-cancel>Cancel</button></div>
     <p role="status" aria-live="polite"></p>`;
+  const actions = document.createElement('div');
+  actions.className = 'wiki-editor-actions';
+  actions.innerHTML = '<button class="btn" type="button" data-save>Save</button><button class="btn" type="button" data-preview aria-pressed="false">Preview</button><button class="btn" type="button" data-cancel>Close</button>';
   const editor = form.querySelector('textarea');
   const source = form.querySelector('.wiki-editor-source');
   const lineNumbers = form.querySelector('.wiki-editor-line-numbers');
   const gutter = window.SourceEditor(editor, source, lineNumbers);
   const syncLineNumbers = gutter.sync;
   editor.addEventListener('input', syncLineNumbers);
-  const save = form.querySelector('[type="submit"]');
-  const cancel = form.querySelector('[data-cancel]');
-  const previewButton = form.querySelector('[data-preview]');
+  const save = actions.querySelector('[data-save]');
+  const cancel = actions.querySelector('[data-cancel]');
+  const previewButton = actions.querySelector('[data-preview]');
   const preview = form.querySelector('.wiki-editor-preview');
   const status = form.querySelector('[role="status"]');
   editor.value = content;
-  editAction.disabled = true;
-  notebookAction.disabled = true;
+  editAction.replaceWith(actions);
+  notebookAction.remove();
+  save.addEventListener('click', () => form.requestSubmit());
   previewButton.addEventListener('click', () => {
     const previewing = preview.hidden;
     if (previewing) {
@@ -501,8 +504,7 @@ function editWikiPage(page, content, editAction, notebookAction) {
   cancel.addEventListener('click', () => {
     gutter.destroy();
     dom.wikiBody.replaceChildren(renderedPage);
-    editAction.disabled = false;
-    notebookAction.disabled = false;
+    actions.replaceWith(editAction, notebookAction);
     editAction.focus();
   });
   form.addEventListener('submit', async event => {

@@ -654,7 +654,8 @@ body {
   min-width: 0;
 }
 
-.wiki-breadcrumb .wiki-edit-action {
+.wiki-breadcrumb .wiki-edit-action,
+.wiki-breadcrumb .wiki-editor-actions {
   margin-left: auto;
 }
 
@@ -670,7 +671,6 @@ body {
 #wiki-body:has(.wiki-editor) { flex: 1; min-height: 0; }
 .wiki-editor { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; }
 .wiki-editor > label,
-.wiki-editor-actions,
 .wiki-editor > [role="status"] { flex-shrink: 0; }
 .wiki-editor > [role="status"] { overflow-wrap: anywhere; }
 .wiki-editor > .wiki-editor-source,
@@ -731,7 +731,7 @@ body {
   overflow-wrap: anywhere;
 }
 .wiki-editor textarea:focus { outline: none; }
-.wiki-editor-actions { display: flex; gap: 8px; }
+.wiki-editor-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .wiki-breadcrumb .breadcrumb-link {
   border: 0 !important;
