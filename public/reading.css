@@ -115,8 +115,9 @@
 .reading-card img { max-width:100%; max-height:180px; background:#fff; object-fit:contain; }
 .reading-comment { border-left:2px solid var(--text-3); padding:6px 9px; margin:10px 0; font-size:12px; white-space:pre-wrap; }
 .reading-comment small { display:block; margin-bottom:4px; }
-.reading-ai-comment { border-left:3px solid var(--highlight-ai); background:var(--surface); border-radius:0 5px 5px 0; white-space:normal; }
-.reading-ai-comment > small { font-weight:600; }
+.reading-ai-comment { border-left:3px solid var(--highlight-ai); white-space:normal; }
+.reading-ai-comment, .reading-ai-comment * { font-weight:normal !important; }
+.reading-ai-comment .reading-response-collapsed { max-height:8.5em; overflow:hidden; }
 .reading-ai-question { margin:6px 0; white-space:pre-wrap; }
 .reading-ai-comment .reading-task-response { font-size:12px; }
 .reading-ai-comment .md-body > :first-child { margin-top:0; }

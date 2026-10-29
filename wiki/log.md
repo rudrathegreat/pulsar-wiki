@@ -282,3 +282,5 @@ All major updates to the wiki are recorded here.
 | 2026-10-29 | Reading assistance / application | Clarified that Ask AI should give one explanation and distinguish interpretation inline; updated the wiki index. |
 
 | 2026-10-29 | Reading assistance / application | Limited Ask AI answers to one or two short paragraphs, with a rewrite when the response exceeds the limit; updated the wiki index. |
+
+| 2026-10-29 | Reading assistance / application | Updated saved AI response styling, labels, and expandable previews; updated the wiki index. |

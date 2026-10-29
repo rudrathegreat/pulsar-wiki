@@ -7,6 +7,7 @@
   const colors = ['yellow', 'green', 'pink'];
   const colorName = color => color === 'blue' ? 'Blue · AI assistance' : color;
   r.highlightsEnabled = true;
+  r.expandedResponses = new Set();
   const actions = { 'wiki-note': 'Add to wiki', explain: 'Explain passage', equation: 'Explain equation', methodology: 'Explain methodology', assumptions: 'Examine assumptions', concept: 'Explain concept', question: 'Ask a question', evidence: 'Compare evidence', links: 'Suggest connections' };
   const yieldUI = () => typeof window.scheduler?.yield === 'function' ? window.scheduler.yield() : new Promise(resolve => setTimeout(resolve, 0));
   const renderQueue = new Map();
@@ -722,20 +723,29 @@
     target.innerHTML = historical + header + body + (r.undo ? '<div class="reading-actions"><button type="button" data-reading-action="undo">Undo deletion</button></div>' : '');
     if (focusId && el(focusId)) { el(focusId).focus(); if (typeof caret === 'number' && el(focusId).setSelectionRange) { try { el(focusId).setSelectionRange(caret, caret); } catch { /* select elements do not expose text selection */ } } }
     for (const node of target.querySelectorAll('.reading-task-response')) typesetMath(node);
+    for (const card of target.querySelectorAll('[data-reading-card]')) {
+      const button = card.querySelector('[data-reading-expand]');
+      if (button && !r.expandedResponses.has(button.dataset.readingExpand)) {
+        const responses = [...card.querySelectorAll('.reading-ai-comment .reading-task-response')];
+        button.hidden = responses.length > 0 && responses.every(node => node.clientHeight > 0 && node.scrollHeight <= node.clientHeight + 1);
+      }
+    }
     if (r.active) target.querySelector(`[data-reading-card="${r.active}"]`)?.classList.add('active');
   }
   function highlightCard(h) {
     const comments = live('annotations').filter(a => a.highlightId === h.id);
     const relationships = live('relationships').filter(link => link.from === h.id || link.targetType === 'highlight' && link.target === h.id);
     const color = highlightColor(h);
+    const assistance = assistanceFor(h);
+    const expanded = r.expandedResponses.has(h.id);
     return `<article class="reading-card ${h.id === r.active ? 'active' : ''}" data-reading-card="${h.id}" tabindex="0" aria-label="Highlight from ${e(docName(h.documentId))}">
       <div class="reading-card-head"><span class="reading-color-dot" data-color="${color}" title="${colorName(color)}"></span><a href="/#reading/${h.documentId}/${h.id}">${e(docName(h.documentId))} · p. ${h.anchors.map(a => e(a.page)).join(', ')}</a></div>
       ${h.image ? `<img src="${h.image}" alt="Selected source region"/>` : ''}<blockquote>${e(h.text || 'Visual region - add a transcription or comment.')}</blockquote>
       ${h.categories.map(c => `<span class="reading-tag">${e(c)}</span>`).join('')}
       ${comments.map(a => `<div class="reading-comment"><small>Researcher comment</small>${e(a.text)}</div>`).join('')}
-      ${assistanceFor(h).map(t => `<div class="reading-comment reading-ai-comment"><small>AI-generated comment · ${e(actions[t.action] || 'Reading assistance')}${t.snapshot.highlights.length > 1 ? ' · Shared response for selected passages' : ''}</small>${t.question ? `<p class="reading-ai-question">${e(t.question)}</p>` : ''}<div class="reading-task-response md-body">${safeMarkdown(t.response, t.snapshot)}</div></div>`).join('')}
+      ${assistance.map(t => `<div class="reading-comment reading-ai-comment"><small>User question</small><p class="reading-ai-question">${e(t.question || 'Assistance based on selected passages')}</p><small>AI Generated Response</small>${t.snapshot.highlights.length > 1 ? '<small>Shared response for selected passages</small>' : ''}<div class="reading-task-response md-body ${expanded ? '' : 'reading-response-collapsed'}">${safeMarkdown(t.response, t.snapshot)}</div></div>`).join('')}
       ${relationships.map(link => `<div class="reading-muted">${e(link.relation)}: ${link.targetType === 'wiki' ? `<a href="/wiki/${e(link.target)}">${e(link.target)}</a>` : `<a href="/#reading/${record('highlights', link.from === h.id ? link.target : link.from)?.documentId}/${link.from === h.id ? link.target : link.from}">Related passage</a>`}</div>`).join('')}
-      <div class="reading-actions"><button type="button" data-reading-delete="${h.id}" aria-label="Delete highlight from ${e(docName(h.documentId))}">Delete</button></div></article>`;
+      <div class="reading-actions">${assistance.length ? `<button type="button" data-reading-expand="${h.id}" aria-expanded="${expanded}">${expanded ? 'Show less' : 'Show more'}</button>` : ''}<button type="button" data-reading-delete="${h.id}" aria-label="Delete highlight from ${e(docName(h.documentId))}">Delete</button></div></article>`;
   }
   function snapshotView(snapshot) {
     const passages = snapshot.highlights.map(h => `<article class="reading-card"><a href="/#reading/${h.documentId}/${h.id}?revision=${h.revision}">${e(snapshot.documents.find(d => d.id === h.documentId)?.aliases[0])} · p. ${h.anchors.map(a => e(a.page)).join(', ')}</a>${h.image && snapshot.includeImages ? `<p><img src="${h.image}" alt="Selected visual input"/></p>` : ''}<blockquote>${e(h.text || '(Visual region; no transcription)')}</blockquote>${snapshot.includeContext ? `<details><summary>Nearby context</summary><p>${h.anchors.map(a => e(a.prefix + a.exact + a.suffix)).join('<br>')}</p></details>` : ''}${snapshot.annotations.filter(a => a.highlightId === h.id).map(a => `<div class="reading-comment">Researcher interpretation: ${e(a.text)}</div>`).join('')}</article>`).join('');
@@ -927,6 +937,11 @@
         return;
       }
       const d = button.dataset;
+      if (d.readingExpand) {
+        if (r.expandedResponses.has(d.readingExpand)) r.expandedResponses.delete(d.readingExpand);
+        else r.expandedResponses.add(d.readingExpand);
+        renderWorkspace();
+      }
       if (d.readingDelete) await deleteHighlight(d.readingDelete);
       if (d.readingAction === 'undo') await undoDeletion();
     }));

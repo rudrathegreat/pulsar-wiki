@@ -4,7 +4,7 @@ Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pul
 
 File navigation: source citations and source lists link to the saved files; wiki page references link to their pages.
 
-Reading assistance: Ask AI gives a concise explanation in one or two paragraphs, with citations to selected passages.
+Reading assistance: Ask AI gives a concise explanation in one or two paragraphs, with citations to selected passages. Saved responses show the user question and can be expanded from a five-line preview.
 
 Agent guidance: [GEMINI.md](../GEMINI.md) requires clickable file references in chat and wiki content, including linked source citations.
 

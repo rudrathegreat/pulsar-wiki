@@ -113,12 +113,17 @@ test('saved AI responses appear beside their source comments and use a dedicated
   const output = c.nodes.get('reading-notes').innerHTML;
   const first = output.split('data-reading-card="highlight-one"')[1].split('</article>')[0];
   const second = output.split('data-reading-card="highlight-two"')[1].split('</article>')[0];
-  assert.match(first, /Researcher comment/); assert.match(first, /AI-generated comment/);
+  assert.match(first, /Researcher comment/); assert.match(first, /AI Generated Response/);
+  assert.match(first, /User question/); assert.match(first, /reading-response-collapsed/);
+  assert.match(first, /data-reading-expand="highlight-one"[^>]*>Show more<\/button>[\s\S]*data-reading-delete="highlight-one"/);
   assert.match(first, /This is the AI explanation/); assert.match(first, /data-color="blue"/);
-  assert.doesNotMatch(second, /AI-generated comment/);
+  assert.doesNotMatch(second, /AI Generated Response/);
   const overlay = { children: [], set innerHTML(value) { this.children = []; }, append(mark) { this.children.push(mark); } };
   c.paintHighlights({ number: 1, overlay, viewport: { convertToViewportRectangle(coords) { return coords; } } });
   assert.equal(overlay.children[0].dataset.color, 'blue');
+  c.r.expandedResponses.add('highlight-one'); c.renderWorkspace();
+  assert.match(c.nodes.get('reading-notes').innerHTML, /aria-expanded="true">Show less/);
+  assert.doesNotMatch(c.nodes.get('reading-notes').innerHTML, /reading-response-collapsed/);
   assert.equal(c.r.data.highlights[0].color, 'yellow', 'AI styling must preserve the researcher colour');
   assert.equal(c.selectedPayload().assistanceIds.length, 0, 'displayed explanations still require explicit inclusion');
   c.r.filter.color = 'blue'; assert.deepEqual(Array.from(c.filteredHighlights(), h => h.id), ['highlight-one']);
@@ -132,7 +137,7 @@ test('pending, failed and artifact tasks do not mark passages as AI assistance o
   addAssistance(c, { id: 'task-artifact', artifactId: 'artifact-one' });
   addAssistance(c, { id: 'task-draft', action: 'artifact' });
   c.renderWorkspace();
-  assert.doesNotMatch(c.nodes.get('reading-notes').innerHTML, /AI-generated comment|data-color="blue"/);
+  assert.doesNotMatch(c.nodes.get('reading-notes').innerHTML, /AI Generated Response|data-color="blue"/);
 });
 
 test('reattaching a passage keeps earlier AI explanations with their original preserved inputs', () => {
@@ -140,7 +145,7 @@ test('reattaching a passage keeps earlier AI explanations with their original pr
   const task = addAssistance(c);
   c.r.data.highlights[0].anchors[0].page = 3;
   c.renderWorkspace();
-  assert.doesNotMatch(c.nodes.get('reading-notes').innerHTML, /AI-generated comment|data-color="blue"/);
+  assert.doesNotMatch(c.nodes.get('reading-notes').innerHTML, /AI Generated Response|data-color="blue"/);
   assert.equal(task.snapshot.highlights[0].anchors[0].page, 1);
   assert.equal(task.response, 'This is the AI explanation of the timing result.');
 });
