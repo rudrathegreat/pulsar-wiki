@@ -274,3 +274,5 @@ All major updates to the wiki are recorded here.
 
 | 2026-10-28 | Reading assistance / application | Preserved answers that omit internal passage references and attached selected passage links automatically. Updated the wiki index. |
 - 2026-10-28: Ingested 1011.0718.pdf after user approval: added a source summary and concept pages for PSR B1913+16, post-Keplerian timing, gravitational-radiation damping, geodetic spin precession, and systemic velocity; updated binary-pulsar, pulsar-timing, pulsar-glitches, astrometry, shapiro-delay, neutron-star, and the wiki index.
+
+| 2026-10-29 | References / application | Removed ORCID fields from bibliography entries while preserving author profile links and preventing their addition during source imports. |

@@ -46,7 +46,8 @@
     const fields = entry.fields;
     const authors = BibTeX.authors(fields.author || '');
     // Positional lists retain explicit '-' placeholders for authors without an ID.
-    const ids = String(fields.orcid || '').split(/\s+and\s+|\s*;\s*/i);
+    const savedProfiles = window.ReferenceOrcids?.[entry.key];
+    const ids = fields.orcid ? String(fields.orcid).split(/\s+and\s+|\s*;\s*/i) : authors.map((name, i) => savedProfiles?.authors[i] === name ? savedProfiles.ids[i] : null);
     const authorOrcids = ids.length === authors.length ? ids : authors.map(() => null);
     return { id: String(parsed.entries.indexOf(entry)), title: BibTeX.text(fields.title || ''), authors, authorOrcids,
       doi: BibTeX.text(fields.doi || ''), bibcode: BibTeX.text(fields.bibcode || fields.adsbibcode || ''),

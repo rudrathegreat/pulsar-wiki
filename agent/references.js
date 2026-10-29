@@ -137,6 +137,7 @@ class References {
       const replacements = [];
       const additions = [];
       for (const [field, value] of Object.entries(fields)) {
+        if (field.toLowerCase() === 'orcid') continue;
         const placeholder = field === 'title' && text(entry.fields.title) === source.name;
         if (entry.fields[field]?.trim() && !placeholder) continue;
         const encoded = field === 'author' ? value.map(bibText).join(' and ') : bibText(value);

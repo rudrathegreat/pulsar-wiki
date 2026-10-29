@@ -60,4 +60,4 @@ Agent guidance: [GEMINI.md](../GEMINI.md) requires clickable file references in 
 - [[active-reading]]: PDF reading with highlight helpers, AI responses linked to selected passages, wiki notes, and reference discovery.
 
 ---
-*Last updated: 2026-10-23*
+*Last updated: 2026-10-29*
