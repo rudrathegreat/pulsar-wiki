@@ -229,6 +229,37 @@ test('assistance receives only selected snapshots, never source tools or uncheck
   assert.equal(f.store.get('tasks', task.id).snapshot.highlights[0].color, 'yellow');
 });
 
+test('Ask AI requests a concise paragraph and keeps fallback citations inline', async t => {
+  const f = fixture(t, { providerFactory: () => ({ async runTurn(input) { f.calls.push(input); return { text: 'The residuals reveal noise.' }; } }) });
+  const h = await highlight(f);
+  const task = await f.service.createTask({ highlightIds: [h.id], action: 'question', question: 'What do the residuals reveal?' });
+  const result = await completed(f.service, task.id);
+  assert.equal(result.status, 'completed');
+  assert.match(f.calls[0].messages[0].text, /one or two short paragraphs, at most 150 words/);
+  assert.match(f.calls[0].instructions, /Distinguish source evidence and interpretation inline/);
+  assert.match(f.calls[0].messages[0].text, /equations are welcome/i);
+  assert.equal(result.response, `The residuals reveal noise. Selected passages: [H:${h.id}]`);
+});
+
+test('Ask AI rewrites overlong answers before saving and rejects repeated failures', async t => {
+  let calls = 0;
+  const f = fixture(t, { providerFactory: () => ({ async runTurn(input) {
+    calls += 1;
+    assert.equal(input.onDelta, undefined);
+    if (calls === 2) { assert.match(input.messages[1].text, /previous answer was too long/i); return { text: 'A concise answer.' }; }
+    return { text: 'One.\n\nTwo.\n\nThree.\n\nFour.' };
+  } }) });
+  const h = await highlight(f);
+  const first = await f.service.createTask({ highlightIds: [h.id], action: 'question' });
+  assert.match((await completed(f.service, first.id)).response, /^A concise answer\./);
+  assert.equal(calls, 2);
+  const second = await f.service.createTask({ highlightIds: [h.id], action: 'question' });
+  const failed = await completed(f.service, second.id);
+  assert.equal(failed.errorCode, 'response-too-long');
+  assert.equal(failed.response, '');
+  assert.equal(calls, 5);
+});
+
 test('invalid citations and unsupported image requests fail safely without changing notes', async t => {
   const f = fixture(t, { providerFactory: () => ({ async runTurn() { return { text: 'Fabricated evidence [H:not-selected]' }; } }) });
   const h = await highlight(f);
