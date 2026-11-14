@@ -877,10 +877,15 @@ body {
   margin-bottom: 14px;
 }
 
+.md-body .md-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+
 .md-body table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 16px;
   font-size: 13px;
 }
 
@@ -896,6 +901,9 @@ body {
   padding: 8px 12px;
   border-bottom: 1px solid var(--border-sub);
 }
+
+.md-body th[align="center"], .md-body td[align="center"] { text-align: center; }
+.md-body th[align="right"], .md-body td[align="right"] { text-align: right; }
 
 .md-body a[href],
 .md-body a[href]:visited,

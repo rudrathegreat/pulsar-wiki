@@ -252,12 +252,16 @@
   }
   function sanitizeHtml(content) {
     const template = document.createElement('template'); template.innerHTML = content;
-    const allowed = new Set(['P', 'BR', 'HR', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'STRONG', 'EM', 'DEL', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'PRE', 'CODE', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD', 'A']);
+    const allowed = new Set(['P', 'BR', 'HR', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'STRONG', 'EM', 'DEL', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'PRE', 'CODE', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD', 'A', 'DIV']);
     for (const node of [...template.content.querySelectorAll('*')]) {
-      if (!allowed.has(node.tagName)) { node.replaceWith(document.createTextNode(node.textContent)); continue; }
+      if (!allowed.has(node.tagName) || (node.tagName === 'DIV' && !node.classList.contains('md-table-wrap'))) { node.replaceWith(document.createTextNode(node.textContent)); continue; }
       const href = node.tagName === 'A' ? node.getAttribute('href') || '' : '';
       const wiki = node.tagName === 'A' && node.classList.contains('wiki-link') ? node.getAttribute('data-page') : '';
+      const tableWrap = node.tagName === 'DIV' && node.classList.contains('md-table-wrap');
+      const align = ['TH', 'TD'].includes(node.tagName) ? node.getAttribute('align') : '';
       for (const attribute of [...node.attributes]) node.removeAttribute(attribute.name);
+      if (tableWrap) node.className = 'md-table-wrap';
+      if (['left', 'center', 'right'].includes(align)) node.setAttribute('align', align);
       if (href && (/^https?:\/\//i.test(href) || /^\/(?!\/)/.test(href))) { node.setAttribute('href', href); node.setAttribute('rel', 'noopener noreferrer'); }
       if (wiki && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(wiki) && href === `/wiki/${encodeURIComponent(wiki)}`) { node.className = 'wiki-link'; node.dataset.page = wiki; }
     }

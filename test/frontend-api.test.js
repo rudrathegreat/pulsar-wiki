@@ -58,7 +58,7 @@ function loadClientHelpers() {
     },
   };
   vm.createContext(context);
-  vm.runInContext(`${helperSource}\nglobalThis.__helpers = { stripEmoji, normalizeWikiPageName, wikiPath, wikiPageFromPath, preprocessMd, renderMd, typesetMath, wikiLinkForInAppNavigation };`, context);
+  vm.runInContext(`${helperSource}\nglobalThis.__helpers = { stripEmoji, normalizeWikiPageName, wikiPath, wikiPageFromPath, preprocessMd, renderMd, renderWikiPageMd, typesetMath, wikiLinkForInAppNavigation };`, context);
   return context.__helpers;
 }
 
@@ -204,6 +204,29 @@ test('LaTeX delimiters survive Markdown rendering and KaTeX assets are local', (
   assert.match(appSource, /typesetMath\(dom\.documentStage\)/);
   assert.match(appSource, /typesetMath\(aiTarget\.el\)/);
   assert.doesNotThrow(() => katex.renderToString('\\Delta t = x_1^2 + f^{-2}', { throwOnError: true }));
+});
+
+test('Markdown tables render in a scrollable container with column alignment', () => {
+  const helpers = loadClientHelpers();
+  const html = helpers.renderMd('| Object | Period |\n| :--- | ---: |\n| [[pulsar]] | $1$ ms |');
+  assert.match(html, /<div class="md-table-wrap"><table>/);
+  assert.match(html, /<th align="right">Period<\/th>/);
+  assert.match(html, /<td align="right">\$1\$ ms<\/td>/);
+  assert.match(html, /class="wiki-link"/);
+  assert.match(html, /<\/table><\/div>/);
+  assert.match(styleSource, /\.md-body \.md-table-wrap\s*\{[^}]*overflow-x:\s*auto/s);
+});
+
+test('the append-only wiki log renders separated rows and dated entries as one table', () => {
+  const helpers = loadClientHelpers();
+  const log = fs.readFileSync(path.join(__dirname, '..', 'wiki', 'log.md'), 'utf8');
+  const html = helpers.renderWikiPageMd('log', log);
+  const entries = log.split(/\r?\n/).filter(line => /^(?:`n)?\| \d{4}-\d{2}-\d{2} \|/.test(line) || /^- \d{4}-\d{2}-\d{2}:/.test(line));
+  assert.equal((html.match(/<table>/g) || []).length, 1);
+  assert.equal((html.match(/<tr>/g) || []).length - 1, entries.length);
+  assert.match(html, /Created pulsar-glitches page/);
+  assert.match(html, /Improved Markdown table display/);
+  assert.match(helpers.renderWikiPageMd('other', '| A | B |\n| - | - |\n| x | y |\n\n| z | q |'), /<p>\| z \| q \|<\/p>/);
 });
 
 test('UI source uses only approved palettes and contains no built-in emojis', () => {

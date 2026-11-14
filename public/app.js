@@ -57,12 +57,38 @@ function postProcessHtml(html, expressions = []) {
     const safeExpression = expression.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     processed = processed.replaceAll(`PULSARWIKIMATH${index}TOKEN`, safeExpression);
   });
-  return typeof window !== 'undefined' && window.ActiveReading ? window.ActiveReading.sanitizeHtml(processed) : processed;
+  const safeHtml = typeof window !== 'undefined' && window.ActiveReading ? window.ActiveReading.sanitizeHtml(processed) : processed;
+  return safeHtml.replace(/<table>/g, '<div class="md-table-wrap"><table>').replace(/<\/table>/g, '</table></div>');
 }
 
 function renderMd(content) {
   const protectedContent = protectLatex(preprocessMd(content));
   return postProcessHtml(marked.parse(protectedContent.text), protectedContent.expressions);
+}
+
+// Older log entries mix blank-separated table rows with dated list entries.
+// Normalize only the display copy, keeping the append-only source intact.
+function renderWikiPageMd(page, content) {
+  if (page !== 'log') return renderMd(content);
+  const lines = content.split(/\r?\n/);
+  const header = lines.findIndex((line, i) => /^\s*\|\s*Date\s*\|\s*Source\s*\|\s*Description\s*\|\s*$/i.test(line)
+    && /^\s*\|\s*:?-+:?\s*\|\s*:?-+:?\s*\|\s*:?-+:?\s*\|\s*$/.test(lines[i + 1] || ''));
+  if (header < 0) return renderMd(content);
+  const output = lines.slice(0, header + 2);
+  let i = header + 2;
+  for (; i < lines.length; i++) {
+    const line = lines[i].replace(/^`n(?=\|)/, '');
+    const bullet = /^\s*-\s+(\d{4}-\d{2}-\d{2}):\s*(.*)$/.exec(line);
+    if (/^\s*\|.*\|\s*$/.test(line)) output.push(line);
+    else if (bullet) output.push(`| ${bullet[1]} | Wiki | ${bullet[2].replace(/(?<!\\)\|/g, '\\|')} |`);
+    else if (!line.trim()) {
+      let next = i + 1;
+      while (next < lines.length && !lines[next].trim()) next++;
+      if (next < lines.length && (/^(?:`n)?\s*\|.*\|\s*$/.test(lines[next]) || /^\s*-\s+\d{4}-\d{2}-\d{2}:/.test(lines[next]))) continue;
+      break;
+    } else break;
+  }
+  return renderMd(output.concat(lines.slice(i)).join('\n'));
 }
 
 function typesetMath(root) {
@@ -432,7 +458,7 @@ async function openPage(name, { historyMode = 'push' } = {}) {
   try {
     const data = await api.getWikiPage(page);
     if (state.currentPage !== page) return;
-    dom.wikiBody.innerHTML = `<div class="md-body">${renderMd(data.content)}</div>`;
+    dom.wikiBody.innerHTML = `<div class="md-body">${renderWikiPageMd(page, data.content)}</div>`;
     typesetMath(dom.wikiBody);
     const editAction = document.createElement('button');
     editAction.type = 'button'; editAction.className = 'btn wiki-edit-action'; editAction.textContent = 'Edit';
@@ -486,7 +512,7 @@ function editWikiPage(page, content, editAction, notebookAction) {
   previewButton.addEventListener('click', () => {
     const previewing = preview.hidden;
     if (previewing) {
-      preview.innerHTML = renderMd(editor.value);
+      preview.innerHTML = renderWikiPageMd(page, editor.value);
       typesetMath(preview);
     }
     source.hidden = previewing;
