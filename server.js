@@ -402,6 +402,29 @@ app.post('/api/chat/threads', (req, res) => {
   try { res.status(201).json(currentWorkspace().agentService.createThread(req.body?.title)); } catch (error) { res.status(400).json({ error: asPublicError(error).text }); }
 });
 
+app.post('/api/chat/from-reading/:id', requireLocalMutation, (req, res) => {
+  try {
+    const workspace = currentWorkspace();
+    const task = workspace.readingService.task(req.params.id);
+    if (task.status !== 'completed' || task.artifactId || ['wiki-note', 'artifact', 'summary', 'synthesis'].includes(task.action) || !task.response) throw new Error('A completed Ask AI response is required.');
+    const passages = task.snapshot.highlights.map(h => {
+      const document = task.snapshot.documents.find(d => d.id === h.documentId);
+      const name = document?.currentName || document?.aliases?.[0] || 'Source';
+      const pages = h.anchors.map(a => a.label || a.page).join(', ');
+      return `- [${name}](/#reading/${h.documentId}/${h.id}?revision=${h.revision}) - p. ${pages}\n  > ${(h.text || 'Visual selection').replace(/\n/g, '\n  > ')}`;
+    }).join('\n\n');
+    const thread = workspace.agentService.createThread(task.question || 'Reading discussion');
+    workspace.agentService.threadStore.append(thread.id, [
+      { role: 'user', text: `From the reading workspace:\n\n${passages}\n\n${task.question}` },
+      { role: 'assistant', text: task.response.replace(/\[H:([^\]]+)\]/g, (citation, id) => {
+        const h = task.snapshot.highlights.find(item => item.id === id);
+        return h ? `[Selected passage](/#reading/${h.documentId}/${h.id}?revision=${h.revision})` : citation;
+      }) },
+    ]);
+    res.status(201).json(workspace.agentService.getThread(thread.id));
+  } catch (error) { res.status(400).json({ error: asPublicError(error).text }); }
+});
+
 app.get('/api/chat/threads/:id', (req, res) => {
   try { res.json(currentWorkspace().agentService.getThread(req.params.id)); } catch (error) { res.status(404).json({ error: asPublicError(error).text }); }
 });

@@ -288,3 +288,5 @@ All major updates to the wiki are recorded here.
 | 2026-11-14 | Application | Improved Markdown table display and column alignment in wiki pages and chat; updated the wiki index. |
 
 | 2026-11-14 | Application | Made historical change-log rows and dated entries render together as a table while preserving the append-only source. |
+
+| 2026-11-14 | Reading assistance / application | Added a way to start a saved chat from an Ask AI response with its selected passages and question; updated the wiki index. |

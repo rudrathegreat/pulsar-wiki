@@ -160,6 +160,9 @@ const api = {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }),
     }), 'Saved chat');
   },
+  async createThreadFromReading(id) {
+    return readJsonResponse(await workspaceFetch(`/api/chat/from-reading/${encodeURIComponent(id)}`, { method: 'POST' }), 'Reading chat');
+  },
   async getThread(id) {
     return readJsonResponse(await workspaceFetch(`/api/chat/threads/${encodeURIComponent(id)}`), 'Saved chat');
   },
@@ -2369,6 +2372,17 @@ async function createThread() {
   await refreshThreads();
   await selectThread(thread.id, { refresh: false });
 }
+
+async function createReadingChat(id) {
+  if (state.aiRunning) throw new Error('Wait for the current chat response to finish before starting a new chat.');
+  const thread = await api.createThreadFromReading(id);
+  state.activeThreadId = thread.id;
+  await refreshThreads();
+  await selectThread(thread.id, { refresh: false });
+  showPanel('chat');
+  dom.chatInput.focus();
+}
+window.createReadingChat = createReadingChat;
 
 async function renameThread(id, title) {
   await api.renameThread(id, title);

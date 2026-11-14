@@ -131,6 +131,16 @@ test('saved AI responses appear beside their source comments and use a dedicated
   assert.deepEqual(Array.from(c.filteredHighlights(), h => h.id), ['highlight-one']);
 });
 
+test('saved response starts a chat for the selected assistance', async () => {
+  const c = client(); populate(c); c.context.state.panel = 'document';
+  addAssistance(c); c.renderWorkspace();
+  assert.match(c.nodes.get('reading-notes').innerHTML, /data-reading-chat="task-one"/);
+  const started = [];
+  c.context.window.createReadingChat = async id => { started.push(id); };
+  await c.nodes.get('reading-notes').listeners.click({ target: { closest(selector) { return selector === 'button' ? { dataset: { readingChat: 'task-one' } } : null; } } });
+  assert.deepEqual(started, ['task-one']);
+});
+
 test('pending, failed and artifact tasks do not mark passages as AI assistance or attach unrelated comments', () => {
   const c = client(); populate(c); c.context.state.panel = 'document';
   addAssistance(c, { status: 'running' }); addAssistance(c, { id: 'task-failed', status: 'failed' });
