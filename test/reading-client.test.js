@@ -25,6 +25,21 @@ function populate(c) {
   c.r.data = { documents: [{ id: 'document-one', aliases: ['paper.pdf'], available: true }], highlights: [{ id: 'highlight-one', documentId: 'document-one', text: 'Measured timing result.', kind: 'text', color: 'yellow', categories: ['result'], revision: 2, anchors: [{ page: 1, label: '1', rects: [[10, 20, 40, 30]] }] }, { id: 'highlight-two', documentId: 'document-one', text: 'Assumption.', kind: 'text', color: 'blue', categories: [], revision: 1, anchors: [{ page: 2, label: '2', rects: [[10, 20, 40, 30]] }] }], annotations: [{ id: 'annotation-private', highlightId: 'highlight-one', text: 'Do not send unchecked notes', revision: 1 }, { id: 'annotation-selected', highlightId: 'highlight-two', text: 'Checked assumption note', revision: 3 }], collections: [], relationships: [], tasks: [], artifacts: [], discoveries: [] };
 }
 
+test('selection toolbar shows blue only for a passage with completed AI assistance', () => {
+  const c = client(); populate(c);
+  const inputs = ['yellow', 'green', 'pink', 'blue'].map(color => ({ dataset: { selectionColor: color }, checked: false }));
+  c.document.querySelectorAll = selector => selector === '[data-selection-color]' ? inputs : [];
+  const h = c.r.data.highlights[0]; h.color = 'green';
+  c.openHighlightHelper(h.id, 100, 100);
+  assert.equal(inputs[1].checked, true);
+  assert.equal(c.nodes.get('reading-selection-ai-color').hidden, true);
+  c.r.data.tasks.push({ status: 'completed', response: 'Explanation', action: 'ask', snapshot: { highlights: [{ id: h.id, documentId: h.documentId, text: h.text, anchors: h.anchors }] } });
+  c.openHighlightHelper(h.id, 100, 100);
+  assert.equal(inputs[1].checked, false);
+  assert.equal(inputs[3].checked, true);
+  assert.equal(c.nodes.get('reading-selection-ai-color').hidden, false);
+});
+
 test('reading client initializes against actual HTML and includes only explicitly checked private inputs', () => {
   const c = client(); populate(c);
   c.r.selected.add('highlight-one');

@@ -10,7 +10,7 @@ Source navigation: the wiki sidebar's Add sources button opens the Sources page.
 
 Markdown tables share the chat style and scroll horizontally when needed; the change log displays its historical entries in a single table.
 
-Reading assistance: Ask AI gives a concise explanation in one or two paragraphs, with citations to selected passages. Saved responses show the user question, can be expanded from a five-line preview, and can start a new chat with the selected passages and response.
+Reading assistance: Ask AI gives a concise explanation in one or two paragraphs, with citations to selected passages. Assisted highlights show blue as their selected colour. Saved responses show the user question, can be expanded from a five-line preview, and can start a new chat with the selected passages and response.
 
 Agent guidance: [GEMINI.md](../GEMINI.md) requires clickable file references in chat and wiki content, including linked source citations.
 

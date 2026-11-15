@@ -609,7 +609,10 @@
     el('reading-helper-body').innerHTML = '';
     el('reading-helper-error').textContent = '';
     el('reading-selection-toolbar').classList.remove('expanded');
-    document.querySelectorAll('[data-selection-color]').forEach(input => { input.checked = Boolean(highlightId && record('highlights', highlightId)?.color === input.dataset.selectionColor); });
+    const highlight = highlightId && record('highlights', highlightId);
+    const selectedColor = highlight ? highlightColor(highlight) : null;
+    document.querySelectorAll('[data-selection-color]').forEach(input => { input.checked = selectedColor === input.dataset.selectionColor; });
+    el('reading-selection-ai-color').hidden = selectedColor !== 'blue';
     const toolbar = el('reading-selection-toolbar'); toolbar.hidden = false;
     positionHelper();
   }
