@@ -2653,7 +2653,7 @@ function sendChat() {
   dom.chatStatus.textContent = 'ChatGPT is thinking...';
   const message = document.createElement('div');
   message.className = 'chat-msg ai';
-  message.innerHTML = '<div class="chat-avatar">AI</div><div class="chat-bubble"><div class="chat-response"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div><div class="chat-activity is-active" hidden><details open><summary><span>Wiki activity</span></summary><ol></ol></details></div></div>';
+  message.innerHTML = '<div class="chat-avatar">AI</div><div class="chat-bubble"><div class="chat-activity is-active" hidden><details><summary><span class="chat-activity-heading"><span class="chat-activity-title">Wiki activity</span><span class="chat-activity-dots" aria-hidden="true"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></span></span></summary><ol></ol></details></div><div class="chat-response"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>';
   dom.chatMessages.appendChild(message);
   const activity = message.querySelector('.chat-activity');
   aiTarget = { el: message.querySelector('.chat-response'), buffer: '', activity, activityOutput: activity.querySelector('ol'), actions: [] };

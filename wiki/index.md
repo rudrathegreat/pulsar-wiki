@@ -61,9 +61,10 @@ Agent guidance: [GEMINI.md](../GEMINI.md) requires clickable file references in 
 - [[1011-0718]]: Timing Measurements of the Relativistic Binary Pulsar PSR B1913+16.
 
 ## Project Continuity
+- Chat displays wiki activity in a full-width, theme-aware collapsible panel before the response, with an indicator while work is underway.
 - [[research-notebooks]]: Embedded JupyterLab for free-form local Python analyses, cited paper and wiki transfers, automatic local history, clean reruns, and on-request recall linked to historical cells.
 - [[project-handover]]: A project handover drafted from complete selected file text using backend instructions, displayed as Markdown for researcher review before publication.
 - [[active-reading]]: PDF reading with highlight helpers, AI responses linked to selected passages, wiki notes, and reference discovery.
 
 ---
-*Last updated: 2026-10-29*
+*Last updated: 2026-11-15*

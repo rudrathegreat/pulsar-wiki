@@ -300,3 +300,11 @@ All major updates to the wiki are recorded here.
 | 2026-11-15 | Chat / application | Unified link styling in saved and streaming chat responses with wiki pages; updated the wiki index. |
 
 | 2026-11-15 | Sources / application | Replaced the wiki sidebar upload button with Add sources, linking to the Sources page; updated the wiki index. |
+
+| 2026-11-15 | Chat / application | Moved wiki activity above responses and updated its disclosure styling; updated the wiki index. |
+
+| 2026-11-15 | Chat / application | Collapsed wiki activity by default and added a light-mode background; updated the wiki index. |
+
+| 2026-11-15 | Chat / application | Expanded wiki activity to the available width and placed the working indicator beside its title; updated the wiki index. |
+
+| 2026-11-15 | Chat / application | Added a dark-mode background to wiki activity; updated the wiki index. |
