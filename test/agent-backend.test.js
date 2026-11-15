@@ -121,8 +121,10 @@ test('agent uses only ChatGPT OAuth configuration, streams, and keeps the instru
     providerFactory: connection => ({
       async runTurn(input) {
         adapterCalls.push({ connection, input });
-        input.onTool({ name: 'search_wiki', phase: 'started' });
+        input.onTool({ name: 'search_wiki', phase: 'started', args: { query: 'timing', content: 'private content' } });
         input.onTool({ name: 'search_wiki', phase: 'completed' });
+        input.onTool({ name: 'read_wiki_page', phase: 'started', args: { pageName: 'pulsar-timing', content: 'private content' } });
+        input.onTool({ name: 'read_wiki_page', phase: 'completed', result: { name: 'pulsar-timing', content: 'private content' } });
         input.onDelta?.('Hello');
         input.onDelta?.(' world');
         return { text: 'Hello world' };
@@ -142,8 +144,10 @@ test('agent uses only ChatGPT OAuth configuration, streams, and keeps the instru
 
   assert.deepEqual(chunks, ['Hello', ' world']);
   assert.deepEqual(tools, [
-    { name: 'search_wiki', status: 'started' },
+    { name: 'search_wiki', status: 'started', subject: 'timing' },
     { name: 'search_wiki', status: 'completed' },
+    { name: 'read_wiki_page', status: 'started', subject: 'pulsar-timing' },
+    { name: 'read_wiki_page', status: 'completed', subject: 'pulsar-timing' },
   ]);
   assert.deepEqual(adapterCalls[0].connection, { accessToken: 'oauth-access' });
   assert.equal(adapterCalls[0].input.model, 'subscription-model');

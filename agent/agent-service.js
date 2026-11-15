@@ -93,8 +93,10 @@ class AgentService {
           toolEvents.push(publicEvent);
           // Send only the small, displayable subject to the live client. Tool
           // arguments (particularly page contents) must not enter diagnostics.
-          const subject = event.name === 'search_wiki' ? event.args?.query
-            : ['read_wiki_page', 'read_source'].includes(event.name) ? event.args?.name : null;
+          const args = event.args || {};
+          const subject = event.name === 'search_wiki' ? (args.query ?? args.q ?? args.search ?? args.searchQuery ?? args.search_term ?? args.term ?? args.keywords)
+            : ['read_wiki_page', 'read_source'].includes(event.name)
+              ? (args.name ?? args.page ?? args.pageName ?? args.fileName ?? args.filename ?? event.result?.name) : null;
           onTool?.(typeof subject === 'string' ? { ...publicEvent, subject: subject.slice(0, 200) } : publicEvent);
         },
         executeTool: (name, args) => {

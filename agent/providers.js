@@ -70,7 +70,7 @@ async function callTool(executeTool, onTool, name, args) {
   onTool?.({ phase: 'started', name, args });
   try {
     const result = await executeTool(name, args);
-    onTool?.({ phase: 'completed', name });
+    onTool?.({ phase: 'completed', name, args, result });
     return result;
   } catch (error) {
     const result = { ok: false, error: error?.message || 'The requested local operation failed.' };

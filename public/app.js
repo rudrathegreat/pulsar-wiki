@@ -2679,6 +2679,7 @@ function handleToolStatus(event) {
     aiTarget.actions.push(action);
     aiTarget.activityOutput.appendChild(action.el);
   }
+  if (event.subject) action.subject = stripEmoji(event.subject);
   action.finished = !started;
   const labels = {
     read_wiki_page: ['Reading', 'Read', 'page'],

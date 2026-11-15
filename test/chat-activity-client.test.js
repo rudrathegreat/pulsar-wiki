@@ -31,4 +31,7 @@ test('wiki activity shows one readable numbered item per action and updates its 
   context.handleToolStatus({ name: 'read_source', status: 'started', subject: 'paper-name.pdf' });
   context.handleToolStatus({ name: 'read_source', status: 'failed', detail: 'Not found' });
   assert.equal(items[2].textContent, 'Reading source paper-name.pdf failed: Not found');
+  context.handleToolStatus({ name: 'read_wiki_page', status: 'started' });
+  context.handleToolStatus({ name: 'read_wiki_page', status: 'completed', subject: 'recovered-page' });
+  assert.equal(items[3].textContent, 'Read recovered page');
 });
