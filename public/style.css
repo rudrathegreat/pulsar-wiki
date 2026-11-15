@@ -228,6 +228,35 @@ body {
   color: var(--text-1);
 }
 
+#iconbar .icon-btn::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: max-content;
+  max-width: min(240px, calc(100vw - 70px));
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-1);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .2);
+  font: 500 12px/1.4 var(--font);
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 20;
+}
+
+#iconbar .icon-btn:hover::after,
+#iconbar .icon-btn:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+}
+
 .icon-btn.active {
   background: var(--surface-3);
   color: var(--accent);
