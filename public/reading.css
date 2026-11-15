@@ -158,8 +158,7 @@
 #reading-selection-toolbar .reading-swatch { display:flex; align-items:center; gap:4px; padding:7px; border:1px solid var(--border); border-radius:4px; background:var(--mark); color:#111; font:12px/1.4 var(--font); cursor:pointer; }
 #reading-selection-toolbar .reading-swatch[hidden] { display:none; }
 #reading-selection-ai-color { cursor:default; }
-#reading-selection-toolbar .reading-swatch[hidden] { display:none; }
-#reading-selection-ai-color { cursor:default; }
+#reading-selection-toolbar .reading-swatch:has(input:disabled):not(#reading-selection-ai-color) { opacity:.5; cursor:not-allowed; }
 #reading-selection-toolbar input { accent-color:var(--text-1); }
 #reading-toast { position:fixed; bottom:25px; left:50%; transform:translateX(-50%); z-index:100; padding:12px 18px; max-width:85vw; border:1px solid var(--text-3); border-radius:7px; background:var(--surface); color:var(--text-1); font-size:13px; }
 .reading-task-response { font-size:13px; line-height:1.7; }

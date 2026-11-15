@@ -609,12 +609,18 @@
     el('reading-helper-body').innerHTML = '';
     el('reading-helper-error').textContent = '';
     el('reading-selection-toolbar').classList.remove('expanded');
-    const highlight = highlightId && record('highlights', highlightId);
-    const selectedColor = highlight ? highlightColor(highlight) : null;
-    document.querySelectorAll('[data-selection-color]').forEach(input => { input.checked = selectedColor === input.dataset.selectionColor; });
-    el('reading-selection-ai-color').hidden = selectedColor !== 'blue';
+    updateSelectionColors(highlightId);
     const toolbar = el('reading-selection-toolbar'); toolbar.hidden = false;
     positionHelper();
+  }
+  function updateSelectionColors(highlightId) {
+    const highlight = highlightId && record('highlights', highlightId);
+    const selectedColor = highlight ? highlightColor(highlight) : null;
+    document.querySelectorAll('[data-selection-color]').forEach(input => {
+      input.checked = selectedColor === input.dataset.selectionColor;
+      input.disabled = input.dataset.selectionColor === 'blue' || selectedColor === 'blue';
+    });
+    el('reading-selection-ai-color').hidden = selectedColor !== 'blue';
   }
   function positionHelper() {
     if (!r.helper) return;
@@ -645,6 +651,7 @@
     try {
       let highlight = helper.highlightId ? record('highlights', helper.highlightId) : null;
       if (highlight?.deletedAt) throw new Error('This highlight was deleted.');
+      if (!next && highlight && highlightColor(highlight) === 'blue') return highlight;
       if (!highlight) highlight = await request('/highlights', 'POST', { ...r.pending, color });
       else if (!next && highlight.color !== color) highlight = await request(`/highlights/${highlight.id}`, 'PATCH', { revision: highlight.revision, color });
       if (r.helper !== helper) return highlight;
@@ -864,6 +871,7 @@
         if (isCurrentView() && el('reading-task-live')) el('reading-task-live').textContent = automatic ? '' : current.progress || '';
         if (['queued', 'running'].includes(current.status)) { r.polling = setTimeout(poll, 900); return; }
         await refresh(); renderWorkspace(); for (const p of r.pages.values()) paintHighlights(p);
+        if (r.helper?.highlightId) updateSelectionColors(r.helper.highlightId);
         if (automatic && current.publication) buildSidebar(await api.getWikiList());
         if (!isCurrentView()) return;
         if (el('reading-task-cancel')) el('reading-task-cancel').hidden = true;

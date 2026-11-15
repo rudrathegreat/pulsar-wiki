@@ -32,12 +32,17 @@ test('selection toolbar shows blue only for a passage with completed AI assistan
   const h = c.r.data.highlights[0]; h.color = 'green';
   c.openHighlightHelper(h.id, 100, 100);
   assert.equal(inputs[1].checked, true);
+  assert.equal(inputs[1].disabled, false);
   assert.equal(c.nodes.get('reading-selection-ai-color').hidden, true);
   c.r.data.tasks.push({ status: 'completed', response: 'Explanation', action: 'ask', snapshot: { highlights: [{ id: h.id, documentId: h.documentId, text: h.text, anchors: h.anchors }] } });
   c.openHighlightHelper(h.id, 100, 100);
   assert.equal(inputs[1].checked, false);
   assert.equal(inputs[3].checked, true);
+  assert.equal(inputs[1].disabled, true);
   assert.equal(c.nodes.get('reading-selection-ai-color').hidden, false);
+  c.r.data.tasks = [];
+  c.openHighlightHelper(h.id, 100, 100);
+  assert.equal(inputs[1].disabled, false);
 });
 
 test('reading client initializes against actual HTML and includes only explicitly checked private inputs', () => {
