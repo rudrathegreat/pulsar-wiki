@@ -91,7 +91,11 @@ class AgentService {
           const publicEvent = { name: event.name, status: event.status || event.phase || 'running' };
           if (publicEvent.status === 'failed' && typeof event.error === 'string') publicEvent.detail = event.error;
           toolEvents.push(publicEvent);
-          onTool?.(publicEvent);
+          // Send only the small, displayable subject to the live client. Tool
+          // arguments (particularly page contents) must not enter diagnostics.
+          const subject = event.name === 'search_wiki' ? event.args?.query
+            : ['read_wiki_page', 'read_source'].includes(event.name) ? event.args?.name : null;
+          onTool?.(typeof subject === 'string' ? { ...publicEvent, subject: subject.slice(0, 200) } : publicEvent);
         },
         executeTool: (name, args) => {
           if (allowedToolNames && !allowedToolNames.has(name)) throw new AgentServiceError('This tool is not available for the current task.', 'tool-not-allowed');

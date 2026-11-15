@@ -2653,10 +2653,10 @@ function sendChat() {
   dom.chatStatus.textContent = 'ChatGPT is thinking...';
   const message = document.createElement('div');
   message.className = 'chat-msg ai';
-  message.innerHTML = '<div class="chat-avatar">AI</div><div class="chat-bubble"><div class="chat-response"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div><div class="chat-activity" hidden><details open><summary>Wiki activity</summary><pre></pre></details></div></div>';
+  message.innerHTML = '<div class="chat-avatar">AI</div><div class="chat-bubble"><div class="chat-response"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div><div class="chat-activity is-active" hidden><details open><summary><span>Wiki activity</span></summary><ol></ol></details></div></div>';
   dom.chatMessages.appendChild(message);
   const activity = message.querySelector('.chat-activity');
-  aiTarget = { el: message.querySelector('.chat-response'), buffer: '', activity, activityOutput: activity.querySelector('pre') };
+  aiTarget = { el: message.querySelector('.chat-response'), buffer: '', activity, activityOutput: activity.querySelector('ol'), actions: [] };
   scrollChat();
   state.ws.send(JSON.stringify({ type: 'chat', threadId: state.activeThreadId, text }));
 }
@@ -2672,9 +2672,28 @@ function handleAiChunk(text) {
 function handleToolStatus(event) {
   if (!aiTarget) return;
   aiTarget.activity.hidden = false;
-  const label = event.status === 'completed' ? 'completed' : (event.status === 'failed' ? 'failed' : 'running');
-  const detail = event.status === 'failed' && event.detail ? ` (${stripEmoji(event.detail)})` : '';
-  aiTarget.activityOutput.textContent += stripEmoji(event.name || 'wiki tool') + ': ' + label + detail + '\n';
+  const started = !['completed', 'failed'].includes(event.status);
+  let action = !started && [...aiTarget.actions].reverse().find(item => item.name === event.name && !item.finished);
+  if (!action) {
+    action = { name: event.name, subject: stripEmoji(event.subject || ''), el: document.createElement('li') };
+    aiTarget.actions.push(action);
+    aiTarget.activityOutput.appendChild(action.el);
+  }
+  action.finished = !started;
+  const labels = {
+    read_wiki_page: ['Reading', 'Read', 'page'],
+    list_wiki_pages: ['Listing wiki pages', 'Listed wiki pages'],
+    search_wiki: ['Searching the wiki for', 'Searched the wiki for', 'a term'],
+    list_sources: ['Listing sources', 'Listed sources'],
+    read_source: ['Reading source', 'Read source', 'document'],
+    apply_wiki_changes: ['Updating wiki pages', 'Updated wiki pages'],
+  };
+  const [running, completed, fallback] = labels[action.name] || ['Working on the wiki', 'Worked on the wiki'];
+  let subject = action.subject || fallback;
+  if (action.name === 'read_wiki_page' && subject) subject = subject.replace(/\.md$/i, '').replace(/-/g, ' ');
+  subject = fallback ? ' ' + subject : '';
+  action.el.textContent = (event.status === 'failed' ? running + subject + ' failed' : (started ? running : completed) + subject) + (event.status === 'failed' && event.detail ? ': ' + stripEmoji(event.detail) : '');
+  action.el.classList.toggle('is-failed', event.status === 'failed');
   scrollChat();
 }
 
@@ -2699,6 +2718,7 @@ function handleAiError(message) {
 function handleAiDone() {
   state.aiRunning = false;
   dom.chatAbort.style.display = 'none';
+  if (aiTarget) aiTarget.activity.classList.remove('is-active');
   aiTarget = null;
   updateAgentUi();
   void refreshThreads();

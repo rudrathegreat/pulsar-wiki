@@ -1343,31 +1343,46 @@ body {
 .chat-activity {
   width: 100%;
   margin: 8px 0 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  overflow: hidden;
 }
 
 .chat-activity summary {
-  padding: 7px 10px;
+  padding: 7px 0;
   color: var(--text-2);
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
 }
 
-.chat-activity pre {
+.chat-activity.is-active summary span {
+  background: linear-gradient(100deg, var(--text-2) 25%, var(--text-1) 50%, var(--text-2) 75%);
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: wiki-activity-shimmer 2s linear infinite;
+}
+
+@keyframes wiki-activity-shimmer {
+  to { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-activity.is-active summary span { animation: none; color: var(--text-2); }
+}
+
+.chat-activity ol {
   max-height: 180px;
-  margin: 0;
-  padding: 10px;
+  margin: 0 0 0 1.5em;
+  padding: 0;
   overflow: auto;
-  border-top: 1px solid var(--border);
   color: var(--text-2);
-  font: 11px/1.55 var(--mono);
-  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.65;
   overflow-wrap: anywhere;
 }
+
+.chat-activity li { padding-left: 3px; }
+.chat-activity li.is-failed { color: var(--text-1); }
 
 .chat-recovery {
   margin: 10px 0 0;
