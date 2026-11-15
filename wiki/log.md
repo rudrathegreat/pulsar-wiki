@@ -310,3 +310,5 @@ All major updates to the wiki are recorded here.
 | 2026-11-15 | Chat / application | Added a dark-mode background to wiki activity; updated the wiki index. |
 
 | 2026-11-15 | Navigation / application | Added descriptive hover and keyboard-focus tooltips to sidebar icons; updated the wiki index. |
+
+| 2026-11-15 | Navigation / application | Removed the sidebar tooltip shadow; updated the wiki index. |

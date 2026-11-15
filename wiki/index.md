@@ -4,7 +4,7 @@ Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pul
 
 File navigation: source citations and source lists open saved files in the reading workspace; wiki page references in pages and chat link to their pages and share the same link styling, including pulsar names containing plus signs and standalone references formatted as inline code.
 
-Sidebar navigation: hover or focus an icon to see what it opens or changes.
+Sidebar navigation: hover or focus an icon to see a shadow-free tooltip explaining what it opens or changes.
 
 Source navigation: the wiki sidebar's Add sources button opens the Sources page.
 
