@@ -13,7 +13,7 @@ function client({ performanceRecorder = null } = {}) {
   const nodes = new Map();
   const staticIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]));
   const element = () => ({ style: {}, dataset: {}, value: '', children: [], listeners: {}, attributes: {}, hidden: false, innerHTML: '', offsetWidth: 350, offsetHeight: 45, classList: { add() {}, remove() {}, toggle() {} }, addEventListener(type, listener) { this.listeners[type] = listener; }, querySelectorAll() { return []; }, querySelector() { return null; }, contains() { return false; }, focus() {}, setAttribute(key, value) { this.attributes[key] = value; }, showModal() { this.open = true; }, close() { this.open = false; }, append(child) { this.children.push(child); }, getBoundingClientRect() { return { left: 100, top: 100, right: 500, bottom: 900, width: 400, height: 800 }; } });
-  const document = { activeElement: null, getElementById(id) { if (!staticIds.has(id) && ![...nodes.values()].some(node => node.innerHTML.includes(`id="${id}"`))) return null; if (!nodes.has(id)) nodes.set(id, element()); return nodes.get(id); }, querySelectorAll() { return []; }, addEventListener() {}, createElement(tag) { const node = element(); if (tag === 'template') node.content = { querySelectorAll() { return []; } }; return node; } };
+  const document = { activeElement: null, listeners: {}, getElementById(id) { if (!staticIds.has(id) && ![...nodes.values()].some(node => node.innerHTML.includes(`id="${id}"`))) return null; if (!nodes.has(id)) nodes.set(id, element()); return nodes.get(id); }, querySelectorAll() { return []; }, addEventListener(type, listener) { this.listeners[type] = listener; }, createElement(tag) { const node = element(); if (tag === 'template') node.content = { querySelectorAll() { return []; } }; return node; } };
   const context = { document, window: { addEventListener() {}, getSelection() { return null; }, requestAnimationFrame: callback => setTimeout(callback, 0), cancelAnimationFrame: clearTimeout, innerWidth: 1200, innerHeight: 900 }, state: { panel: 'document' }, setTimeout, clearTimeout, ReadableStream, URL, URLSearchParams, Node: { TEXT_NODE: 3 }, renderMd(v) { return v; }, typesetMath() {} };
   context.window.WorkspaceSession = { fetch: (...args) => context.fetch(...args), url: value => value };
   if (performanceRecorder) context.window.ReadingPerformance = { create({ sample }) { performanceRecorder.sample = sample; return performanceRecorder; } };
@@ -86,6 +86,23 @@ test('reading library is removed and its old route opens Files', async () => {
   assert.equal(await c.route('#reading'), true);
   assert.deepEqual(panels, ['files']);
   assert.deepEqual(urls, ['/#files']);
+});
+
+test('clicking a wiki source link opens the named file in the reading workspace', async () => {
+  const c = client();
+  const opened = []; const urls = [];
+  c.context.api = { getRawList: async () => [{ name: 'paper ?#.pdf', ext: 'pdf' }] };
+  c.context.openRawFile = async (...args) => { opened.push(args); };
+  c.context.history = { pushState(_state, _title, url) { urls.push(url); } };
+  let prevented = false;
+  const link = { href: 'http://localhost/#file/paper%20%3F%23.pdf' };
+  await c.document.listeners.click({ target: { closest: () => link }, button: 0, preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.deepEqual(urls, ['/#file/paper%20%3F%23.pdf']);
+  assert.equal(opened.length, 1);
+  assert.equal(opened[0][0], 'paper ?#.pdf');
+  assert.equal(opened[0][1], 'pdf');
+  assert.equal(opened[0][3], false);
 });
 
 test('reader sidebar shows every matching highlight with filters and a delete action per highlight', () => {

@@ -695,10 +695,10 @@
       }
       return true;
     }
-    if (hashValue.startsWith('#file/') && hashValue.includes('?')) {
+    if (hashValue.startsWith('#file/')) {
       const [file, query] = hashValue.slice(6).split('?'); const name = decodeURIComponent(file);
       const files = await api.getRawList(); const source = files.find(f => f.name === name);
-      if (source) { await openRawFile(name, source.ext, source, false); if (r.pdf) await navigate(Number(new URLSearchParams(query).get('page')) || 1); return true; }
+      if (source) { await openRawFile(name, source.ext, source, false); if (query && r.pdf) await navigate(Number(new URLSearchParams(query).get('page')) || 1); return true; }
     }
     return false;
   }

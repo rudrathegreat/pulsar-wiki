@@ -2,7 +2,7 @@
 
 Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pulsar science, observational tools, and relativistic physics.
 
-File navigation: source citations and source lists link to the saved files; wiki page references link to their pages.
+File navigation: source citations and source lists open saved files in the reading workspace; wiki page references link to their pages.
 
 Markdown tables share the chat style and scroll horizontally when needed; the change log displays its historical entries in a single table.
 
