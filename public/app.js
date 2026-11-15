@@ -896,7 +896,7 @@ $('source-sidebar-list').addEventListener('click', event => {
   if (file) void openRawFile(file.name, file.ext, file);
 });
 
-$('source-sidebar-add').addEventListener('click', () => {
+for (const id of ['btn-add-sources', 'source-sidebar-add']) $(id).addEventListener('click', () => {
   setSourceView('add');
   showPanel('files');
 });
@@ -2030,7 +2030,6 @@ function openUploadModal() {
 }
 function closeUploadModal() { dom.uploadModal.style.display = 'none'; }
 
-$('btn-upload').onclick = openUploadModal;
 $('files-upload-btn').onclick = openUploadModal;
 $('saved-upload-btn').onclick = openUploadModal;
 $('modal-cancel').onclick = closeUploadModal;

@@ -4,6 +4,8 @@ Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pul
 
 File navigation: source citations and source lists open saved files in the reading workspace; wiki page references in pages and chat link to their pages and share the same link styling, including pulsar names containing plus signs and standalone references formatted as inline code.
 
+Source navigation: the wiki sidebar's Add sources button opens the Sources page.
+
 Markdown tables share the chat style and scroll horizontally when needed; the change log displays its historical entries in a single table.
 
 Reading assistance: Ask AI gives a concise explanation in one or two paragraphs, with citations to selected passages. Saved responses show the user question, can be expanded from a five-line preview, and can start a new chat with the selected passages and response.

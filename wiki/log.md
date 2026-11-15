@@ -298,3 +298,5 @@ All major updates to the wiki are recorded here.
 | 2026-11-15 | Chat / application | Made standalone wiki references formatted as inline code render as clickable links; updated the wiki index. |
 
 | 2026-11-15 | Chat / application | Unified link styling in saved and streaming chat responses with wiki pages; updated the wiki index. |
+
+| 2026-11-15 | Sources / application | Replaced the wiki sidebar upload button with Add sources, linking to the Sources page; updated the wiki index. |
