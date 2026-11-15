@@ -160,7 +160,7 @@ test('a plain app launch opens the wiki index after explicit routes are consider
 test('emoji sanitizer removes emojis from plain text and Markdown before rendering', () => {
   const helpers = loadClientHelpers();
   assert.equal(helpers.stripEmoji('Pulsar 🔭 timing'), 'Pulsar timing');
-  assert.equal(helpers.preprocessMd('[[Pulsar 🔭|Pulsar 🔭]]'), '[Pulsar](WIKILINK:pulsar)');
+  assert.equal(helpers.preprocessMd('[[Pulsar 🔭|Pulsar 🔭]]'), '[Pulsar](/wiki/pulsar)');
 });
 
 test('chat wiki links render canonical routes and only plain primary clicks navigate in-app', () => {
@@ -169,6 +169,14 @@ test('chat wiki links render canonical routes and only plain primary clicks navi
   assert.match(html, /href="\/wiki\/psr-j0437-4715"/);
   assert.match(html, /class="wiki-link"/);
   assert.match(html, /data-page="psr-j0437-4715"/);
+  for (const input of ['[[psr-j0740+6620]]', '`[[psr-j0740+6620]]`', '[psr-j0740+6620](WIKILINK:psr-j0740+6620)', '`[psr-j0740+6620](/wiki/psr-j0740%2B6620)`', '[PSR J0740](/wiki/psr-j0740%2B6620)']) {
+    const rendered = helpers.renderMd(input);
+    assert.match(rendered, /href="\/wiki\/psr-j0740%2B6620"/);
+    assert.match(rendered, /class="wiki-link" data-page="psr-j0740\+6620"/);
+    assert.doesNotMatch(rendered, /WIKILINK:/);
+    assert.doesNotMatch(rendered, /<code>/);
+  }
+  assert.match(helpers.renderMd('`ordinary code`'), /<code>ordinary code<\/code>/);
 
   const wikiLink = { dataset: { page: 'psr-j0437-4715' } };
   const plainClick = {

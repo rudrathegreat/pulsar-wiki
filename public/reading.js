@@ -263,7 +263,7 @@
       if (tableWrap) node.className = 'md-table-wrap';
       if (['left', 'center', 'right'].includes(align)) node.setAttribute('align', align);
       if (href && (/^https?:\/\//i.test(href) || /^\/(?!\/)/.test(href))) { node.setAttribute('href', href); node.setAttribute('rel', 'noopener noreferrer'); }
-      if (wiki && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(wiki) && href === `/wiki/${encodeURIComponent(wiki)}`) { node.className = 'wiki-link'; node.dataset.page = wiki; }
+      if (wiki && wikiPageFromPath(href) === wiki && href === wikiPath(wiki)) { node.className = 'wiki-link'; node.dataset.page = wiki; }
     }
     return template.innerHTML;
   }

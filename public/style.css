@@ -906,9 +906,7 @@ body {
 .md-body th[align="right"], .md-body td[align="right"] { text-align: right; }
 
 .md-body a[href],
-.md-body a[href]:visited,
-.chat-msg.ai .chat-bubble a[href],
-.chat-msg.ai .chat-bubble a[href]:visited {
+.md-body a[href]:visited {
   color: var(--text-1);
   text-decoration: none;
   border-bottom: 1px solid var(--border);
@@ -917,9 +915,7 @@ body {
 }
 
 .md-body a[href]:hover,
-.md-body a[href]:focus-visible,
-.chat-msg.ai .chat-bubble a[href]:hover,
-.chat-msg.ai .chat-bubble a[href]:focus-visible {
+.md-body a[href]:focus-visible {
   border-color: var(--text-1);
 }
 

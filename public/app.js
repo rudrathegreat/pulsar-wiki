@@ -30,10 +30,13 @@ function wikiPageFromPath(pathname) {
 }
 
 function preprocessMd(text) {
-  return stripEmoji(text).replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, page, label) => {
+  return stripEmoji(text)
+    // Models sometimes put a standalone wiki reference in inline code.
+    .replace(/(?<!`)`(\[\[[^`\n]+?\]\]|\[[^`\n\]]+\]\((?:WIKILINK:|\/wiki\/)[^`\n)]+\))`(?!`)/gi, '$1')
+    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, page, label) => {
     const display = stripEmoji(label || page).trim();
-    return `[${display}](WIKILINK:${normalizeWikiPageName(page)})`;
-  });
+    return `[${display}](${wikiPath(page)})`;
+  }).replace(/\]\(WIKILINK:([^\s)]+)\)/gi, (_, page) => `](${wikiPath(page)})`);
 }
 
 function protectLatex(text) {
@@ -50,8 +53,11 @@ function protectLatex(text) {
 
 function postProcessHtml(html, expressions = []) {
   let processed = html.replace(
-    /href="WIKILINK:([^"]+)"/g,
-    (_, page) => `href="${wikiPath(page)}" class="wiki-link" data-page="${escHtml(normalizeWikiPageName(page))}"`
+    /href="(\/wiki\/[^"?#]+)"/g,
+    (match, path) => {
+      const page = wikiPageFromPath(path);
+      return page ? `href="${wikiPath(page)}" class="wiki-link" data-page="${escHtml(page)}"` : match;
+    }
   );
   expressions.forEach((expression, index) => {
     const safeExpression = expression.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -2702,7 +2708,7 @@ function handleAiDone() {
 function appendChatMsg(role, text) {
   const el = document.createElement('div');
   el.className = 'chat-msg ' + role;
-  el.innerHTML = '<div class="chat-avatar">' + (role === 'user' ? 'U' : 'AI') + '</div><div class="chat-bubble">' + (role === 'user' ? escHtml(text) : renderMd(text)) + '</div>';
+  el.innerHTML = '<div class="chat-avatar">' + (role === 'user' ? 'U' : 'AI') + '</div><div class="chat-bubble">' + (role === 'user' ? escHtml(text) : '<div class="md-body">' + renderMd(text) + '</div>') + '</div>';
   if (role !== 'user') typesetMath(el);
   dom.chatMessages.appendChild(el);
   scrollChat();
