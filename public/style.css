@@ -3481,10 +3481,18 @@ button:disabled {
   font-weight: 600;
 }
 
-.source-sidebar-row { display: flex; align-items: center; position: relative; }
+.source-sidebar-row { display: flex; align-items: center; position: relative; padding-bottom: 8px; margin-bottom: 6px; }
 .source-sidebar-row > .nav-item { flex: 1; min-width: 0; }
-.source-options { position: relative; flex: none; }
-.source-options summary { cursor: pointer; list-style: none; padding: 6px 10px; }
-.source-options summary::-webkit-details-marker { display: none; }
-.source-options-menu { position: absolute; right: 0; z-index: 20; background: var(--bg-primary, white); border: 1px solid #888; border-radius: 6px; padding: 4px; }
-.source-options-menu button { cursor: pointer; padding: 6px 12px; }
+.source-sidebar-row > .chat-thread-menu-wrap { margin-right: 12px; }
+#sidebar .source-sidebar-row > .nav-item:hover { border-bottom-color: transparent !important; }
+.source-sidebar-row::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--transition);
+  pointer-events: none;
+}
+.source-sidebar-row:hover::after { border-bottom-color: var(--focus); }

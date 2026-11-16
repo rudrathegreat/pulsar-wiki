@@ -892,13 +892,30 @@ function renderSourceSidebar() {
   $('source-sidebar-list').innerHTML = state.rawFiles.map(file => {
     const active = state.currentDocument?.name === file.name;
     const label = file.displayName || file.name;
-    return `<div class="source-sidebar-row"><button class="nav-item${active ? ' active' : ''}" type="button" data-source-file="${escHtml(file.name)}" title="${escHtml(label)}">${fileIcon(file.ext)}<span class="source-sidebar-name">${escHtml(label)}</span></button><details class="source-options"><summary aria-label="More options for ${escHtml(label)}" title="More options">?</summary><div class="source-options-menu"><button type="button" data-rename-source="${escHtml(file.name)}">Rename</button><button type="button" data-delete-source="${escHtml(file.name)}">Delete</button></div></details></div>`;
+    return `<div class="source-sidebar-row"><button class="nav-item${active ? ' active' : ''}" type="button" data-source-file="${escHtml(file.name)}" title="${escHtml(label)}">${fileIcon(file.ext)}<span class="source-sidebar-name">${escHtml(label)}</span></button><div class="chat-thread-menu-wrap"><button type="button" class="chat-thread-menu" data-source-menu aria-label="Source options for ${escHtml(label)}" aria-expanded="false" title="Source options">&#8943;</button><div class="chat-thread-actions" role="menu" hidden><button type="button" role="menuitem" data-rename-source="${escHtml(file.name)}">Rename</button><button type="button" role="menuitem" class="chat-thread-delete" data-delete-source="${escHtml(file.name)}">Delete</button></div></div></div>`;
   }).join('');
 }
 
 $('source-sidebar-list').addEventListener('click', async event => {
+  const menu = event.target.closest('[data-source-menu]');
+  if (menu) {
+    event.stopPropagation();
+    const actions = menu.nextElementSibling;
+    const willOpen = actions.hidden;
+    closeThreadMenus();
+    actions.hidden = !willOpen;
+    menu.setAttribute('aria-expanded', String(willOpen));
+    if (willOpen) {
+      const sidebarRect = $('sidebar').getBoundingClientRect();
+      const buttonRect = menu.getBoundingClientRect();
+      actions.style.left = `${sidebarRect.right + 4}px`;
+      actions.style.top = `${Math.max(4, Math.min(buttonRect.top, window.innerHeight - actions.offsetHeight - 4))}px`;
+    }
+    return;
+  }
   const remove = event.target.closest('[data-delete-source]');
   if (remove) {
+    closeThreadMenus();
     const file = state.rawFiles.find(source => source.name === remove.dataset.deleteSource);
     if (!file || !confirm(`Delete ${file.displayName || file.name}? Links to this source will stop working.`)) return;
     try {
@@ -912,7 +929,7 @@ $('source-sidebar-list').addEventListener('click', async event => {
     const file = state.rawFiles.find(source => source.name === rename.dataset.renameSource);
     if (!file) return;
     const displayName = prompt('Display name for this source:', file.displayName || file.name);
-    rename.closest('details').open = false;
+    closeThreadMenus();
     if (displayName === null) return;
     try {
       await readJsonResponse(await workspaceFetch(`/api/raw/${encodeURIComponent(file.name)}/display-name`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ displayName }) }), 'Rename source');
@@ -2778,6 +2795,7 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Escape') closeThreadMenus();
 });
 dom.chatThreadList.addEventListener('scroll', closeThreadMenus);
+$('source-sidebar-list').addEventListener('scroll', closeThreadMenus);
 window.addEventListener('resize', closeThreadMenus);
 
 $('ads-settings-form').addEventListener('submit', event => { event.preventDefault(); void updateAdsSettings(); });
