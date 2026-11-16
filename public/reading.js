@@ -867,14 +867,19 @@
       try {
         const current = await request(`/tasks/${task.id}`);
         if (r.task !== task.id) return;
-        if (isCurrentView() && el('reading-task-status')) el('reading-task-status').textContent = `${current.status}${current.model ? ` · ${current.model}` : ''}${current.error ? `: ${current.error}` : ''}`;
+        if (isCurrentView() && el('reading-task-status')) {
+          const status = el('reading-task-status');
+          if (!automatic && ['queued', 'running'].includes(current.status)) {
+            if (!status.querySelector('.typing-dot')) status.innerHTML = '<span aria-label="Generating response"><span class="typing-dot" aria-hidden="true"></span><span class="typing-dot" aria-hidden="true"></span><span class="typing-dot" aria-hidden="true"></span></span>';
+          } else status.textContent = `${current.status}${current.model ? ` · ${current.model}` : ''}${current.error ? `: ${current.error}` : ''}`;
+        }
         if (isCurrentView() && el('reading-task-live')) el('reading-task-live').textContent = automatic ? '' : current.progress || '';
         if (['queued', 'running'].includes(current.status)) { r.polling = setTimeout(poll, 900); return; }
         await refresh(); renderWorkspace(); for (const p of r.pages.values()) paintHighlights(p);
         if (r.helper?.highlightId) updateSelectionColors(r.helper.highlightId);
         if (automatic && current.publication) buildSidebar(await api.getWikiList());
         if (!isCurrentView()) return;
-        if (el('reading-task-cancel')) el('reading-task-cancel').hidden = true;
+        if (el('reading-task-cancel')) el('reading-task-cancel').parentElement.hidden = true;
         if (el('reading-task-live')) el('reading-task-live').textContent = '';
         if (el('reading-task-complete')) {
           el('reading-task-complete').innerHTML = automatic

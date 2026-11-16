@@ -102,6 +102,7 @@
 .reading-section-title { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:12px 0; }
 .reading-section-title h3 { font-size:16px; font-weight:500; }
 .reading-actions, .reading-filters { display:flex; gap:6px; flex-wrap:wrap; margin:12px 0; }
+.reading-actions[hidden] { display:none; }
 .reading-filters > * { min-width:0; flex:1 1 100px; }
 .reading-actions button, .reading-filters :is(input,select), .reading-field :is(input,textarea,select), #reading-find, #reading-thumbnails button { border:1px solid var(--border); border-radius:5px; background:var(--surface-2); color:var(--text-1); padding:8px 10px; font:12px var(--font); }
 .reading-actions button:hover { border-color:var(--text-2); }
@@ -165,7 +166,7 @@
 #reading-selection-toolbar input { accent-color:var(--text-1); }
 #reading-toast { position:fixed; bottom:25px; left:50%; transform:translateX(-50%); z-index:100; padding:12px 18px; max-width:85vw; border:1px solid var(--text-3); border-radius:7px; background:var(--surface); color:var(--text-1); font-size:13px; }
 .reading-task-response { font-size:13px; line-height:1.7; }
-.reading-task-box { margin:12px 0; padding:12px 14px; border:0; border-radius:8px; background:var(--reading-card-bg); overflow-wrap:anywhere; }
+.reading-task-box { margin:6px 0; padding:12px 14px; border:0; border-radius:8px; background:var(--reading-card-bg); overflow-wrap:anywhere; }
 .reading-task-box > p:last-child { margin-bottom:0; }
 .reading-task-response pre { white-space:pre-wrap; }
 .reading-task-progress { white-space:pre-wrap; max-height:240px; overflow:auto; font-size:12px; }

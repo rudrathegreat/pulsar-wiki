@@ -327,3 +327,7 @@ All major updates to the wiki are recorded here.
 | 2026-11-16 | Reading / application | Removed the response input inspection panel and placed the question and answer in separate boxes; updated the wiki index. |
 
 | 2026-11-16 | Reading / application | Styled the question and answer boxes without borders, moved completion status into the answer, and removed the wiki-note prompt; updated the wiki index. |
+
+| 2026-11-16 | Reading / application | Reduced the spacing between the question and answer boxes; updated the wiki index. |
+
+| 2026-11-16 | Reading / application | Added the chat-style animated dots while Ask AI generates a response; updated the wiki index. |
