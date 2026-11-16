@@ -323,3 +323,7 @@ All major updates to the wiki are recorded here.
 | 2026-11-16 | Reading / application | Removed selected-input counts and the inspection panel from the Ask AI question form; updated the wiki index. |
 
 | 2026-11-16 | Reading / application | Replaced text-labelled highlight colour controls with individual colour swatches; updated the wiki index. |
+
+| 2026-11-16 | Reading / application | Removed the response input inspection panel and placed the question and answer in separate boxes; updated the wiki index. |
+
+| 2026-11-16 | Reading / application | Styled the question and answer boxes without borders, moved completion status into the answer, and removed the wiki-note prompt; updated the wiki index. |
