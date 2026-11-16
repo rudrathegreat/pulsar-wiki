@@ -3525,6 +3525,9 @@ button:disabled {
 .saved-sources-actions, .saved-selection-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .saved-selection-toolbar[hidden] { display: none; }
 .saved-selection-toolbar { margin: 0 0 18px; }
-.file-card-select { cursor: pointer; }
-.file-card-select input { margin: 0 0 12px; accent-color: var(--text-1); }
+.file-card-select { position: relative; cursor: pointer; background: transparent !important; color: var(--button-text) !important; }
+.file-card-select, .file-card-select * { font-weight: 400 !important; }
+.file-card-select:hover { background: transparent !important; border-color: var(--focus) !important; }
+.file-card-select input { position: absolute; right: 16px; bottom: 16px; width: 20px; height: 20px; margin: 0; accent-color: var(--text-1); }
+.file-card-select .file-card-meta { padding-right: 24px; }
 #saved-selection-status { margin: 0 0 16px; }

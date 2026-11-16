@@ -340,3 +340,9 @@ All major updates to the wiki are recorded here.
 
 
 | 2026-11-16 | Sources / application | Added selection and bulk deletion in Saved sources; updated the wiki index. |
+
+| 2026-11-16 | Sources / application | Preserved saved source card details and layout during selection; updated the wiki index. |
+
+| 2026-11-16 | Sources / application | Matched selection card background and text weight to normal cards; updated the wiki index. |
+
+| 2026-11-16 | Sources / application | Enlarged the saved source selection checkboxes; updated the wiki index. |

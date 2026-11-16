@@ -1076,20 +1076,16 @@ async function loadFiles() {
 function renderSavedFiles() {
   renderSavedSelection();
   $('saved-select-all').textContent = state.rawFiles.length && selectedSavedFiles.size === state.rawFiles.length ? 'Clear all' : 'Select all';
-  dom.filesGrid.innerHTML = state.rawFiles.map((f, index) => savedSelecting ? `
-    <label class="file-card file-card-select">
-      <input type="checkbox" data-saved-index="${index}" ${selectedSavedFiles.has(f.name) ? 'checked' : ''} aria-label="Select ${escHtml(f.displayName || f.name)}">
-      <span class="file-card-name">${escHtml(f.displayName || f.name)}</span>
-      <span class="file-card-meta">${fmtSize(f.size)}</span>
-    </label>` : `
-    <button class="file-card" type="button" data-file-index="${index}" aria-label="Open ${escHtml(f.name)}">
+  dom.filesGrid.innerHTML = state.rawFiles.map((f, index) => `
+    ${savedSelecting ? `<label class="file-card file-card-select">` : `<button class="file-card" type="button" data-file-index="${index}" aria-label="Open ${escHtml(f.name)}">`}
+      ${savedSelecting ? `<input type="checkbox" data-saved-index="${index}" ${selectedSavedFiles.has(f.name) ? 'checked' : ''} aria-label="Select ${escHtml(f.displayName || f.name)}">` : ''}
       <div class="file-card-topline">
         <div class="file-card-icon">${fileIcon(f.ext)}</div>
         <span class="file-card-ext">${escHtml(f.ext || 'file')}</span>
       </div>
       <div class="file-card-name">${escHtml(f.displayName || f.name)}</div>
       <div class="file-card-meta">${fmtSize(f.size)} ? View document</div>
-    </button>`).join('');
+    ${savedSelecting ? '</label>' : '</button>'}`).join('');
   dom.filesGrid.querySelectorAll('[data-file-index]').forEach(card => {
     card.addEventListener('click', () => {
       const file = state.rawFiles[Number(card.dataset.fileIndex)];
