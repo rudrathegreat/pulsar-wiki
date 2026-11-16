@@ -29,7 +29,9 @@ const LOCAL_TOOL_GUIDANCE = `
 
 ## Local wiki tool protocol
 
-Use the exact JSON fields in each tool schema. In particular, use \`name\` for \`read_wiki_page\` and \`query\` for \`search_wiki\`. Page names are lowercase and hyphenated, without a directory path. A \`read_wiki_page\` result with \`exists: false\` is an expected absence check, not a reason to stop. To create or edit a normal wiki page, use \`apply_wiki_changes\` with the page and the updated \`index\`; it appends the log automatically. Never claim that a page was created unless that tool returned successfully.`;
+Use the exact JSON fields in each tool schema. In particular, use \`name\` for \`read_wiki_page\` and \`query\` for \`search_wiki\`. Page names are lowercase and hyphenated, without a directory path. A \`read_wiki_page\` result with \`exists: false\` is an expected absence check, not a reason to stop. To create or edit a normal wiki page, use \`apply_wiki_changes\` with the page and the updated \`index\`; it appends the log automatically. Never claim that a page was created unless that tool returned successfully.
+
+In every chat response, link each reference to an existing wiki page using [[page-name]] or [[page-name|descriptive title]], including citations and pages created or changed. For example, write [[pulsar-timing|Pulsar timing]], not \`pulsar-timing\`, \`wiki/pulsar-timing.md\`, or a plain page name. Do not wrap wiki links in code formatting. Use actual page names verified through the wiki tools; do not invent links to missing pages. Ordinary technical terms and code that are not page references may remain unlinked.`;
 
 class AgentService {
   constructor({ threadStore, authService, wikiTools, instructions, providerFactory = createChatGPTAdapter } = {}) {

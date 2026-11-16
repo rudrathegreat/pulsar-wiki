@@ -182,6 +182,8 @@ test('agent uses only ChatGPT OAuth configuration, streams, and keeps the instru
   assert.deepEqual(adapterCalls[0].connection, { accessToken: 'oauth-access' });
   assert.equal(adapterCalls[0].input.model, 'subscription-model');
   assert.match(adapterCalls[0].input.instructions, /^snapshot A\n\n## Local wiki tool protocol/);
+  assert.match(adapterCalls[0].input.instructions, /link each reference to an existing wiki page using \[\[page-name\]\]/);
+  assert.match(adapterCalls[1].input.instructions, /Do not wrap wiki links in code formatting/);
   assert.deepEqual(adapterCalls[1].input.messages.map(message => message.text), [
     'What is timing noise?', 'Hello world', 'Continue.',
   ]);
