@@ -337,3 +337,6 @@ All major updates to the wiki are recorded here.
 | 2026-11-16 | Sources / application | Updated source dialog and backdrop colours for light and dark themes; updated the wiki index. |
 
 | 2026-11-16 | Sources / application | Adjusted source dialog backdrop opacity, dark colours and input focus styling; updated the wiki index. |
+
+
+| 2026-11-16 | Sources / application | Added selection and bulk deletion in Saved sources; updated the wiki index. |

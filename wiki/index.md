@@ -8,6 +8,8 @@ Browser tab: PulsarWiki uses its favicon as the tab icon.
 
 Sidebar navigation: hover or focus an icon to see a shadow-free tooltip explaining what it opens or changes.
 
+Saved sources: select multiple documents in the Saved sources view and delete them together.
+
 Source navigation: the wiki sidebar's Add sources button opens the Sources page. Source rename and delete actions use in-app dialogs with theme-specific colours and accessible input focus.
 
 Markdown tables share the chat style and scroll horizontally when needed; the change log displays its historical entries in a single table.

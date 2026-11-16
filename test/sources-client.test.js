@@ -25,11 +25,12 @@ function client() {
     if (!nodes.has(id)) {
       const classes = new Set();
       nodes.set(id, {
-        innerHTML: '', textContent: '', hidden: false, handlers: {}, attributes: {},
+        innerHTML: '', textContent: '', value: '', hidden: false, handlers: {}, attributes: {},
         classList: { toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); }, contains(name) { return classes.has(name); } },
         addEventListener(type, handler) { this.handlers[type] = handler; },
         setAttribute(name, value) { this.attributes[name] = value; },
         querySelectorAll() { return []; }, contains() { return true; },
+        showModal() { this.open = true; }, close() { this.open = false; }, focus() {},
       });
     }
     return nodes.get(id);
@@ -46,6 +47,8 @@ function client() {
     wikiPath: name => `/wiki/${name}`,
     history: { pushState(_state, _title, url) { context.hash = url; Object.assign(context.location, { pathname: new URL(url, 'http://localhost').pathname, hash: new URL(url, 'http://localhost').hash }); } },
     workspaceUrl: url => `${url}?workspace=test-project`,
+    workspaceFetch: async url => { const name = decodeURIComponent(url.split('/').pop()); if (name.startsWith('notes')) throw new Error('Denied'); files = files.filter(file => file.name !== name); return { ok: true }; },
+    readJsonResponse: async response => response,
     stripEmoji: value => String(value),
     escHtml: value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
   };
@@ -176,4 +179,22 @@ test('socket reconnection catches up sources and references even if the wiki ref
   assert.match(c.element('source-sidebar-list').innerHTML, /added-while-offline.pdf/);
   assert.equal(c.referenceRefreshes, 2);
   assert.equal(c.state.sourceView, 'references');
+});
+
+
+test('saved sources selection deletes successes and retains failures for retry', async () => {
+  const c = client();
+  await c.loadFiles();
+  c.element('saved-select-btn').handlers.click();
+  assert.match(c.element('files-grid').innerHTML, /data-saved-index="0"/);
+  c.element('saved-select-all').handlers.click();
+  assert.equal(c.element('saved-selection-count').textContent, '2 selected');
+  c.element('saved-delete-selected').handlers.click();
+  assert.match(c.element('source-action-description').textContent, /2 selected sources/);
+  await c.element('source-action-form').handlers.submit({ preventDefault() {} });
+  assert.equal(c.element('source-sidebar-count').textContent, 1);
+  assert.equal(c.element('saved-selection-count').textContent, '1 selected');
+  assert.match(c.element('saved-selection-status').textContent, /Denied/);
+  c.element('saved-selection-cancel').handlers.click();
+  assert.match(c.element('files-grid').innerHTML, /data-file-index="0"/);
 });

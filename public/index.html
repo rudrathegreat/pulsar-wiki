@@ -331,11 +331,21 @@
           <section class="source-view" id="source-view-saved" role="tabpanel" aria-labelledby="source-tab-saved" hidden>
             <header class="saved-sources-header">
               <div><h3>Saved sources</h3><p>Documents in the current research workspace.</p></div>
+              <div class="saved-sources-actions">
+              <button class="btn" id="saved-select-btn" type="button">Select</button>
               <button class="upload-btn" id="saved-upload-btn" type="button">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
                 Upload file
               </button>
+              </div>
             </header>
+            <div id="saved-selection-toolbar" class="saved-selection-toolbar" hidden>
+              <span id="saved-selection-count" aria-live="polite">0 selected</span>
+              <button class="btn" id="saved-select-all" type="button">Select all</button>
+              <button class="btn" id="saved-selection-cancel" type="button">Cancel</button>
+              <button class="btn" id="saved-delete-selected" type="button" disabled>Delete selected</button>
+            </div>
+            <p id="saved-selection-status" role="status" hidden></p>
             <div class="files-grid" id="files-grid"><!-- populated by JS --></div>
           </section>
 

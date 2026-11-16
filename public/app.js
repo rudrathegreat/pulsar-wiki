@@ -898,6 +898,45 @@ function renderSourceSidebar() {
 
 let sourceAction = null;
 let sourceActionBusy = false;
+let savedSelecting = false;
+const selectedSavedFiles = new Set();
+
+function renderSavedSelection() {
+  $('saved-select-btn').hidden = savedSelecting;
+  $('saved-select-btn').disabled = !state.rawFiles.length;
+  $('saved-selection-toolbar').hidden = !savedSelecting;
+  $('saved-selection-count').textContent = `${selectedSavedFiles.size} selected`;
+  $('saved-delete-selected').disabled = !selectedSavedFiles.size || sourceActionBusy;
+  $('saved-select-all').disabled = !state.rawFiles.length || sourceActionBusy;
+  $('saved-selection-cancel').disabled = sourceActionBusy;
+}
+
+$('saved-select-btn').addEventListener('click', () => {
+  savedSelecting = true;
+  $('saved-selection-status').hidden = true;
+  renderSavedFiles();
+});
+$('saved-selection-cancel').addEventListener('click', () => {
+  savedSelecting = false;
+  selectedSavedFiles.clear();
+  renderSavedFiles();
+});
+$('saved-select-all').addEventListener('click', () => {
+  if (selectedSavedFiles.size === state.rawFiles.length) selectedSavedFiles.clear();
+  else state.rawFiles.forEach(file => selectedSavedFiles.add(file.name));
+  renderSavedFiles();
+});
+$('saved-delete-selected').addEventListener('click', () => {
+  if (!selectedSavedFiles.size) return;
+  sourceAction = { action: 'delete-selected', files: [...selectedSavedFiles] };
+  $('source-action-title').textContent = 'Delete selected sources';
+  $('source-action-description').textContent = `Delete ${selectedSavedFiles.size} selected source${selectedSavedFiles.size === 1 ? '' : 's'}? Links to these sources will stop working.`;
+  $('source-action-name-field').hidden = true;
+  $('source-action-error').hidden = true;
+  $('source-action-submit').textContent = 'Delete sources';
+  $('source-action-dialog').showModal();
+  $('source-action-cancel').focus();
+});
 
 function openSourceActionDialog(file, action) {
   sourceAction = { file, action };
@@ -935,6 +974,24 @@ $('source-action-form').addEventListener('submit', async event => {
   $('source-action-cancel').disabled = true;
   errorElement.hidden = true;
   try {
+    if (action === 'delete-selected') {
+      const failures = [];
+      for (const name of sourceAction.files) {
+        try {
+          await readJsonResponse(await workspaceFetch(`/api/raw/${encodeURIComponent(name)}`, { method: 'DELETE' }), 'Delete source');
+          selectedSavedFiles.delete(name);
+        } catch (error) { failures.push(`${name}: ${error.message}`); }
+      }
+      $('source-action-dialog').close();
+      const status = $('saved-selection-status');
+      status.textContent = failures.length ? `Could not delete: ${failures.join('; ')}` : 'Selected sources deleted.';
+      status.hidden = false;
+      if (!failures.length) savedSelecting = false;
+      try { await loadFiles(); } catch (error) {
+        status.textContent += ` Could not refresh sources: ${error.message}`;
+      }
+      return;
+    }
     const url = `/api/raw/${encodeURIComponent(file.name)}`;
     const options = action === 'delete' ? { method: 'DELETE' } : {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ displayName })
@@ -949,6 +1006,7 @@ $('source-action-form').addEventListener('submit', async event => {
     sourceActionBusy = false;
     $('source-action-submit').disabled = false;
     $('source-action-cancel').disabled = false;
+    renderSavedSelection();
   }
 });
 
@@ -1010,20 +1068,42 @@ async function loadFiles() {
   renderSourceSidebar();
   dom.filesCount.textContent = files.length;
 
-  dom.filesGrid.innerHTML = files.map((f, index) => `
+  const available = new Set(files.map(file => file.name));
+  for (const name of selectedSavedFiles) if (!available.has(name)) selectedSavedFiles.delete(name);
+  renderSavedFiles();
+}
+
+function renderSavedFiles() {
+  renderSavedSelection();
+  $('saved-select-all').textContent = state.rawFiles.length && selectedSavedFiles.size === state.rawFiles.length ? 'Clear all' : 'Select all';
+  dom.filesGrid.innerHTML = state.rawFiles.map((f, index) => savedSelecting ? `
+    <label class="file-card file-card-select">
+      <input type="checkbox" data-saved-index="${index}" ${selectedSavedFiles.has(f.name) ? 'checked' : ''} aria-label="Select ${escHtml(f.displayName || f.name)}">
+      <span class="file-card-name">${escHtml(f.displayName || f.name)}</span>
+      <span class="file-card-meta">${fmtSize(f.size)}</span>
+    </label>` : `
     <button class="file-card" type="button" data-file-index="${index}" aria-label="Open ${escHtml(f.name)}">
       <div class="file-card-topline">
         <div class="file-card-icon">${fileIcon(f.ext)}</div>
         <span class="file-card-ext">${escHtml(f.ext || 'file')}</span>
       </div>
       <div class="file-card-name">${escHtml(f.displayName || f.name)}</div>
-      <div class="file-card-meta">${fmtSize(f.size)} · View document</div>
+      <div class="file-card-meta">${fmtSize(f.size)} ? View document</div>
     </button>`).join('');
-
   dom.filesGrid.querySelectorAll('[data-file-index]').forEach(card => {
     card.addEventListener('click', () => {
       const file = state.rawFiles[Number(card.dataset.fileIndex)];
       if (file) openRawFile(file.name, file.ext, file);
+    });
+  });
+  dom.filesGrid.querySelectorAll('[data-saved-index]').forEach(checkbox => {
+    checkbox.addEventListener('change', () => {
+      const file = state.rawFiles[Number(checkbox.dataset.savedIndex)];
+      if (!file) return;
+      if (checkbox.checked) selectedSavedFiles.add(file.name);
+      else selectedSavedFiles.delete(file.name);
+      renderSavedSelection();
+      $('saved-select-all').textContent = selectedSavedFiles.size === state.rawFiles.length ? 'Clear all' : 'Select all';
     });
   });
 }
