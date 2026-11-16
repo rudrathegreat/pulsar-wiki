@@ -861,6 +861,7 @@ body {
 
 .md-body code {
   font-family: var(--mono);
+  font-weight: normal;
   font-size: 12.5px;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -1214,6 +1215,7 @@ body {
 
 .chat-msg.ai .chat-bubble code {
   font-family: var(--mono);
+  font-weight: normal;
   font-size: 12.5px;
   background: var(--surface-2);
   border: 1px solid var(--border);
