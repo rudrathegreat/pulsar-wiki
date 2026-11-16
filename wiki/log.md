@@ -316,3 +316,6 @@ All major updates to the wiki are recorded here.
 | 2026-11-15 | Reading / application | Matched the selected highlight colour indicator to the blue used for AI-assisted passages; updated the wiki index. |
 
 | 2026-11-15 | Reading / application | Disabled manual colour choices for AI-assisted highlights; updated the wiki index. |
+
+
+| 2026-11-16 | Application | Added the supplied favicon to the browser tab; updated the wiki index. |
