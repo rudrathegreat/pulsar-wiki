@@ -331,3 +331,5 @@ All major updates to the wiki are recorded here.
 | 2026-11-16 | Reading / application | Reduced the spacing between the question and answer boxes; updated the wiki index. |
 
 | 2026-11-16 | Reading / application | Added the chat-style animated dots while Ask AI generates a response; updated the wiki index. |
+
+| 2026-11-16 | Sources / application | Added in-app dialogs for renaming and deleting sources; updated the wiki index. |

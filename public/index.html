@@ -586,6 +586,22 @@
   </div><!-- /main -->
 </div><!-- /app -->
 
+<dialog id="source-action-dialog" class="source-action-dialog" aria-labelledby="source-action-title" aria-describedby="source-action-description">
+  <form id="source-action-form">
+    <h3 id="source-action-title"></h3>
+    <p id="source-action-description"></p>
+    <div id="source-action-name-field">
+      <label for="source-action-name">Display name</label>
+      <input id="source-action-name" type="text" autocomplete="off" />
+    </div>
+    <p id="source-action-error" role="alert" hidden></p>
+    <div class="modal-actions">
+      <button class="btn" id="source-action-cancel" type="button">Cancel</button>
+      <button class="btn btn-primary" id="source-action-submit" type="submit"></button>
+    </div>
+  </form>
+</dialog>
+
 <!-- Upload modal (hidden) -->
 <div class="modal-overlay" id="upload-modal" style="display:none">
   <div class="modal">

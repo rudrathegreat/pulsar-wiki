@@ -896,6 +896,62 @@ function renderSourceSidebar() {
   }).join('');
 }
 
+let sourceAction = null;
+let sourceActionBusy = false;
+
+function openSourceActionDialog(file, action) {
+  sourceAction = { file, action };
+  const deleting = action === 'delete';
+  $('source-action-title').textContent = deleting ? 'Delete source' : 'Rename source';
+  $('source-action-description').textContent = deleting
+    ? `Delete ${file.displayName || file.name}? Links to this source will stop working.`
+    : 'Change the display name shown in PulsarWiki. The source filename stays the same.';
+  $('source-action-name-field').hidden = deleting;
+  $('source-action-name').value = file.displayName || file.name;
+  $('source-action-error').hidden = true;
+  $('source-action-error').textContent = '';
+  $('source-action-submit').textContent = deleting ? 'Delete source' : 'Save name';
+  $('source-action-dialog').showModal();
+  if (deleting) $('source-action-cancel').focus();
+  else { $('source-action-name').focus(); $('source-action-name').select(); }
+}
+
+$('source-action-cancel').addEventListener('click', () => $('source-action-dialog').close());
+$('source-action-dialog').addEventListener('cancel', event => { if (sourceActionBusy) event.preventDefault(); });
+$('source-action-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!sourceAction || sourceActionBusy) return;
+  const { file, action } = sourceAction;
+  const displayName = $('source-action-name').value.trim();
+  const errorElement = $('source-action-error');
+  if (action === 'rename' && !displayName) {
+    errorElement.textContent = 'Enter a display name.';
+    errorElement.hidden = false;
+    $('source-action-name').focus();
+    return;
+  }
+  sourceActionBusy = true;
+  $('source-action-submit').disabled = true;
+  $('source-action-cancel').disabled = true;
+  errorElement.hidden = true;
+  try {
+    const url = `/api/raw/${encodeURIComponent(file.name)}`;
+    const options = action === 'delete' ? { method: 'DELETE' } : {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ displayName })
+    };
+    await readJsonResponse(await workspaceFetch(action === 'delete' ? url : `${url}/display-name`, options), action === 'delete' ? 'Delete source' : 'Rename source');
+    $('source-action-dialog').close();
+    await loadFiles();
+  } catch (error) {
+    errorElement.textContent = error.message;
+    errorElement.hidden = false;
+  } finally {
+    sourceActionBusy = false;
+    $('source-action-submit').disabled = false;
+    $('source-action-cancel').disabled = false;
+  }
+});
+
 $('source-sidebar-list').addEventListener('click', async event => {
   const menu = event.target.closest('[data-source-menu]');
   if (menu) {
@@ -913,28 +969,12 @@ $('source-sidebar-list').addEventListener('click', async event => {
     }
     return;
   }
-  const remove = event.target.closest('[data-delete-source]');
-  if (remove) {
+  const action = event.target.closest('[data-delete-source], [data-rename-source]');
+  if (action) {
+    const deleting = action.hasAttribute('data-delete-source');
+    const file = state.rawFiles.find(source => source.name === (deleting ? action.dataset.deleteSource : action.dataset.renameSource));
     closeThreadMenus();
-    const file = state.rawFiles.find(source => source.name === remove.dataset.deleteSource);
-    if (!file || !confirm(`Delete ${file.displayName || file.name}? Links to this source will stop working.`)) return;
-    try {
-      await readJsonResponse(await workspaceFetch(`/api/raw/${encodeURIComponent(file.name)}`, { method: 'DELETE' }), 'Delete source');
-      await loadFiles();
-    } catch (error) { alert(error.message); }
-    return;
-  }
-  const rename = event.target.closest('[data-rename-source]');
-  if (rename) {
-    const file = state.rawFiles.find(source => source.name === rename.dataset.renameSource);
-    if (!file) return;
-    const displayName = prompt('Display name for this source:', file.displayName || file.name);
-    closeThreadMenus();
-    if (displayName === null) return;
-    try {
-      await readJsonResponse(await workspaceFetch(`/api/raw/${encodeURIComponent(file.name)}/display-name`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ displayName }) }), 'Rename source');
-      await loadFiles();
-    } catch (error) { alert(error.message); }
+    if (file) openSourceActionDialog(file, deleting ? 'delete' : 'rename');
     return;
   }
   const item = event.target.closest('[data-source-file]');
