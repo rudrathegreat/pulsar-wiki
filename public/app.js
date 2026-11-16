@@ -69,7 +69,15 @@ function postProcessHtml(html, expressions = []) {
 
 function renderMd(content) {
   const protectedContent = protectLatex(preprocessMd(content));
-  return postProcessHtml(marked.parse(protectedContent.text), protectedContent.expressions);
+  const template = document.createElement('template');
+  template.innerHTML = postProcessHtml(marked.parse(protectedContent.text), protectedContent.expressions);
+  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (node.parentElement?.closest('code, pre, script, style')) continue;
+    for (const file of state.rawFiles || []) if (file.displayName && file.displayName !== file.name) node.nodeValue = node.nodeValue.split(file.name).join(file.displayName);
+  }
+  return template.innerHTML;
 }
 
 // Older log entries mix blank-separated table rows with dated list entries.
@@ -883,15 +891,37 @@ function renderSourceSidebar() {
     : state.rawFiles.length ? '' : 'No saved sources yet. Add a source to start reading.');
   $('source-sidebar-list').innerHTML = state.rawFiles.map(file => {
     const active = state.currentDocument?.name === file.name;
-    return `<button class="nav-item${active ? ' active' : ''}" type="button" data-source-file="${escHtml(file.name)}" title="${escHtml(file.name)}" aria-label="Open ${escHtml(file.name)}"${active ? ' aria-current="true"' : ''}>
-      ${fileIcon(file.ext)}<span class="source-sidebar-name">${escHtml(file.name)}</span>
-    </button>`;
+    const label = file.displayName || file.name;
+    return `<div class="source-sidebar-row"><button class="nav-item${active ? ' active' : ''}" type="button" data-source-file="${escHtml(file.name)}" title="${escHtml(label)}">${fileIcon(file.ext)}<span class="source-sidebar-name">${escHtml(label)}</span></button><details class="source-options"><summary aria-label="More options for ${escHtml(label)}" title="More options">?</summary><div class="source-options-menu"><button type="button" data-rename-source="${escHtml(file.name)}">Rename</button><button type="button" data-delete-source="${escHtml(file.name)}">Delete</button></div></details></div>`;
   }).join('');
 }
 
-$('source-sidebar-list').addEventListener('click', event => {
+$('source-sidebar-list').addEventListener('click', async event => {
+  const remove = event.target.closest('[data-delete-source]');
+  if (remove) {
+    const file = state.rawFiles.find(source => source.name === remove.dataset.deleteSource);
+    if (!file || !confirm(`Delete ${file.displayName || file.name}? Links to this source will stop working.`)) return;
+    try {
+      await readJsonResponse(await workspaceFetch(`/api/raw/${encodeURIComponent(file.name)}`, { method: 'DELETE' }), 'Delete source');
+      await loadFiles();
+    } catch (error) { alert(error.message); }
+    return;
+  }
+  const rename = event.target.closest('[data-rename-source]');
+  if (rename) {
+    const file = state.rawFiles.find(source => source.name === rename.dataset.renameSource);
+    if (!file) return;
+    const displayName = prompt('Display name for this source:', file.displayName || file.name);
+    rename.closest('details').open = false;
+    if (displayName === null) return;
+    try {
+      await readJsonResponse(await workspaceFetch(`/api/raw/${encodeURIComponent(file.name)}/display-name`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ displayName }) }), 'Rename source');
+      await loadFiles();
+    } catch (error) { alert(error.message); }
+    return;
+  }
   const item = event.target.closest('[data-source-file]');
-  if (!item || !$('source-sidebar-list').contains(item)) return;
+  if (!item) return;
   const file = state.rawFiles.find(source => source.name === item.dataset.sourceFile);
   if (file) void openRawFile(file.name, file.ext, file);
 });
@@ -929,7 +959,7 @@ async function loadFiles() {
         <div class="file-card-icon">${fileIcon(f.ext)}</div>
         <span class="file-card-ext">${escHtml(f.ext || 'file')}</span>
       </div>
-      <div class="file-card-name">${escHtml(f.name)}</div>
+      <div class="file-card-name">${escHtml(f.displayName || f.name)}</div>
       <div class="file-card-meta">${fmtSize(f.size)} · View document</div>
     </button>`).join('');
 
@@ -1088,7 +1118,7 @@ async function loadHandoverWorkspace(force = false) {
 
     state.handover.materials = {
       wiki: selectablePages.map(page => ({ name: page.name, label: page.name })),
-      raw: files.map(file => ({ name: file.name, label: file.name })),
+      raw: files.map(file => ({ name: file.name, label: file.displayName || file.name })),
       notebook: notebooks.map(book => ({ name: book.id, label: book.path })),
     };
     for (const [type, short] of Object.entries(HANDOVER_SELECTORS)) {

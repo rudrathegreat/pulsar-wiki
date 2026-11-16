@@ -475,11 +475,40 @@ app.delete('/api/wiki/:page', (req, res) => {
 });
 
 // --- Raw file API ---
+// Display names are workspace metadata; raw source filenames remain unchanged.
+function sourceDisplayNames() {
+  try { return JSON.parse(fs.readFileSync(path.join(currentWorkspace().dataDir, 'source-display-names.json'), 'utf8')); }
+  catch (error) { if (error.code === 'ENOENT') return {}; throw error; }
+}
+app.delete('/api/raw/:file', requireLocalMutation, (req, res) => {
+  const name = safeBase(req.params.file);
+  const filePath = path.join(currentWorkspace().rawDir, name);
+  if (name !== req.params.file || !fs.existsSync(filePath)) return res.status(404).json({ error: 'Source not found' });
+  fs.unlinkSync(filePath);
+  const names = sourceDisplayNames();
+  delete names[name];
+  fs.mkdirSync(currentWorkspace().dataDir, { recursive: true });
+  fs.writeFileSync(path.join(currentWorkspace().dataDir, 'source-display-names.json'), JSON.stringify(names, null, 2));
+  res.json({ ok: true });
+});
+app.put('/api/raw/:file/display-name', requireLocalMutation, (req, res) => {
+  const name = safeBase(req.params.file);
+  if (name !== req.params.file || !fs.existsSync(path.join(currentWorkspace().rawDir, name))) return res.status(404).json({ error: 'Source not found' });
+  const displayName = typeof req.body?.displayName === 'string' ? req.body.displayName.trim() : '';
+  if (!displayName || displayName.length > 255) return res.status(400).json({ error: 'Enter a display name of up to 255 characters.' });
+  const names = sourceDisplayNames();
+  names[name] = displayName;
+  fs.mkdirSync(currentWorkspace().dataDir, { recursive: true });
+  fs.writeFileSync(path.join(currentWorkspace().dataDir, 'source-display-names.json'), JSON.stringify(names, null, 2));
+  res.json({ ok: true });
+});
+
 app.get('/api/raw', (_req, res) => {
   const files = fs.readdirSync(currentWorkspace().rawDir);
+  const names = sourceDisplayNames();
   res.json(files.map(file => {
     const stat = fs.statSync(path.join(currentWorkspace().rawDir, file));
-    return { name: file, size: stat.size, modified: stat.mtime, ext: path.extname(file).slice(1).toLowerCase() };
+    return { name: file, displayName: names[file] || file, size: stat.size, modified: stat.mtime, ext: path.extname(file).slice(1).toLowerCase() };
   }));
 });
 
