@@ -321,3 +321,5 @@ All major updates to the wiki are recorded here.
 | 2026-11-16 | Application | Added the supplied favicon to the browser tab; updated the wiki index. |
 
 | 2026-11-16 | Reading / application | Removed selected-input counts and the inspection panel from the Ask AI question form; updated the wiki index. |
+
+| 2026-11-16 | Reading / application | Replaced text-labelled highlight colour controls with individual colour swatches; updated the wiki index. |
