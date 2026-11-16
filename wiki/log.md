@@ -346,3 +346,5 @@ All major updates to the wiki are recorded here.
 | 2026-11-16 | Sources / application | Matched selection card background and text weight to normal cards; updated the wiki index. |
 
 | 2026-11-16 | Sources / application | Enlarged the saved source selection checkboxes; updated the wiki index. |
+
+| 2026-11-16 | Chat / application | Added automatic titles based on the first completed conversation exchange; updated the wiki index. |

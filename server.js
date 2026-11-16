@@ -781,6 +781,7 @@ wss.on('connection', (ws, request) => {
         onTool: event => {
           if (activeTurn?.id === id) send({ type: 'tool-status', threadId: message.threadId, ...event });
         },
+        onTitle: thread => send({ type: 'thread-updated', threadId: message.threadId, thread }),
       });
       if (activeTurn?.id === id) send({ type: 'thread-updated', threadId: message.threadId, thread: { id: thread.id, title: thread.title, updatedAt: thread.updatedAt } });
       if (activeTurn?.id === id) send({ type: 'done', code: 0, threadId: message.threadId });

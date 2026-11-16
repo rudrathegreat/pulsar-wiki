@@ -2534,8 +2534,7 @@ async function selectThread(id, { refresh = true } = {}) {
 
 async function createThread() {
   if (state.aiRunning) return;
-  const title = stripEmoji(window.prompt('Name this chat (optional):') || 'New chat');
-  const thread = await api.createThread(title);
+  const thread = await api.createThread('New chat');
   state.activeThreadId = thread.id;
   await refreshThreads();
   await selectThread(thread.id, { refresh: false });

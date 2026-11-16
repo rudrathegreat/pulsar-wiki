@@ -36,6 +36,36 @@ function assistantMessage(content, extra = {}) {
   };
 }
 
+test('new chats generate a title in the background without overwriting manual renames', async t => {
+  const store = temporaryStore(t);
+  let finishTitle;
+  const service = new AgentService({
+    threadStore: store,
+    authService: { async inferenceConfig() { return { accessToken: 'token', model: 'model' }; } },
+    wikiTools: { definitions: () => [] },
+    providerFactory: () => ({ runTurn(input) {
+      if (input.tools.length) throw new Error('Unexpected tools');
+      if (input.instructions.startsWith('Generate a short')) return new Promise(resolve => { finishTitle = resolve; });
+      return Promise.resolve({ text: 'Timing noise is irregular rotation.' });
+    } }),
+  });
+  const thread = service.createThread();
+  let notified;
+  const notification = new Promise(resolve => { notified = resolve; });
+  const saved = await service.runTurn({ threadId: thread.id, text: 'Explain timing noise', onTitle: notified });
+  assert.equal(saved.title, 'Explain timing noise');
+  finishTitle({ text: '"Pulsar Timing Noise"' });
+  assert.equal((await notification).title, 'Pulsar Timing Noise');
+  assert.equal(store.get(thread.id).title, 'Pulsar Timing Noise');
+
+  const second = service.createThread();
+  await service.runTurn({ threadId: second.id, text: 'Another question' });
+  service.renameThread(second.id, 'My title');
+  finishTitle({ text: 'Generated title' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(store.get(second.id).title, 'My title');
+});
+
 test('threads persist complete provider context and remain isolated', t => {
   const store = temporaryStore(t);
   const first = store.create({ title: 'First', instructionVersion: 'one', instructionSnapshot: 'instructions one' });
