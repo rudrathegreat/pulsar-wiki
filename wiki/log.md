@@ -333,3 +333,7 @@ All major updates to the wiki are recorded here.
 | 2026-11-16 | Reading / application | Added the chat-style animated dots while Ask AI generates a response; updated the wiki index. |
 
 | 2026-11-16 | Sources / application | Added in-app dialogs for renaming and deleting sources; updated the wiki index. |
+
+| 2026-11-16 | Sources / application | Updated source dialog and backdrop colours for light and dark themes; updated the wiki index. |
+
+| 2026-11-16 | Sources / application | Adjusted source dialog backdrop opacity, dark colours and input focus styling; updated the wiki index. |
