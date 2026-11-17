@@ -15,7 +15,7 @@ The researcher selected Add to wiki and authorised saving this note without a Ma
 4. Cite every selected passage using its exact supplied [H:id] reference and (source: filename) citation. Include each selected passage in the note. Never invent quotes, references, page numbers, facts or wiki links.
 5. Separate findings from interpretation using natural wording such as Interpretation or Open question. Mark unsupported interpretations Needs verification. External abstracts are unverified candidates; explanations are not independent evidence. Do not add declarations about AI use, model names, hashes, operation IDs or technical provenance.
 6. Append a short, topic-focused section to the reading summary, using short paragraphs or a few bullets. Explain the useful takeaway directly; avoid repetitive boilerplate, duplicated excerpts and restating the page. Write plain Markdown in clear language. Use only ### or deeper headings within the note. Do not include raw HTML or executable links. Existing page content and citations must remain intact.`;
-const pageName = value => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && !['index', 'log'].includes(value);
+const pageName = value => /^[a-z0-9]+(?:[-+][a-z0-9]+)*$/.test(value) && !['index', 'log'].includes(value);
 const quoteText = value => String(value).normalize('NFKC').replace(/\s+/g, ' ').trim();
 const passageUrl = (documentId, highlightId, page, revision) => `/#reading/${documentId}/${highlightId || ''}${revision ? `?revision=${revision}` : page ? `?page=${page}` : ''}`;
 const plain = value => String(value).replace(/[\r\n]+/g, ' ').replace(/[<>]/g, '');
@@ -560,7 +560,7 @@ class ReadingService {
     if (input.reviewed !== true) throw new ReadingError('Review the draft and selected private inputs before publishing.', 'review-required');
     for (const document of artifact.snapshot.documents) this.documentFile(document);
     const name = artifact.type === 'concept' ? artifact.targetPage : input.pageName;
-    if (!pageName(name)) throw new ReadingError('Use a lowercase, hyphenated page name other than index or log.');
+    if (!pageName(name)) throw new ReadingError('Use a lowercase page name with letters, numbers, hyphens, or plus signs, other than index or log.');
     const existing = this.wikiTools.readWikiPage({ name, maxChars: 1000000 });
     if (artifact.type === 'concept' ? !existing.exists || existing.hasMore || hash(existing.content) !== artifact.targetHash : existing.exists) throw new ReadingError('The target page changed or already exists. Create a fresh draft and review its diff.', 'wiki-conflict', 409);
     if (this.isOutdated(artifact.snapshot, artifact) && input.acceptOutdated !== true) throw new ReadingError('The selected reading inputs changed. Review the preserved inputs and acknowledge them before publishing.', 'outdated-draft', 409);

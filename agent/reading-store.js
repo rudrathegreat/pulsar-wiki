@@ -63,7 +63,7 @@ function validateSnapshot(snapshot) {
   }
   if (snapshot.highlights.some(h => !snapshot.documents.some(d => d.id === h.documentId))) throw new ReadingError('Missing preserved document.');
   for (const a of snapshot.annotations) { if (!a || !/^[a-zA-Z0-9-]{1,150}$/.test(a.id) || !snapshot.highlights.some(h => h.id === a.highlightId)) throw new ReadingError('Invalid preserved comment.'); text(a.text); }
-  for (const w of snapshot.wikiPages) { if (!w || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(w.name)) throw new ReadingError('Invalid preserved wiki page.'); text(w.content, 1000000); }
+  for (const w of snapshot.wikiPages) { if (!w || !/^[a-z0-9]+(?:[-+][a-z0-9]+)*$/.test(w.name)) throw new ReadingError('Invalid preserved wiki page.'); text(w.content, 1000000); }
   for (const d of snapshot.discoveries) validateDiscovery(d);
   for (const response of snapshot.responses) { if (!response || !/^[a-zA-Z0-9-]{1,150}$/.test(response.id)) throw new ReadingError('Invalid included AI response.'); text(response.response, 500000); }
 }
@@ -129,11 +129,11 @@ class ReadingStore {
       if (ids(c.highlightIds).some(id => !highlights.has(id)) || !c.groups || typeof c.groups !== 'object' || Array.isArray(c.groups)) throw new ReadingError('Invalid collection members or groups.');
       for (const [id, value] of Object.entries(c.groups)) { if (!c.highlightIds.includes(id)) throw new ReadingError('Invalid collection group.'); text(value, 120); }
     }
-    for (const r of data.relationships) if (!highlights.has(r.from) || !['highlight', 'wiki'].includes(r.targetType) || (r.targetType === 'highlight' ? !highlights.has(r.target) : !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(r.target))) throw new ReadingError('Invalid relationship.');
+    for (const r of data.relationships) if (!highlights.has(r.from) || !['highlight', 'wiki'].includes(r.targetType) || (r.targetType === 'highlight' ? !highlights.has(r.target) : !/^[a-z0-9]+(?:[-+][a-z0-9]+)*$/.test(r.target))) throw new ReadingError('Invalid relationship.');
     for (const a of data.artifacts) {
       if (!ARTIFACT_TYPES.has(a.type) || typeof a.content !== 'string' || !Array.isArray(a.revisions) || !Array.isArray(a.publications)) throw new ReadingError('Invalid artifact.');
       text(a.title, 200); text(a.content, 500000); validateSnapshot(a.snapshot);
-      for (const publication of a.publications) { if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(publication.page)) throw new ReadingError('Invalid publication history.'); validateSnapshot(publication.snapshot); }
+      for (const publication of a.publications) { if (!/^[a-z0-9]+(?:[-+][a-z0-9]+)*$/.test(publication.page)) throw new ReadingError('Invalid publication history.'); validateSnapshot(publication.snapshot); }
     }
     for (const t of data.tasks) { if (!['queued', 'running', 'completed', 'failed', 'cancelled', 'interrupted'].includes(t.status)) throw new ReadingError('Invalid assistance record.'); validateSnapshot(t.snapshot); }
     for (const d of data.discoveries) validateDiscovery(d);

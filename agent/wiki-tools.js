@@ -85,7 +85,7 @@ function safeName(value) {
 }
 
 function validPageName(value) {
-  return value === 'index' || /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
+  return value === 'index' || /^[a-z0-9]+(?:[-+][a-z0-9]+)*$/.test(value);
 }
 
 function firstDefined(object, keys) {
@@ -132,7 +132,7 @@ class WikiTools {
   }
 
   wikiPath(name) {
-    if (!validPageName(name)) throw new WikiToolError('Wiki page names must use lowercase letters, numbers, and hyphens.', 'invalid-page-name');
+    if (!validPageName(name)) throw new WikiToolError('Wiki page names must use lowercase letters, numbers, hyphens, and plus signs.', 'invalid-page-name');
     return path.join(this.wikiDir, `${name}.md`);
   }
 

@@ -416,6 +416,7 @@ test('reading routes require session and origin guards for private reads and mut
   assert.equal((await fetch(url + '/documents', { method: 'POST', headers: { 'x-session': 'yes', 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'paper.txt' }) })).status, 403);
   const allowed = await fetch(url + '/documents', { method: 'POST', headers: { 'x-session': 'yes', Origin: 'http://local.test', 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'paper.txt' }) });
   assert.equal(allowed.status, 200); assert.match(allowed.headers.get('cache-control'), /no-store/);
+  fs.writeFileSync(path.join(f.wikiDir, 'psr-j0740+6620.md'), '# Pulsar timing residuals\n\nPulsar timing residuals reveal noise.');
   const h = await highlight(f);
   assert.equal((await fetch(url + '/tasks', { method: 'POST', headers: { 'x-session': 'yes', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'wiki-note', targetPage: 'paper', createMissingPage: true, highlightIds: [h.id] }) })).status, 403);
   f.service.providerFactory = () => ({ async runTurn() { return { text: `### Timing noise\nNoise [H:${h.id}] (source: paper.txt).` }; } });
@@ -428,7 +429,12 @@ test('reading routes require session and origin guards for private reads and mut
   assert.equal((await fullText.json()).pages[0].text, fs.readFileSync(path.join(f.rawDir, 'paper.txt'), 'utf8'));
   assert.equal((await fetch(url + '/connections', { method: 'POST', headers: { 'x-session': 'yes', 'Content-Type': 'application/json' }, body: JSON.stringify({ highlightId: h.id }) })).status, 403);
   const connected = await fetch(url + '/connections', { method: 'POST', headers: { 'x-session': 'yes', Origin: 'http://local.test', 'Content-Type': 'application/json' }, body: JSON.stringify({ highlightId: h.id, revision: h.revision }) });
-  assert.equal(connected.status, 200); assert.equal((await connected.json()).highlightId, h.id);
+  assert.equal(connected.status, 200);
+  const result = await connected.json();
+  assert.equal(result.highlightId, h.id);
+  assert.ok(result.wiki.some(page => page.name === 'psr-j0740+6620' && page.url === '/wiki/psr-j0740%2B6620'));
+  const relation = f.service.saveRelationship({ from: h.id, targetType: 'wiki', target: 'psr-j0740+6620', relation: 'related' });
+  assert.equal(f.store.read().relationships.find(item => item.id === relation.id).target, 'psr-j0740+6620');
 });
 
 test('provider forwards selected visual content while preserving plain text conversations', async () => {
