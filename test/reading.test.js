@@ -367,6 +367,38 @@ test('related knowledge finds distinctive concepts throughout long highlights in
   assert.ok(result.wiki.some(page => page.name === 'binary' && /orthometric parameterization/.test(page.text)));
 });
 
+test('named scientific concepts rank above incidental timing vocabulary', async t => {
+  const f = fixture(t, { discovery: { async search() { throw new Error('Expected a wiki match'); } } });
+  const passage = 'The Shapiro delay changes pulsar pulse arrival times in a binary system when signals pass near the companion. Timing measurements constrain the companion mass and orbital inclination.';
+  fs.writeFileSync(path.join(f.rawDir, 'paper.txt'), passage);
+  fs.writeFileSync(path.join(f.wikiDir, 'shapiro-delay.md'), '# Shapiro Delay\n\nRelativistic propagation through curved spacetime.');
+  fs.writeFileSync(path.join(f.wikiDir, 'dispersion-measure.md'), '# Dispersion Measure\n\nThe pulsar pulse arrival times depend on radio frequency.');
+  fs.writeFileSync(path.join(f.wikiDir, 'binary.md'), '# Binary pulsar\n\nThe companion mass and orbital inclination constrain timing measurements.');
+  const h = await highlight(f, 'paper.txt', passage);
+  const result = await f.service.relatedKnowledge(h.id);
+  assert.equal(result.wiki[0].name, 'shapiro-delay');
+  assert.ok(result.wiki.every(page => page.name !== 'dispersion-measure' || page.score < result.wiki[0].score));
+});
+
+test('semantic comparison finds paraphrased concepts and validates model results', async t => {
+  let answer = JSON.stringify([{ name: 'relativity', passageIndex: 1 }]);
+  let prompt;
+  const f = fixture(t, { providerFactory: () => ({ async runTurn(input) { prompt = input.messages[0].text; return { text: answer }; } }) });
+  const passage = 'Light takes longer to reach us when passing close to a massive companion.';
+  fs.writeFileSync(path.join(f.rawDir, 'paper.txt'), passage);
+  fs.writeFileSync(path.join(f.wikiDir, 'relativity.md'), '# Relativity\n\nGravitational time delay occurs as signals traverse curved spacetime.');
+  const h = await highlight(f, 'paper.txt', passage);
+  f.service.saveAnnotation({ highlightId: h.id, text: 'private comment' });
+  const result = await f.service.relatedKnowledge(h.id, h.revision, { semantic: true });
+  assert.equal(result.wiki[0].name, 'relativity');
+  assert.equal(result.wiki[0].semantic, true);
+  assert.doesNotMatch(prompt, /private comment/);
+  answer = JSON.stringify([{ name: '../invented', passageIndex: 1 }]);
+  const fallback = await f.service.relatedKnowledge(h.id, h.revision, { semantic: true });
+  assert.ok(fallback.warnings.some(w => /Semantic comparison was unavailable/.test(w)));
+  assert.ok(fallback.wiki.every(page => page.name !== '../invented'));
+});
+
 test('related knowledge falls back to relevant papers and excludes generic matches and private comments', async t => {
   const queries = [];
   const f = fixture(t, { discovery: { async search(query) {
