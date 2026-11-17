@@ -382,8 +382,8 @@ test('named scientific concepts rank above incidental timing vocabulary', async 
 
 test('semantic comparison finds paraphrased concepts and validates model results', async t => {
   let answer = JSON.stringify([{ name: 'relativity', passageIndex: 1 }]);
-  let prompt;
-  const f = fixture(t, { providerFactory: () => ({ async runTurn(input) { prompt = input.messages[0].text; return { text: answer }; } }) });
+  const prompts = [];
+  const f = fixture(t, { providerFactory: () => ({ async runTurn(input) { prompts.push(input.messages[0].text); return { text: input.instructions.startsWith('Summarize') ? JSON.stringify([{ name: 'relativity', summary: 'Gravitational time delay occurs in curved spacetime.' }]) : answer }; } }) });
   const passage = 'Light takes longer to reach us when passing close to a massive companion.';
   fs.writeFileSync(path.join(f.rawDir, 'paper.txt'), passage);
   fs.writeFileSync(path.join(f.wikiDir, 'relativity.md'), '# Relativity\n\nGravitational time delay occurs as signals traverse curved spacetime.');
@@ -392,7 +392,9 @@ test('semantic comparison finds paraphrased concepts and validates model results
   const result = await f.service.relatedKnowledge(h.id, h.revision, { semantic: true });
   assert.equal(result.wiki[0].name, 'relativity');
   assert.equal(result.wiki[0].semantic, true);
-  assert.doesNotMatch(prompt, /private comment/);
+  assert.equal(result.wiki[0].text, 'Gravitational time delay occurs in curved spacetime.');
+  assert.match(prompts[1], /Gravitational time delay occurs as signals traverse curved spacetime/);
+  assert.ok(prompts.every(prompt => !prompt.includes('private comment')));
   answer = JSON.stringify([{ name: '../invented', passageIndex: 1 }]);
   const fallback = await f.service.relatedKnowledge(h.id, h.revision, { semantic: true });
   assert.ok(fallback.warnings.some(w => /Semantic comparison was unavailable/.test(w)));

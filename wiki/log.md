@@ -348,3 +348,9 @@ All major updates to the wiki are recorded here.
 | 2026-11-16 | Sources / application | Enlarged the saved source selection checkboxes; updated the wiki index. |
 
 | 2026-11-16 | Chat / application | Added automatic titles based on the first completed conversation exchange; updated the wiki index. |
+
+| 2026-11-17 | Reading / application | Rendered Markdown in related knowledge previews and matched connection title links to wiki styling; updated the wiki index. |
+
+| 2026-11-17 | Reading / application | Added concise AI summaries to related wiki page previews and removed the ranking label; updated the wiki index. |
+
+| 2026-11-17 | Reading / application | Added spacing between related wiki page titles and summaries; updated the wiki index. |

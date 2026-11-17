@@ -282,15 +282,21 @@ test('add-to-wiki selection defaults the destination using only that passage', a
 test('connect action requests only the highlighted passage and renders wiki references', async () => {
   const c = client(); populate(c);
   let submitted;
+  let typeset = false;
+  c.context.renderMd = value => `<p>${value.replace('**timing**', '<strong>timing</strong>')}</p>`;
+  c.context.typesetMath = () => { typeset = true; };
   c.context.fetch = async (url, options) => {
     submitted = { url, body: JSON.parse(options.body) };
-    return { ok: true, json: async () => ({ wiki: [{ name: 'timing', title: 'Timing', url: '/wiki/timing', text: 'Related timing knowledge.', matchedTerms: ['timing'] }], papers: [], warnings: [] }) };
+    return { ok: true, json: async () => ({ wiki: [{ name: 'timing', title: 'Timing', url: '/wiki/timing', text: 'Related **timing** knowledge.', matchedTerms: ['timing'] }], papers: [], warnings: [] }) };
   };
   await c.connectKnowledge('highlight-one');
   assert.equal(submitted.url, '/api/reading/connections');
   assert.deepEqual(Object.keys(submitted.body).sort(), ['highlightId', 'revision']);
   assert.match(c.nodes.get('reading-connections-results').innerHTML, /href="\/wiki\/timing"/);
   assert.match(c.nodes.get('reading-connections-results').innerHTML, /Connect this page/);
+  assert.match(c.nodes.get('reading-connections-results').innerHTML, /Related <strong>timing<\/strong> knowledge/);
+  assert.doesNotMatch(c.nodes.get('reading-connections-results').innerHTML, /AI-ranked scientific connection|Matching terms:/);
+  assert.equal(typeset, true);
   assert.doesNotMatch(JSON.stringify(submitted), /Do not send unchecked notes/);
 });
 
