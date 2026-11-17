@@ -26,14 +26,20 @@ function connectionTerms(value) {
     .filter(word => word.length > 2 && !CONNECTION_STOP_WORDS.has(word))
     .map(word => word.length > 4 && word.endsWith('s') && !/(ss|is|us)$/.test(word) ? word.slice(0, -1) : word);
 }
-function connectionMatch(terms, body, title = '') {
+function connectionMatch(terms, body, title = '', selectionWords = terms, distinctivePhrases = new Set()) {
   const words = new Set(connectionTerms(`${title} ${body}`));
   const matchedTerms = terms.filter(term => words.has(term));
   const titleTerms = [...new Set(connectionTerms(title))];
   const coverage = matchedTerms.length / terms.length;
   const titleMatches = terms.filter(term => titleTerms.includes(term)).length;
-  const namedConcept = titleTerms.length && (titleTerms.length > 1 || terms.length <= 3) && terms.join(' ').includes(titleTerms.join(' '));
-  return { matchedTerms, relevant: Boolean(namedConcept || matchedTerms.length >= Math.min(2, terms.length) && coverage >= .4), score: coverage * (matchedTerms.length + titleMatches * 2) + (namedConcept ? 3 : 0) };
+  const namedConcept = titleTerms.length > 1 && (` ${selectionWords.join(' ')} `).includes(` ${titleTerms.join(' ')} `);
+  const bodyWords = connectionTerms(body);
+  const phraseMatches = new Set();
+  for (let i = 0; i < bodyWords.length - 1; i += 1) {
+    const phrase = `${bodyWords[i]} ${bodyWords[i + 1]}`;
+    if (distinctivePhrases.has(phrase)) phraseMatches.add(phrase);
+  }
+  return { matchedTerms, relevant: Boolean(namedConcept || phraseMatches.size || matchedTerms.length >= Math.min(2, terms.length) && coverage >= .4), score: coverage * (matchedTerms.length + titleMatches * 2) + (namedConcept ? 3 : 0) + phraseMatches.size * 2 }; 
 }
 
 function sourceCitations(content) {
@@ -637,11 +643,13 @@ class ReadingService {
   async relatedKnowledge(highlightId, revision) {
     const highlight = this.store.get('highlights', highlightId);
     if (revision !== undefined && revision !== highlight.revision) throw new ReadingError('The highlight changed. Refresh and connect its current selection.', 'reading-conflict', 409);
-    const terms = [...new Set(connectionTerms(highlight.text))].slice(0, 32);
+    const selectionWords = connectionTerms(highlight.text);
+    const terms = [...new Set(selectionWords)];
     if (!terms.length) throw new ReadingError('Add a transcription to this visual selection, or select meaningful text before connecting related knowledge.');
     const query = terms.slice(0, 6).join(' ');
     const wiki = [];
     const warnings = [];
+    const pages = [];
     for (const name of this.wikiTools.listWikiPages().filter(name => !['index', 'log', 'active-reading', 'project-handover'].includes(name))) {
       const page = this.wikiTools.readWikiPage({ name, maxChars: 1000000 });
       if (!page.exists) continue;
@@ -652,7 +660,22 @@ class ReadingService {
         const chunks = []; for (let offset = 0; offset < paragraph.length; offset += 650) chunks.push(paragraph.slice(offset, offset + 900));
         return chunks;
       });
-      const best = excerpts.map(excerpt => ({ text: excerpt, ...connectionMatch(terms, excerpt, title) })).filter(match => match.relevant).sort((a, b) => b.score - a.score)[0];
+      pages.push({ name, title, excerpts });
+    }
+    const frequencies = new Map();
+    for (const page of pages) {
+      const words = connectionTerms(page.excerpts.join(' '));
+      const phrases = new Set();
+      for (let i = 0; i < words.length - 1; i += 1) phrases.add(`${words[i]} ${words[i + 1]}`);
+      for (const phrase of phrases) frequencies.set(phrase, (frequencies.get(phrase) || 0) + 1);
+    }
+    const distinctivePhrases = new Set();
+    for (let i = 0; i < selectionWords.length - 1; i += 1) {
+      const phrase = `${selectionWords[i]} ${selectionWords[i + 1]}`;
+      if (selectionWords[i].length > 3 && selectionWords[i + 1].length > 3 && (frequencies.get(phrase) || 0) <= Math.max(1, Math.floor(pages.length * .2))) distinctivePhrases.add(phrase);
+    }
+    for (const { name, title, excerpts } of pages) {
+      const best = excerpts.map(excerpt => ({ text: excerpt, ...connectionMatch(terms, excerpt, title, selectionWords, distinctivePhrases) })).filter(match => match.relevant).sort((a, b) => b.score - a.score)[0];
       if (best) wiki.push({ name, title, url: `/wiki/${encodeURIComponent(name)}`, ...best });
     }
     wiki.sort((a, b) => b.score - a.score);

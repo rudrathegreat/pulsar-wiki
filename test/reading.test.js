@@ -355,6 +355,18 @@ test('related knowledge prefers relevant wiki prose and never calls external dis
   assert.equal(searches, 0); assert.equal(f.calls.length, 0);
 });
 
+test('related knowledge finds distinctive concepts throughout long highlights in titles and prose', async t => {
+  const f = fixture(t, { discovery: { async search() { throw new Error('Expected a wiki match'); } } });
+  const passage = 'observations across different observatories reveal complex orbital dynamics and detailed measurements of rapidly rotating neutron stars including accurate estimates of mass geometry inclination uncertainties calibration pulse arrival times instrumental sensitivity evolution relativistic phenomena constraints experimental approaches over multiple decades of monitoring investigations. Shapiro delay provides independent evidence. The orthometric parameterization enables precision analysis.';
+  fs.writeFileSync(path.join(f.rawDir, 'paper.txt'), passage);
+  fs.writeFileSync(path.join(f.wikiDir, 'shapiro-delay.md'), '# Shapiro Delay\n\nThe Shapiro delay describes propagation through curved spacetime.');
+  fs.writeFileSync(path.join(f.wikiDir, 'binary.md'), '# Binary systems\n\nThe orthometric parameterization describes a timing signal.');
+  const h = await highlight(f, 'paper.txt', passage);
+  const result = await f.service.relatedKnowledge(h.id);
+  assert.ok(result.wiki.some(page => page.name === 'shapiro-delay'));
+  assert.ok(result.wiki.some(page => page.name === 'binary' && /orthometric parameterization/.test(page.text)));
+});
+
 test('related knowledge falls back to relevant papers and excludes generic matches and private comments', async t => {
   const queries = [];
   const f = fixture(t, { discovery: { async search(query) {
