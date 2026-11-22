@@ -155,6 +155,7 @@ test('project loading lasts through initial data and clears on success or failur
       openPage: async () => {
         assert.equal(c.document.body.classList.contains('workspace-loading'), true);
       },
+      notifySettingsUpdate() {},
       $: id => c.document.getElementById(id), stripEmoji: text => text,
     });
     const initialized = vm.runInContext(appSource.slice(appSource.indexOf('(async function init()')), c.context);

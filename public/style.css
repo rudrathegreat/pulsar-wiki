@@ -3462,7 +3462,7 @@ button:disabled {
   .reference-field { grid-template-columns: 70px minmax(0, 1fr); gap: 8px; }
   .reference-entry > summary > .reference-meta { margin-left: 0; }
 }
-#source-notifications { position: fixed; right: 24px; bottom: 24px; z-index: 200; display: grid; gap: 12px; width: min(390px, calc(100vw - 32px)); max-height: calc(100vh - 100px); overflow-y: auto; background: transparent; }
+#app-notifications { position: fixed; right: 24px; bottom: 24px; z-index: 200; display: grid; gap: 12px; width: min(390px, calc(100vw - 32px)); max-height: calc(100vh - 100px); overflow-y: auto; background: transparent; }
 /* Only the card paints a surface; shadows would be clipped square by the scrolling stack. */
 .source-notification { display: flex; align-items: flex-start; overflow: hidden; border: 1px solid #ccc; border-radius: 10px; background: #fff; background-clip: padding-box; color: #111; transition: border-color var(--transition); }
 .source-notification:hover { border-color: #000; }

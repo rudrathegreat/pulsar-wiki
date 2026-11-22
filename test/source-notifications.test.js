@@ -6,7 +6,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
 
-function client(storage = new Map()) {
+function client(storage = new Map(), settings = []) {
   function element() {
     return {
       children: [], handlers: {}, append(...items) { this.children.push(...items); },
@@ -16,21 +16,98 @@ function client(storage = new Map()) {
     };
   }
   const container = element();
+  const heading = { focus() { this.focused = true; } };
   const selected = [], routes = [], panels = [], opened = [];
   const context = {
-    document: { createElement: element }, $: () => container,
+    document: { createElement: element, querySelectorAll: () => settings },
+    $: id => id === 'chatgpt-settings-title' ? heading : container,
     workspaceId: 'workspace-a', state: {}, stripEmoji: String,
     sessionStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) },
+    localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) },
+    panelUrl: panel => `/#${panel}`,
     async selectThread(id) { selected.push(id); },
     showPanel(panel) { panels.push(panel); }, updateAppHistory(route) { routes.push(route); },
     refreshThreads: async () => {},
     async openRawFile(...args) { opened.push(args); },
   };
   vm.createContext(context);
-  vm.runInContext(source.slice(source.indexOf('function notifySourceAdded('), source.indexOf('function monitorSourceJob(')), context);
-  return { context, container, selected, routes, panels, opened, notify: context.notifySourceJob };
+  vm.runInContext(source.slice(source.indexOf('function notifySettingsUpdate('), source.indexOf('function monitorSourceJob(')), context);
+  return { context, container, heading, selected, routes, panels, opened, notify: context.notifySourceJob };
 }
 const job = { id: 'job-1', status: 'completed', threadId: 'review-1', files: [{ name: '<paper>.pdf' }] };
+
+test('settings notice names new settings and only reappears for later additions', () => {
+  const storage = new Map();
+  const token = { dataset: { settingsUpdate: 'nasa-ads-api-token' }, textContent: 'NASA ADS API token' };
+  const c = client(storage, [token]);
+  c.context.notifySettingsUpdate();
+  const [notice] = c.container.children;
+  const [link] = notice.children;
+  assert.equal(link.href, '/#settings');
+  assert.equal(link.children[0].textContent, 'Settings updated');
+  assert.equal(link.children[1].textContent, 'NASA ADS API token');
+  link.handlers.click({ preventDefault() {} });
+  assert.deepEqual(c.panels, ['settings']);
+  assert.equal(c.heading.focused, true);
+  assert.equal(notice.removed, true);
+
+  const reloaded = client(storage, [token]);
+  reloaded.context.notifySettingsUpdate();
+  assert.equal(reloaded.container.children.length, 0);
+
+  const laterSettings = [token, { dataset: { settingsUpdate: 'example' }, textContent: 'New setting' }];
+  const updated = client(storage, laterSettings);
+  updated.context.notifySettingsUpdate();
+  const [nextNotice] = updated.container.children;
+  assert.equal(nextNotice.children[0].children[1].textContent, 'New setting');
+  nextNotice.children[1].handlers.click();
+  assert.equal(nextNotice.removed, true);
+  const dismissed = client(storage, laterSettings);
+  dismissed.context.notifySettingsUpdate();
+  assert.equal(dismissed.container.children.length, 0);
+});
+
+test('saving a changed subscription model shows a dismissible settings notice after confirmation', async () => {
+  const c = client();
+  const { context } = c;
+  const models = [{ id: 'first', name: 'First model' }, { id: 'second', name: 'Second model' }];
+  context.state.chatgpt = { selectedModel: 'first', models };
+  context.state.panel = 'settings';
+  context.dom = { chatgptModel: { value: 'second' }, chatgptModelSave: {}, chatgptError: {} };
+  context.updateAgentUi = () => {};
+  context.renderChatGPTSettings = () => {};
+  let confirmSave;
+  context.api = { saveChatGPTModel: model => new Promise(resolve => {
+    assert.equal(model, 'second');
+    confirmSave = resolve;
+  }) };
+  vm.runInContext(source.slice(source.indexOf('let modelUpdateNotice;'), source.indexOf('async function disconnectChatGPT()')), context);
+
+  const saving = context.saveChatGPTModel();
+  assert.equal(c.container.children.length, 0);
+  confirmSave({ selectedModel: 'second', models });
+  await saving;
+  const [notice] = c.container.children;
+  assert.equal(notice.children[0].children[0].textContent, 'Settings updated');
+  assert.equal(notice.children[0].children[1].textContent, 'Subscription model changed to Second model.');
+
+  context.dom.chatgptModel.value = 'first';
+  context.api.saveChatGPTModel = async model => ({ selectedModel: model, models });
+  await context.saveChatGPTModel();
+  const updatedNotice = c.container.children[1];
+  assert.equal(notice.removed, true);
+  assert.equal(updatedNotice.children[0].children[1].textContent, 'Subscription model changed to First model.');
+  updatedNotice.children[1].handlers.click();
+  assert.equal(updatedNotice.removed, true);
+
+  await context.saveChatGPTModel();
+  assert.equal(c.container.children.length, 2);
+  context.dom.chatgptModel.value = 'second';
+  context.api.saveChatGPTModel = async () => { throw new Error('Save failed'); };
+  await context.saveChatGPTModel();
+  assert.equal(context.dom.chatgptError.textContent, 'Save failed');
+  assert.equal(c.container.children.length, 2);
+});
 
 test('source added notification opens the exact source in the reading workspace', async () => {
   const c = client();

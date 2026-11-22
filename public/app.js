@@ -1802,6 +1802,56 @@ async function importSourcePapers(ids) {
   }
 }
 
+function notifySettingsUpdate() {
+  const settingKey = setting => `pw-settings-update:${setting.dataset.settingsUpdate}`;
+  const updates = Array.from(document.querySelectorAll('#panel-settings [data-settings-update]')).filter(setting => {
+    try { return !localStorage.getItem(settingKey(setting)); } catch { return true; }
+  });
+  if (!updates.length) return;
+
+  showSettingsNotification(updates.map(setting => setting.textContent.trim()).join(', '), () => {
+    try {
+      for (const setting of updates) localStorage.setItem(settingKey(setting), 'read');
+    } catch { /* Dismiss for this visit if storage is unavailable. */ }
+  });
+}
+
+function showSettingsNotification(message, onDismiss) {
+  const card = document.createElement('div');
+  card.className = 'source-notification';
+  const link = document.createElement('a');
+  link.href = panelUrl('settings');
+  const title = document.createElement('strong');
+  title.textContent = 'Settings updated';
+  const detail = document.createElement('span');
+  detail.textContent = message;
+  const action = document.createElement('span');
+  action.className = 'source-notification-action';
+  action.textContent = 'Open Settings \u2192';
+  link.append(title, detail, action);
+
+  const dismiss = () => {
+    card.remove();
+    onDismiss?.();
+  };
+  link.addEventListener('click', event => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    if (state.panel !== 'settings') showPanel('settings');
+    $('chatgpt-settings-title').focus();
+    dismiss();
+  });
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'source-notification-close';
+  close.setAttribute('aria-label', 'Dismiss settings update notification');
+  close.textContent = '\u00d7';
+  close.addEventListener('click', dismiss);
+  card.append(link, close);
+  $('app-notifications').appendChild(card);
+  return card;
+}
+
 function notifySourceAdded(file) {
   if (!file?.name) return;
   const card = document.createElement('div');
@@ -1833,7 +1883,7 @@ function notifySourceAdded(file) {
   close.textContent = '×';
   close.addEventListener('click', () => card.remove());
   card.append(link, close);
-  $('source-notifications').appendChild(card);
+  $('app-notifications').appendChild(card);
 }
 
 function notifyReferenceAdded(reference) {
@@ -1868,7 +1918,7 @@ function notifyReferenceAdded(reference) {
   close.textContent = '\u00d7';
   close.addEventListener('click', () => card.remove());
   card.append(link, close);
-  $('source-notifications').appendChild(card);
+  $('app-notifications').appendChild(card);
 }
 
 async function openReferenceEntry(key) {
@@ -1924,7 +1974,7 @@ function notifySourceJob(job) {
   close.textContent = '×';
   close.addEventListener('click', dismiss);
   card.append(link, close);
-  $('source-notifications').appendChild(card);
+  $('app-notifications').appendChild(card);
   void refreshThreads().catch(() => {});
 }
 
@@ -2675,13 +2725,23 @@ async function refreshChatGPTStatus({ open = false, message = '' } = {}) {
   }
 }
 
+let modelUpdateNotice;
+
 async function saveChatGPTModel() {
+  const previousModel = state.chatgpt?.selectedModel;
+  const requestedModel = dom.chatgptModel.value;
   dom.chatgptModelSave.disabled = true;
   dom.chatgptError.textContent = '';
   try {
-    state.chatgpt = await api.saveChatGPTModel(dom.chatgptModel.value);
+    const status = await api.saveChatGPTModel(requestedModel);
+    state.chatgpt = status;
     updateAgentUi();
     renderChatGPTSettings();
+    if (requestedModel && status.selectedModel === requestedModel && requestedModel !== previousModel) {
+      const model = status.models?.find(model => model.id === requestedModel);
+      modelUpdateNotice?.remove();
+      modelUpdateNotice = showSettingsNotification(`Subscription model changed to ${stripEmoji(model?.name || requestedModel)}.`);
+    }
   } catch (error) {
     dom.chatgptError.textContent = stripEmoji(error.message);
   } finally {
@@ -2957,6 +3017,7 @@ dom.chatAbort.addEventListener('click', () => {
     const pages = await api.getWikiList();
     buildSidebar(pages);
     if (!await handleAppRoute()) await openPage('index', { historyMode: 'replace' });
+    notifySettingsUpdate();
   } catch (error) {
     const status = $('workspace-status');
     status.textContent = `Could not finish opening project: ${stripEmoji(error.message)}`;

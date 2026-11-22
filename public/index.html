@@ -562,7 +562,7 @@
       <!-- Settings panel -->
       <div class="panel" id="panel-settings">
         <section class="settings-shell" aria-labelledby="chatgpt-settings-title">
-          <h2 id="chatgpt-settings-title">Settings</h2>
+          <h2 id="chatgpt-settings-title" tabindex="-1">Settings</h2>
           <h3>ChatGPT</h3>
           <div class="chatgpt-account" id="chatgpt-account"></div>
           <p class="chatgpt-connection-status" id="chatgpt-connection-status"></p>
@@ -575,7 +575,7 @@
           </label>
           <div class="setup-error" id="chatgpt-error" role="alert"></div>
           <form id="ads-settings-form" class="ads-settings">
-            <label class="chatgpt-field" for="ads-token">NASA ADS API token</label>
+            <label class="chatgpt-field" for="ads-token" data-settings-update="nasa-ads-api-token">NASA ADS API token</label>
             <input id="ads-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your token" aria-describedby="ads-token-note ads-token-status" required maxlength="4096"/>
             <p id="ads-token-note">Saved on this computer for literature searches across workspaces.</p>
             <p id="ads-token-status" role="status" aria-live="polite"></p>
@@ -671,7 +671,7 @@
   </section>
 </div>
 <div id="reading-toast" role="status" aria-live="polite" hidden></div>
-<section id="source-notifications" aria-label="Source notifications" aria-live="polite" aria-relevant="additions"></section>
+<section id="app-notifications" aria-label="Notifications" aria-live="polite" aria-relevant="additions"></section>
 <script src="/reading-performance.js"></script>
 <script src="/reading.js"></script>
 <script src="/workspaces.js"></script>

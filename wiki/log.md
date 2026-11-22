@@ -364,3 +364,7 @@ All major updates to the wiki are recorded here.
 | 2026-11-19 | Sources / application | Simplified discovery to one keyword, review, or AI-ranked research-question search. |
 
 | 2026-11-19 | Sources / application | Preserved question search routes across filters and sorted question-relevant results after ranking. |
+
+| 2026-11-22 | Settings / application | Added a dismissible notification for new settings, starting with the NASA ADS API token. [Notification code](../public/app.js) |
+
+| 2026-11-22 | Settings / application | Showed a confirmation notification after saving a different ChatGPT subscription model. [Model save flow](../public/app.js) |
