@@ -368,3 +368,5 @@ All major updates to the wiki are recorded here.
 | 2026-11-22 | Settings / application | Added a dismissible notification for new settings, starting with the NASA ADS API token. [Notification code](../public/app.js) |
 
 | 2026-11-22 | Settings / application | Showed a confirmation notification after saving a different ChatGPT subscription model. [Model save flow](../public/app.js) |
+
+| 2026-11-22 | Settings / application | Applied dark-mode colours to Settings notifications, including text, borders, and keyboard focus. [Notification styles](../public/style.css) |

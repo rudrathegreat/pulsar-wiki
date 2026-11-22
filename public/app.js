@@ -1818,7 +1818,7 @@ function notifySettingsUpdate() {
 
 function showSettingsNotification(message, onDismiss) {
   const card = document.createElement('div');
-  card.className = 'source-notification';
+  card.className = 'source-notification settings-notification';
   const link = document.createElement('a');
   link.href = panelUrl('settings');
   const title = document.createElement('strong');

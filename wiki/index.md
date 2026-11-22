@@ -10,7 +10,7 @@ Browser tab: PulsarWiki uses its favicon as the tab icon.
 
 Sidebar navigation: hover or focus an icon to see a shadow-free tooltip explaining what it opens or changes.
 
-Settings updates appear in a dismissible notification that names the new settings and links to Settings. To announce a future addition, give its heading or label a unique `data-settings-update` value. [Settings markup](../public/index.html)
+Settings updates appear in a dismissible notification that follows the active theme, names the new settings, and links to Settings. To announce a future addition, give its heading or label a unique `data-settings-update` value. [Settings markup](../public/index.html)
 
 Saving a different ChatGPT subscription model shows a Settings updated notification with the saved model name. [Model save flow](../public/app.js)
 
