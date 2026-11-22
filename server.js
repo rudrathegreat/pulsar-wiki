@@ -19,6 +19,7 @@ const { ProviderError } = require('./agent/providers');
 const { FILTERS: SOURCE_FILTERS, SourceDiscoveryService } = require('./agent/source-discovery');
 const { SourceSettings } = require('./agent/source-settings');
 const { PaperKeywords } = require('./agent/paper-keywords');
+const { PaperRanking } = require('./agent/paper-ranking');
 const { ReadingStore } = require('./agent/reading-store');
 const { ReadingService } = require('./agent/reading-service');
 const { createReadingRouter } = require('./agent/reading-router');
@@ -62,7 +63,7 @@ function openWorkspace(folder) {
   workspace.references = new References({ rootDir, rawDir, metadata: new PaperMetadata({ rawDir, authService: chatgptAuth }) });
   workspace.wikiTools = new WikiTools({ rootDir, wikiDir, rawDir, dataDir });
   workspace.agentService = new AgentService({ threadStore: new ThreadStore({ dataDir: path.join(dataDir, 'chat') }), authService: chatgptAuth, wikiTools: workspace.wikiTools, instructions });
-  workspace.sourceDiscovery = new SourceDiscoveryService({ rawDir, references: workspace.references, adsToken: sourceSettings.token, onImport: item => workspace.references.enrich([{ ...item.source, name: item.name }]) });
+  workspace.sourceDiscovery = new SourceDiscoveryService({ rawDir, references: workspace.references, adsToken: sourceSettings.token, paperRanking: new PaperRanking({ authService: chatgptAuth }), onImport: item => workspace.references.enrich([{ ...item.source, name: item.name }]) });
   workspace.paperKeywords = new PaperKeywords({ authService: chatgptAuth });
   workspace.readingService = new ReadingService({ store: new ReadingStore({ dataDir: path.join(dataDir, 'reading') }), wikiTools: workspace.wikiTools, authService: chatgptAuth, discovery: workspace.sourceDiscovery, instructions });
   workspace.ingestJobs = new Map();

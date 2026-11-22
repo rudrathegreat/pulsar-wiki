@@ -16,6 +16,8 @@ Saved sources: select multiple documents in the Saved sources view and delete th
 
 Source navigation: the wiki sidebar's Add sources button opens the Sources page. Source rename and delete actions use in-app dialogs with theme-specific colours and accessible input focus.
 
+Paper discovery: searches use one keyword, sciX review, or AI-ranked research-question route; filter and sort changes retain the question route.
+
 Markdown tables share the chat style and scroll horizontally when needed; the change log displays its historical entries in a single table.
 
 Reading assistance: Ask AI shows animated dots while generating a concise explanation in one or two paragraphs, with citations to selected passages. The question and answer appear in closely spaced borderless boxes, with completion status below the answer. Highlight colours appear as individual swatches; assisted highlights show blue as their selected colour and disable other colour choices. Saved responses show the user question, can be expanded from a five-line preview, and can start a new chat with the selected passages and response.

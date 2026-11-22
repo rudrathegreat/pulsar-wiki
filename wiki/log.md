@@ -354,3 +354,13 @@ All major updates to the wiki are recorded here.
 | 2026-11-17 | Reading / application | Added concise AI summaries to related wiki page previews and removed the ranking label; updated the wiki index. |
 
 | 2026-11-17 | Reading / application | Added spacing between related wiki page titles and summaries; updated the wiki index. |
+
+| 2026-11-19 | Sources / application | Added AI relevance ranking of paper candidates for natural-language questions and documented the fallback. |
+
+| 2026-11-19 | Sources / application | Added AI-planned complementary sciX searches, including review and citation-based discovery, before relevance ranking. |
+
+| 2026-11-19 | Sources / application | Showed initial paper results during AI search and ran standard retrieval alongside query planning. |
+
+| 2026-11-19 | Sources / application | Simplified discovery to one keyword, review, or AI-ranked research-question search. |
+
+| 2026-11-19 | Sources / application | Preserved question search routes across filters and sorted question-relevant results after ranking. |

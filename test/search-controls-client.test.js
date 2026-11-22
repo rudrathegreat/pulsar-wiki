@@ -60,6 +60,15 @@ test('late searches cannot replace newer filtered results or errors', async () =
   assert.doesNotMatch(c.element('status').textContent, /Stale error/);
 });
 
+test('question searches issue one request and show the selected route', async () => {
+  const calls = [];
+  const c = client(async (...args) => { calls.push(args); return { results: [], route: 'reviews' }; });
+  c.element('source-search-input').value = 'what is a pulsar?';
+  await c.context.runSourceSearch();
+  assert.equal(calls.length, 1);
+  assert.match(c.element('status').textContent, /Review search complete/);
+});
+
  test('downloaded filter updates visible results without losing search results', () => {
   const nodes = new Map();
   const element = id => {

@@ -1695,7 +1695,6 @@ async function runSourceSearch() {
   dom.sourceFilterSuggestions.classList.remove('visible');
   dom.sourceSearchStatus.className = 'source-search-status visible loading';
   dom.sourceSearchStatus.innerHTML = '<span class="document-spinner"></span><span>Searching for papers...</span>';
-  $('source-search-submit').disabled = true;
   state.selectedSourceIds.clear();
   closeSourceDetail();
   state.sourcePapers.clear();
@@ -1709,15 +1708,14 @@ async function runSourceSearch() {
     renderSourceResults(data.results);
     void loadSourceKeywords(state.sourceResults);
     const warning = data.warnings?.length ? ` ${data.warnings.join(' ')}` : '';
-    const intent = data.query?.intent === 'specific' ? 'Exact lookup' : data.query?.intent === 'research-question' ? 'Research question' : 'Keyword search';
+    const intent = data.route === 'reviews' ? 'Review search' : data.query?.intent === 'specific' ? 'Exact lookup' : data.query?.intent === 'research-question' ? 'Research question' : 'Keyword search';
     dom.sourceSearchStatus.className = `source-search-status visible${warning ? ' warning' : ''}`;
-    dom.sourceSearchStatus.textContent = `${intent} complete.${warning}`;
+    const sortNote = options.sort !== 'default' && ['research', 'reviews'].includes(data.route) ? ' Sorted within the most relevant results.' : '';
+    dom.sourceSearchStatus.textContent = `${intent} complete.${data.ranking === 'ai' ? ' AI-ranked by relevance to your question.' : ''}${sortNote}${warning}`;
   } catch (error) {
     if (!current()) return;
     dom.sourceSearchStatus.className = 'source-search-status visible error';
-    dom.sourceSearchStatus.textContent = stripEmoji(error.message);
-  } finally {
-    if (current()) $('source-search-submit').disabled = false;
+    dom.sourceSearchStatus.textContent = `Search could not be completed. ${stripEmoji(error.message)}`;
   }
 }
 

@@ -24,7 +24,7 @@ const FILTERS = [
   { key: 'bibcode', label: 'ADS bibcode', example: 'bibcode:2024ApJ...' },
 ];
 
-const QUESTION_WORDS = /^(what|when|where|which|who|why|how|does|do|did|can|could|is|are|was|were|find|show|papers?\s+(?:about|on))\b/i;
+const QUESTION_WORDS = /^(what|when|where|which|who|why|how|does|do|did|can|could|is|are|was|were|find|show|looking\s+for|papers?\s+(?:about|on))\b/i;
 const DOI_PATTERN = /\b10\.\d{4,9}\/[-._;()/:a-z0-9]+\b/i;
 const ARXIV_PATTERN = /(?:arxiv:\s*)?(\d{4}\.\d{4,5}(?:v\d+)?|[a-z-]+(?:\.[A-Z]{2})?\/\d{7}(?:v\d+)?)/i;
 const FILTER_PATTERN = /(?:^|\s)(author|year|from|to|title|object|category|source|doi|bibcode):(?:"([^"]*)"|(\S+))/gi;
@@ -81,7 +81,7 @@ function classifyQuery(input) {
       if (adsMatch) bibcode = decodeURIComponent(adsMatch[1]);
     } catch { /* malformed links are handled as ordinary specific searches */ }
   }
-  const exactFilter = Boolean(parsed.filters.title || parsed.filters.doi || parsed.filters.bibcode);
+  const exactFilter = Boolean((parsed.filters.title && !parsed.terms) || parsed.filters.doi || parsed.filters.bibcode);
   const quotedTitle = /^"[^\"]+"$/.test(parsed.terms);
   let intent = 'keywords';
   if (doi || arxiv || isUrl || exactFilter || quotedTitle) intent = 'specific';
@@ -104,11 +104,12 @@ function buildArxivQuery(classified) {
   const clauses = [];
   if (classified.arxiv) clauses.push(`id:${escapeQueryValue(classified.arxiv)}`);
   else if (classified.doi) clauses.push(`doi:${escapeQueryValue(classified.doi)}`);
-  else if (filters.title?.length) clauses.push(...filters.title.map(value => `ti:"${escapeQueryValue(value)}"`));
+  else if (filters.title?.length && classified.intent !== 'research-question') clauses.push(...filters.title.map(value => `ti:"${escapeQueryValue(value)}"`));
   else {
     const terms = usefulTerms(classified.terms);
     if (terms.length) clauses.push(`all:(${terms.map(escapeQueryValue).join(' AND ')})`);
   }
+  if (classified.intent === 'research-question') for (const value of filters.title || []) clauses.push(`ti:"${escapeQueryValue(value)}"`);
   for (const value of filters.author || []) clauses.push(`au:"${escapeQueryValue(value)}"`);
   for (const value of filters.category || []) clauses.push(`cat:${escapeQueryValue(value)}`);
   for (const value of filters.object || []) clauses.push(`all:"${escapeQueryValue(value)}"`);
@@ -121,24 +122,26 @@ function buildArxivQuery(classified) {
   return clauses.join(' AND ') || 'all:pulsar';
 }
 
-function buildAdsQuery(classified) {
+function buildAdsQuery(classified, includeTerms = true) {
   const { filters } = classified;
   const clauses = [];
-  if (classified.bibcode) clauses.push(`bibcode:"${escapeQueryValue(classified.bibcode)}"`);
+  if (!includeTerms) { /* Only apply user-specified filters to planned searches. */ }
+  else if (classified.bibcode) clauses.push(`bibcode:"${escapeQueryValue(classified.bibcode)}"`);
   else if (classified.doi) clauses.push(`doi:"${escapeQueryValue(classified.doi)}"`);
   else if (classified.arxiv) clauses.push(`identifier:"arXiv:${escapeQueryValue(classified.arxiv)}"`);
-  else if (filters.title?.length) clauses.push(...filters.title.map(value => `title:"${escapeQueryValue(value)}"`));
+  else if (filters.title?.length && classified.intent !== 'research-question') clauses.push(...filters.title.map(value => `title:"${escapeQueryValue(value)}"`));
   else {
     const terms = usefulTerms(classified.terms);
     if (terms.length) clauses.push(`(${terms.map(term => `full:"${escapeQueryValue(term)}"`).join(' AND ')})`);
   }
+  if (!includeTerms || classified.intent === 'research-question') for (const value of filters.title || []) clauses.push(`title:"${escapeQueryValue(value)}"`);
   for (const value of filters.author || []) clauses.push(`author:"${escapeQueryValue(value)}"`);
   for (const value of filters.object || []) clauses.push(`object:"${escapeQueryValue(value)}"`);
   const year = filters.year?.[0];
   const from = year || filters.from?.[0];
   const to = year || filters.to?.[0];
   if (/^\d{4}$/.test(from || '') || /^\d{4}$/.test(to || '')) clauses.push(`year:[${from || '*'} TO ${to || '*'}]`);
-  return clauses.join(' AND ') || 'full:"pulsar"';
+  return clauses.join(' AND ') || (includeTerms ? 'full:"pulsar"' : '');
 }
 
 function resultId(result) {
@@ -222,7 +225,7 @@ function matchesReference(result, entry) {
 }
 
 class SourceDiscoveryService {
-  constructor({ rawDir, fetchImpl = globalThis.fetch, adsToken = process.env.NASA_ADS_API_TOKEN, now = Date.now, onImport = () => {}, references = null } = {}) {
+  constructor({ rawDir, fetchImpl = globalThis.fetch, adsToken = process.env.NASA_ADS_API_TOKEN, now = Date.now, onImport = () => {}, references = null, paperRanking = null } = {}) {
     if (!rawDir) throw new Error('rawDir is required');
     if (typeof fetchImpl !== 'function') throw new Error('fetch implementation is required');
     this.rawDir = rawDir;
@@ -233,7 +236,24 @@ class SourceDiscoveryService {
     this.orcidCache = new Map();
     this.onImport = onImport;
     this.references = references;
+    this.paperRanking = paperRanking;
+    this.searchPlans = new Map();
     this.importQueue = Promise.resolve();
+  }
+
+  async questionPlan(terms) {
+    const key = terms.trim();
+    const existing = this.searchPlans.get(key);
+    if (existing && existing.expires > this.now()) return existing.promise;
+    const promise = Promise.resolve().then(() => this.paperRanking.plan(terms)).then(plan => {
+      if (!plan || !['reviews', 'research'].includes(plan.type) || typeof plan.phrase !== 'string' || !/^[\p{L}\p{N} +.\-/]{2,100}$/u.test(plan.phrase.trim())) throw new Error('Invalid search plan');
+      return { type: plan.type, phrase: plan.phrase.trim() };
+    });
+    const entry = { promise, expires: this.now() + 30 * 60 * 1000 };
+    this.searchPlans.set(key, entry);
+    if (this.searchPlans.size > 100) this.searchPlans.delete(this.searchPlans.keys().next().value);
+    try { return await promise; }
+    catch (error) { if (this.searchPlans.get(key) === entry) this.searchPlans.delete(key); throw error; }
   }
 
   downloaded(result) {
@@ -364,23 +384,58 @@ class SourceDiscoveryService {
     const rows = Math.min(MAX_RESULTS, Math.max(1, Number(limit) || 20));
     const sourceFilter = query.filters.source?.[0]?.toLowerCase();
     const settled = [];
+    const searchWarnings = [];
+    let route = query.intent === 'research-question' ? 'research' : query.intent === 'specific' ? 'specific' : 'keywords';
+    let searchQuery = query;
+    if (route === 'research' && typeof this.paperRanking?.plan === 'function') {
+      try {
+        const plan = await this.questionPlan(query.terms);
+        route = plan.type;
+        searchQuery = { ...query, terms: plan.phrase.trim() };
+      } catch { searchWarnings.push('AI search selection was unavailable; the standard question search was used.'); }
+    }
+    const questionRoute = route === 'research' || route === 'reviews';
+    const rerank = route === 'research' && this.paperRanking;
+    const candidateRows = rerank || (questionRoute && sort !== 'default') ? MAX_RESULTS : rows;
     if ((!sourceFilter || ['scix', 'ads', 'nasa-ads'].includes(sourceFilter)) && this.adsToken) {
-      const params = new URLSearchParams({ q: clauses.join(' AND '), fl: 'bibcode,title,author,orcid_pub,orcid_user,year,pub,pubdate,abstract,doi,identifier,citation_count,reference_count', rows: String(rows), sort: sorts[sort] });
+      const base = route === 'reviews' ? `reviews(abs:"${escapeQueryValue(searchQuery.terms)}")` : buildAdsQuery(searchQuery);
+      const userFilters = route === 'reviews' ? [buildAdsQuery(query, false), ...clauses.slice(1)].filter(Boolean) : clauses.slice(1);
+      const params = new URLSearchParams({ q: [base, ...userFilters].join(' AND '), fl: 'bibcode,title,author,orcid_pub,orcid_user,year,pub,pubdate,abstract,doi,identifier,citation_count,reference_count', rows: String(candidateRows), sort: questionRoute ? sorts.default : sorts[sort] });
       settled.push(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` } }, 'NASA ADS')
         .then(JSON.parse).then(parseAdsResponse).then(results => ({ source: 'NASA ADS', results })).catch(error => ({ source: 'NASA ADS', results: [], error: error.message })));
     }
     if (!requiresAds && (sourceFilter === 'arxiv' || (!sourceFilter && !settled.some(item => item.results.length)))) {
-      const arxivQuery = year === '' ? query : { ...query, filters: { ...query.filters, year: [String(year)] } };
-      const url = `${ARXIV_API}?search_query=${encodeURIComponent(buildArxivQuery(arxivQuery))}&start=0&max_results=${rows}&sortBy=${sort === 'recent' ? 'submittedDate' : 'relevance'}&sortOrder=descending`;
+      if (route === 'reviews') searchWarnings.push('arXiv does not support sciX review search; keyword results are shown.');
+      const arxivQuery = year === '' ? searchQuery : { ...searchQuery, filters: { ...searchQuery.filters, year: [String(year)] } };
+      const url = `${ARXIV_API}?search_query=${encodeURIComponent(buildArxivQuery(arxivQuery))}&start=0&max_results=${candidateRows}&sortBy=${sort === 'recent' && !questionRoute ? 'submittedDate' : 'relevance'}&sortOrder=descending`;
       settled.push(await this.fetchText(url, { headers: { 'User-Agent': 'PulsarWiki/1.0 source discovery' } }, 'arXiv')
         .then(parseArxivFeed).then(results => ({ source: 'arXiv', results })).catch(error => ({ source: 'arXiv', results: [], error: error.message })));
     }
-    const results = this.markDownloaded(deduplicate(settled.flatMap(item => item.results)).slice(0, rows));
+    const warnings = [...searchWarnings, ...settled.filter(item => item.error).map(item => `${item.source}: ${item.error}`)];
+    let candidates = deduplicate(settled.flatMap(item => item.results));
+    let ranking = 'provider';
+    if (rerank && candidates.length > 1) {
+      try {
+        candidates = await this.paperRanking.rank(query.terms, candidates);
+        ranking = 'ai';
+      } catch {
+        warnings.push('AI relevance ranking was unavailable; results use the search order.');
+      }
+    }
+    candidates = candidates.slice(0, rows);
+    if (questionRoute && sort !== 'default') {
+      candidates.sort((a, b) => {
+        if (sort === 'citations') return (b.citationCount ?? -1) - (a.citationCount ?? -1);
+        if (sort === 'recent') return String(b.published || b.year || '').localeCompare(String(a.published || a.year || ''));
+        if (sort === 'author') return String(a.authors?.[0] || '\uffff').localeCompare(String(b.authors?.[0] || '\uffff'));
+        return 0;
+      });
+    }
+    const results = this.markDownloaded(candidates);
     this.remember(results);
-    const warnings = settled.filter(item => item.error).map(item => `${item.source}: ${item.error}`);
     if (!this.adsToken && sourceFilter !== 'arxiv') warnings.push(`NASA ADS is unavailable until a NASA ADS API token is added in Settings; ${sourceFilter || requiresAds ? 'no results are shown for the selected filters' : 'arXiv results are shown'}.`);
     if (requiresAds && (!settled.length || settled.some(item => item.error))) warnings.push('The selected filters or sort order require NASA ADS metadata. arXiv fallback is unavailable for these options. Choose All publications, All collections, no minimum citations, and Default or Most recent to allow arXiv results.');
-    return { query: { intent: query.intent, terms: query.terms, filters: query.filters }, results, warnings, filters: FILTERS };
+    return { query: { intent: query.intent, terms: query.terms, filters: query.filters }, results, warnings, ranking, route, filters: FILTERS };
   }
 
   async related(id, identity = {}) {

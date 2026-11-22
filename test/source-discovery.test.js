@@ -166,6 +166,133 @@ test('default search uses sciX without requesting arXiv when matches exist', asy
   assert.deepEqual(result.warnings, []);
 });
 
+test('question searches rank a larger filtered candidate set before limiting, and preserve explicit sort', async () => {
+  const requests = [];
+  let rankCalls = 0;
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', paperRanking: { async rank(question, papers) {
+    rankCalls++;
+    assert.equal(question, 'what is a pulsar?');
+    return [...papers].reverse();
+  } }, fetchImpl: async url => {
+    requests.push(new URL(String(url)).searchParams);
+    return Response.json({ response: { docs: [
+      { bibcode: 'timing', title: ['Timing software'], abstract: 'A pulsar timing package.' },
+      { bibcode: 'review', title: ['Pulsar review'], abstract: 'An overview of pulsars.' },
+    ] } });
+  } });
+  const result = await service.search('what is a pulsar?', { limit: 1 });
+  assert.equal(requests[0].get('rows'), '50');
+  assert.match(requests[0].get('q'), /property:refereed/);
+  assert.equal(result.results[0].bibcode, 'review');
+  assert.equal(result.ranking, 'ai');
+  assert.equal(service.cached(result.results[0].id).bibcode, 'review');
+  const sorted = await service.search('what is a pulsar?', { limit: 1, sort: 'recent' });
+  assert.equal(requests[1].get('rows'), '50');
+  assert.equal(requests[1].get('sort'), 'score desc');
+  assert.equal(sorted.results[0].bibcode, 'review');
+  assert.equal(rankCalls, 2);
+});
+
+test('filter changes reuse the same question plan and sort within relevant papers', async () => {
+  let planCalls = 0;
+  const requests = [];
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', paperRanking: {
+    async plan() { planCalls++; return { type: 'research', phrase: 'pulsar glitches' }; },
+    async rank(question, papers) { assert.equal(question, 'How do glitches affect pulsars?'); return [papers[1], papers[2], papers[0]]; },
+  }, fetchImpl: async url => {
+    requests.push(new URL(String(url)).searchParams);
+    return Response.json({ response: { docs: [
+      { bibcode: 'irrelevant', title: ['Irrelevant'], citation_count: 999 },
+      { bibcode: 'relevant1', title: ['Relevant 1'], citation_count: 2 },
+      { bibcode: 'relevant2', title: ['Relevant 2'], citation_count: 10 },
+    ] } });
+  } });
+  await service.search('How do glitches affect pulsars? title:"pulsar"', { limit: 2 });
+  const filtered = await service.search('How do glitches affect pulsars? title:"pulsar"', { limit: 2, sort: 'citations', filters: { refereed: 'all', collection: 'astronomy', minCitations: '1' } });
+  assert.equal(planCalls, 1);
+  assert.equal(filtered.route, 'research');
+  assert.deepEqual(filtered.results.map(paper => paper.bibcode), ['relevant2', 'relevant1']);
+  assert.match(requests[1].get('q'), /full:"glitches"/);
+  for (const filter of ['title:"pulsar"', 'database:astronomy', 'citation_count:[1 TO *]']) assert.ok(requests[1].get('q').includes(filter));
+  assert.equal(requests[1].get('sort'), 'score desc');
+});
+
+test('review routing and title filters survive control changes', async () => {
+  let plans = 0;
+  const calls = [];
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', paperRanking: {
+    async plan() { plans++; return { type: 'reviews', phrase: 'pulsar' }; },
+  }, fetchImpl: async url => {
+    calls.push(new URL(String(url)).searchParams);
+    return Response.json({ response: { docs: [{ bibcode: 'one', title: ['One'], pubdate: '2020-01-01' }, { bibcode: 'two', title: ['Two'], pubdate: '2024-01-01' }] } });
+  } });
+  await service.search('what is a pulsar? title:"pulsar"');
+  const changed = await service.search('what is a pulsar? title:"pulsar"', { sort: 'recent', filters: { refereed: 'all' } });
+  assert.equal(plans, 1);
+  assert.equal(changed.route, 'reviews');
+  assert.deepEqual(changed.results.map(paper => paper.bibcode), ['two', 'one']);
+  assert.match(calls[1].get('q'), /^reviews\(abs:"pulsar"\) AND title:"pulsar"/);
+  assert.equal(calls[1].get('sort'), 'score desc');
+});
+
+test('question search reports ranking failure and retains provider order', async () => {
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', paperRanking: { async rank() { throw new Error('unavailable'); } }, fetchImpl: async () => Response.json({ response: { docs: [{ bibcode: 'first', title: ['First'] }, { bibcode: 'second', title: ['Second'] }] } }) });
+  const result = await service.search('what is a pulsar?');
+  assert.deepEqual(result.results.map(paper => paper.bibcode), ['first', 'second']);
+  assert.equal(result.ranking, 'provider');
+  assert.match(result.warnings.join(' '), /AI relevance ranking was unavailable/);
+});
+
+test('questions choose one review or research search and preserve filters', async () => {
+  const calls = [];
+  let route = 'reviews';
+  let rankCalls = 0;
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', paperRanking: {
+    async plan() { return { type: route, phrase: route === 'reviews' ? 'pulsar' : 'pulsar timing noise' }; },
+    async rank(question, papers) { rankCalls++; return [...papers].reverse(); },
+  }, fetchImpl: async url => {
+    calls.push(new URL(String(url)).searchParams);
+    return Response.json({ response: { docs: [{ bibcode: 'one', title: ['One'] }, { bibcode: 'two', title: ['Two'] }] } });
+  } });
+  const review = await service.search('what is a pulsar? author:"Smith"', { filters: { collection: 'astronomy' } });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].get('q'), /^reviews\(abs:"pulsar"\)/);
+  for (const filter of ['author:"Smith"', 'property:refereed', 'database:astronomy']) assert.ok(calls[0].get('q').includes(filter));
+  assert.equal(review.route, 'reviews');
+  assert.equal(rankCalls, 0);
+  route = 'research';
+  const research = await service.search('how does timing noise affect pulsars?');
+  assert.equal(calls.length, 2);
+  assert.match(calls[1].get('q'), /full:"pulsar" AND full:"timing" AND full:"noise"/);
+  assert.equal(research.results[0].bibcode, 'two');
+  assert.equal(rankCalls, 1);
+  await service.search('pulsars');
+  assert.equal(calls.length, 3);
+  assert.equal(rankCalls, 1);
+});
+
+test('failed planning uses standard question search and reports the fallback', async () => {
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', paperRanking: {
+    async plan() { throw new Error('offline'); },
+    async rank(question, papers) { return papers; },
+  }, fetchImpl: async () => Response.json({ response: { docs: [{ bibcode: 'one', title: ['One'] }] } }) });
+  const result = await service.search('what is a pulsar?');
+  assert.match(result.warnings.join(' '), /selection was unavailable/);
+  assert.equal(result.results[0].bibcode, 'one');
+});
+
+test('arXiv falls back to keyword retrieval when a review search is selected', async () => {
+  let query;
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: '', paperRanking: {
+    async plan() { return { type: 'reviews', phrase: 'pulsar' }; },
+    async rank() { assert.fail('Reviews are not AI reranked'); },
+  }, fetchImpl: async url => { query = new URL(String(url)).searchParams.get('search_query'); return new Response(ARXIV_FEED); } });
+  const result = await service.search('what is a pulsar? source:arxiv', { filters: { refereed: 'all' } });
+  assert.match(query, /all:\(pulsar\)/);
+  assert.match(result.warnings.join(' '), /arXiv does not support sciX review search/);
+  assert.equal(result.results.length, 1);
+});
+
 test('ADS receives filters and sorting before limiting results', async () => {
   let params;
   const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', fetchImpl: async url => {
