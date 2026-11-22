@@ -758,7 +758,7 @@
       ${h.categories.map(c => `<span class="reading-tag">${e(c)}</span>`).join('')}
       ${comments.map(a => `<div class="reading-comment"><small>Researcher comment</small>${e(a.text)}</div>`).join('')}
       ${assistance.map(t => `<div class="reading-comment reading-ai-comment"><small>User question</small><p class="reading-ai-question">${e(t.question || 'Assistance based on selected passages')}</p><small>AI Generated Response</small>${t.snapshot.highlights.length > 1 ? '<small>Shared response for selected passages</small>' : ''}<div class="reading-task-response md-body ${expanded ? '' : 'reading-response-collapsed'}">${safeMarkdown(t.response, t.snapshot)}</div><div class="reading-actions"><button type="button" data-reading-chat="${e(t.id)}">New chat from response</button></div></div>`).join('')}
-      ${relationships.map(link => `<div class="reading-muted">${e(link.relation)}: ${link.targetType === 'wiki' ? `<a href="/wiki/${e(link.target)}">${e(link.target)}</a>` : `<a href="/#reading/${record('highlights', link.from === h.id ? link.target : link.from)?.documentId}/${link.from === h.id ? link.target : link.from}">Related passage</a>`}</div>`).join('')}
+      ${relationships.map(link => `<div class="reading-muted">${e(link.relation)}: ${link.targetType === 'wiki' ? `<span class="md-body"><a class="wiki-link" data-page="${e(link.target)}" href="${e(wikiPath(link.target))}">${e(link.target)}</a></span>` : `<a href="/#reading/${record('highlights', link.from === h.id ? link.target : link.from)?.documentId}/${link.from === h.id ? link.target : link.from}">Related passage</a>`}</div>`).join('')}
       <div class="reading-actions">${assistance.length ? `<button type="button" data-reading-expand="${h.id}" aria-expanded="${expanded}">${expanded ? 'Show less' : 'Show more'}</button>` : ''}<button type="button" data-reading-delete="${h.id}" aria-label="Delete highlight from ${e(docName(h.documentId))}">Delete</button></div></article>`;
   }
   function snapshotView(snapshot) {
@@ -871,7 +871,7 @@
         if (isCurrentView() && el('reading-task-status')) {
           const status = el('reading-task-status');
           if (!automatic && ['queued', 'running'].includes(current.status)) {
-            if (!status.querySelector('.typing-dot')) status.innerHTML = '<span aria-label="Generating response"><span class="typing-dot" aria-hidden="true"></span><span class="typing-dot" aria-hidden="true"></span><span class="typing-dot" aria-hidden="true"></span></span>';
+            if (!status.querySelector('.typing-dot')) status.innerHTML = `<span aria-label="${current.action === 'question' ? 'Checking the wiki and generating a response' : 'Generating response'}"><span class="typing-dot" aria-hidden="true"></span><span class="typing-dot" aria-hidden="true"></span><span class="typing-dot" aria-hidden="true"></span></span>`;
           } else status.textContent = `${current.status}${current.model ? ` · ${current.model}` : ''}${current.error ? `: ${current.error}` : ''}`;
         }
         if (isCurrentView() && el('reading-task-live')) el('reading-task-live').textContent = automatic ? '' : current.progress || '';
@@ -885,14 +885,14 @@
         if (el('reading-task-complete')) {
           el('reading-task-complete').innerHTML = automatic
             ? current.publication ? `<p>Note added to <a href="/wiki/${encodeURIComponent(current.publication.page)}">${e(current.publication.page)}</a>.</p>${current.warning ? `<p>${e(current.warning)}</p>` : ''}` : `<p>${e(current.error || 'The wiki was not updated.')}</p><button type="button" id="reading-task-retry">Try again</button>`
-            : current.response ? `<div class="reading-task-box"><strong>Answer</strong>${safeMarkdown(current.response, current.snapshot)}</div><div class="reading-actions"><button type="button" id="reading-task-add-note">Add to wiki</button><button type="button" id="reading-task-new-chat">New chat from response</button></div>` : `<p>${e(current.error || 'The request did not complete.')}</p>`;
+            : current.response ? `<div class="reading-task-box"><strong>Answer</strong>${safeMarkdown(current.response, current.snapshot)}</div><div class="reading-actions"><button type="button" id="reading-task-add-note">Add to wiki</button><button type="button" id="reading-task-new-chat">New chat from response</button></div>` : `<p>${e(current.error || 'The request did not complete.')}</p><button type="button" id="reading-task-retry">Try again</button>`;
           if (!automatic && current.response) {
             const status = el('reading-task-status');
             status.classList.add('reading-muted');
             el('reading-task-complete').querySelector('.reading-task-box').append(status);
           }
           typesetMath(el('reading-task-complete'));
-          if (automatic && !current.publication) el('reading-task-retry').addEventListener('click', guard(async () => { await watchTask(await request(`/tasks/${task.id}/retry`, 'POST', {})); }));
+          if (el('reading-task-retry')) el('reading-task-retry').addEventListener('click', guard(async () => { await watchTask(await request(`/tasks/${task.id}/retry`, 'POST', {})); }));
           if (!automatic && current.response) el('reading-task-new-chat').addEventListener('click', guard(async () => { await window.createReadingChat(current.id); closeHelper(); if (el('reading-dialog').open) el('reading-dialog').close(); }));
           if (!automatic && current.response) el('reading-task-add-note').addEventListener('click', guard(async () => {
             r.assistanceIds.add(current.id);

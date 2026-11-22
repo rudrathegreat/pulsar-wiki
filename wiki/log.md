@@ -370,3 +370,13 @@ All major updates to the wiki are recorded here.
 | 2026-11-22 | Settings / application | Showed a confirmation notification after saving a different ChatGPT subscription model. [Model save flow](../public/app.js) |
 
 | 2026-11-22 | Settings / application | Applied dark-mode colours to Settings notifications, including text, borders, and keyboard focus. [Notification styles](../public/style.css) |
+
+| 2026-11-22 | Reading / application | Applied chat and wiki link styling to saved wiki connections in the reading sidebar. [Reading interface](../public/reading.js) |
+
+| 2026-11-23 | Reading / application | Added sciX/NASA ADS searches for peer-reviewed research and linked MNRAS-style citations in Ask AI. [Reading assistance](../agent/reading-service.js) |
+
+| 2026-11-23 | Reading / application | Made Ask AI search and cite the current wiki before using sciX/NASA ADS when the wiki lacks relevant context. [Reading assistance](../agent/reading-service.js) |
+
+| 2026-11-23 | Reading / application | Made Ask AI continue to peer-reviewed literature search when the wiki pass cannot produce a valid cited answer. [Reading assistance](../agent/reading-service.js) |
+
+| 2026-11-23 | Reading / application | Added a search-plan retry and a question-keyword fallback for Ask AI literature searches. [Reading assistance](../agent/reading-service.js) |

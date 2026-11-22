@@ -369,13 +369,24 @@ test('notes save from the helper and collapse back to the same highlight menu', 
   clearTimeout(c.r.toastTimer);
 });
 
-test('related knowledge results expand within an existing highlight helper', async () => {
+test('related knowledge results expand in the highlight helper and save styled wiki links', async () => {
   const c = client(); populate(c); c.context.state.panel = 'document';
-  c.context.fetch = async url => ({ ok: true, json: async () => url.endsWith('/connections') ? { wiki: [{ name: 'timing', title: 'Timing', url: '/wiki/timing', text: 'Timing context.', matchedTerms: ['timing'] }], papers: [], warnings: [] } : c.r.data });
+  c.context.wikiPath = name => `/wiki/${encodeURIComponent(name)}`;
+  const page = { name: 'psr-j0737+3039', title: 'PSR J0737+3039', url: '/wiki/psr-j0737%2B3039', text: 'Timing context.', matchedTerms: ['timing'] };
+  c.context.fetch = async (url, options) => {
+    if (url.endsWith('/connections')) return { ok: true, json: async () => ({ wiki: [page], papers: [], warnings: [] }) };
+    if (url.endsWith('/relationships')) c.r.data.relationships.push(JSON.parse(options.body));
+    return { ok: true, json: async () => c.r.data };
+  };
   c.openHighlightHelper('highlight-one', 160, 180); await c.saveSelection('yellow', 'connect');
   assert.equal(c.nodes.get('reading-helper-title').textContent, 'Connect to related knowledge');
-  assert.match(c.nodes.get('reading-connections-results').innerHTML, /Connect this page/);
+  const results = c.nodes.get('reading-connections-results');
+  assert.match(results.innerHTML, /Connect this page/);
   assert.equal(c.r.helper.expanded, true); assert.ok(!c.nodes.get('reading-dialog')?.open);
+  const button = { dataset: { connectWiki: page.name } };
+  await results.listeners.click({ target: { closest: () => button } });
+  assert.equal(button.textContent, 'Connected');
+  assert.ok(c.nodes.get('reading-notes').innerHTML.includes(`related: <span class="md-body"><a class="wiki-link" data-page="${page.name}" href="${page.url}">${page.name}</a></span>`));
 });
 
 test('Add sends the selected passage for automatic saving and shows completion without a Markdown editor', async () => {

@@ -11,6 +11,7 @@ const { ReadingService, sourceCitations } = require('../agent/reading-service');
 const { WikiTools } = require('../agent/wiki-tools');
 const { createReadingRouter } = require('../agent/reading-router');
 const { createChatGPTAdapter, ProviderError } = require('../agent/providers');
+const { SourceDiscoveryService } = require('../agent/source-discovery');
 
 function fixture(t, overrides = {}) {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulsar-reading-'));
@@ -38,6 +39,29 @@ async function completed(service, id) {
     await new Promise(resolve => setTimeout(resolve, 5));
   }
   throw new Error('Task did not finish');
+}
+
+function enableResearch(f, docs = [
+  { bibcode: '2013MNRAS.431.2378S', title: ['Pulsar timing noise'], author: ['Shannon, R. M.', 'Cordes, J. M.'], year: '2013', pub: 'MNRAS', volume: '431', page: ['2378'], abstract: 'Timing residuals are used to study pulsar timing noise.' },
+  { bibcode: '2020ApJ...900...01U', title: ['Uncited result'], author: ['Unused, A.'], year: '2020', pub: 'ApJ', abstract: 'A different finding.' },
+  { bibcode: '2021ApJ...901...01M', title: ['Missing abstract'], author: ['Missing, A.'], year: '2021', pub: 'ApJ' },
+], { wikiReply = 'NO_WIKI_CONTEXT', planReply = () => '["pulsar timing noise","timing residuals"]' } = {}) {
+  const searches = [];
+  f.service.discovery = new SourceDiscoveryService({ rawDir: f.rawDir, adsToken: 'test-token', fetchImpl: async (url, options) => {
+    searches.push(new URL(url));
+    assert.equal(options.headers.Authorization, 'Bearer test-token');
+    return { ok: true, text: async () => JSON.stringify({ response: { docs } }) };
+  } });
+  const providerFactory = f.service.providerFactory;
+  f.service.providerFactory = options => {
+    const provider = providerFactory(options);
+    return { runTurn(input) {
+      if (input.instructions.includes('Evaluate the supplied wiki search results')) return { text: wikiReply };
+      if (input.instructions.startsWith('Plan a public scientific literature search')) return { text: planReply(input) };
+      return provider.runTurn(input);
+    } };
+  };
+  return searches;
 }
 
 test('non-PDF source text can be selected and unsupported files still open', async t => {
@@ -229,8 +253,9 @@ test('assistance receives only selected snapshots, never source tools or uncheck
   assert.equal(f.store.get('tasks', task.id).snapshot.highlights[0].color, 'yellow');
 });
 
-test('Ask AI requests a concise paragraph and keeps fallback citations inline', async t => {
-  const f = fixture(t, { providerFactory: () => ({ async runTurn(input) { f.calls.push(input); return { text: 'The residuals reveal noise.' }; } }) });
+test('Ask AI falls back to refereed articles after the wiki check and renders linked MNRAS citations', async t => {
+  const f = fixture(t, { providerFactory: () => ({ async runTurn(input) { f.calls.push(input); return { text: 'The residuals reveal noise [P:1].' }; } }) });
+  const searches = enableResearch(f);
   const h = await highlight(f);
   const task = await f.service.createTask({ highlightIds: [h.id], action: 'question', question: 'What do the residuals reveal?' });
   const result = await completed(f.service, task.id);
@@ -238,7 +263,74 @@ test('Ask AI requests a concise paragraph and keeps fallback citations inline', 
   assert.match(f.calls[0].messages[0].text, /one or two short paragraphs, at most 150 words/);
   assert.match(f.calls[0].instructions, /Distinguish source evidence and interpretation inline/);
   assert.match(f.calls[0].messages[0].text, /equations are welcome/i);
-  assert.equal(result.response, `The residuals reveal noise. Selected passages: [H:${h.id}]`);
+  assert.equal(searches.length, 1);
+  assert.equal(searches[0].hostname, 'api.adsabs.harvard.edu');
+  assert.match(searches[0].searchParams.get('q'), /abs:"pulsar".*OR.*abs:"residuals".*AND property:refereed AND doctype:article/);
+  assert.match(f.calls[0].messages[0].text, /Timing residuals are used to study pulsar timing noise/);
+  assert.doesNotMatch(f.calls[0].messages[0].text, /Missing abstract/);
+  const url = 'https://ui.adsabs.harvard.edu/abs/2013MNRAS.431.2378S/abstract';
+  assert.equal(result.response, `The wiki did not provide a cited answer.\n\nThe residuals reveal noise [(R.M. Shannon & J.M. Cordes 2013)](${url}). Selected passages: [H:${h.id}]\n\n### References\n\n- [Shannon R.M., Cordes J.M., 2013, MNRAS, 431, 2378](${url})`);
+});
+
+test('Ask AI cites relevant wiki context without requesting any online papers', async t => {
+  const f = fixture(t, { providerFactory: () => ({ async runTurn(input) {
+    f.calls.push(input);
+    assert.match(input.instructions, /Evaluate the supplied wiki search results/);
+    assert.match(input.messages[0].text, /Timing residuals track deviations from the model/);
+    return { text: 'Timing residuals track deviations from the model [W:timing]. The wiki does not quantify the noise.' };
+  } }) });
+  const wikiFile = path.join(f.wikiDir, 'timing.md');
+  fs.writeFileSync(wikiFile, fs.readFileSync(wikiFile, 'utf8').replace('Existing content.', 'Timing residuals track deviations from the model.'));
+  const h = await highlight(f);
+  const task = await f.service.createTask({ highlightIds: [h.id], action: 'question', question: 'What do timing residuals measure, and how large is the noise?' });
+  const result = await completed(f.service, task.id);
+  assert.equal(result.status, 'completed');
+  assert.equal(f.calls.length, 1);
+  assert.match(result.response, /\[\[timing\]\]/);
+  assert.match(result.response, /does not quantify the noise/);
+});
+
+test('Ask AI searches online when the wiki answer has an invalid citation', async t => {
+  const f = fixture(t, { providerFactory: () => ({ async runTurn(input) {
+    f.calls.push(input);
+    return { text: 'The residuals reveal noise [P:1].' };
+  } }) });
+  const searches = enableResearch(f, undefined, { wikiReply: 'Claim [W:invented].' });
+  const h = await highlight(f);
+  const task = await f.service.createTask({ highlightIds: [h.id], action: 'question' });
+  const result = await completed(f.service, task.id);
+  assert.equal(result.status, 'completed');
+  assert.equal(searches.length, 1);
+  assert.match(f.calls[0].messages[0].text, /Refereed journal article records retrieved from NASA ADS/);
+  assert.match(result.response, /\(R\.M\. Shannon & J\.M\. Cordes 2013\)/);
+  assert.match(result.response, /### References/);
+  assert.doesNotMatch(result.response, /invented/);
+});
+
+test('Ask AI retries malformed literature plans and falls back to question keywords', async t => {
+  const scenarios = [
+    { retry: '{"queries":["timing noise (pulsars)"]}', query: /abs:"timing".*abs:"noise".*abs:"pulsars"/ },
+    { retry: 'Timing noise', query: /abs:"pulsar".*abs:"timing".*abs:"noise"/ },
+  ];
+  for (const { retry, query } of scenarios) {
+    const f = fixture(t, { providerFactory: () => ({ async runTurn() { return { text: 'Timing residuals help measure timing noise [P:1].' }; } }) });
+    const planAttempts = [];
+    const searches = enableResearch(f, undefined, { planReply(input) {
+      planAttempts.push(input.messages.length);
+      return input.messages.length === 1 ? 'Here are some search ideas.' : retry;
+    } });
+    const h = await highlight(f, 'other.txt', 'An independent measurement challenges the stable rotation assumption.');
+    const task = await f.service.createTask({ highlightIds: [h.id], action: 'question', question: 'What is pulsar timing noise?' });
+    const result = await completed(f.service, task.id);
+    assert.deepEqual(planAttempts, [1, 2]);
+    assert.equal(result.status, 'completed');
+    assert.equal(searches.length, 1);
+    const adsQuery = searches[0].searchParams.get('q');
+    assert.match(adsQuery, query);
+    assert.match(adsQuery, /property:refereed/);
+    assert.doesNotMatch(adsQuery, /independent|stable|assumption/);
+    assert.match(result.response, /### References/);
+  }
 });
 
 test('Ask AI rewrites overlong answers before saving and rejects repeated failures', async t => {
@@ -246,18 +338,34 @@ test('Ask AI rewrites overlong answers before saving and rejects repeated failur
   const f = fixture(t, { providerFactory: () => ({ async runTurn(input) {
     calls += 1;
     assert.equal(input.onDelta, undefined);
-    if (calls === 2) { assert.match(input.messages[1].text, /previous answer was too long/i); return { text: 'A concise answer.' }; }
+    if (calls === 2) { assert.match(input.messages[1].text, /previous answer was too long/i); return { text: 'A concise answer [P:1].' }; }
     return { text: 'One.\n\nTwo.\n\nThree.\n\nFour.' };
   } }) });
+  enableResearch(f);
   const h = await highlight(f);
   const first = await f.service.createTask({ highlightIds: [h.id], action: 'question' });
-  assert.match((await completed(f.service, first.id)).response, /^A concise answer\./);
+  assert.match((await completed(f.service, first.id)).response, /A concise answer \[/);
   assert.equal(calls, 2);
   const second = await f.service.createTask({ highlightIds: [h.id], action: 'question' });
   const failed = await completed(f.service, second.id);
   assert.equal(failed.errorCode, 'response-too-long');
   assert.equal(failed.response, '');
   assert.equal(calls, 5);
+});
+
+test('Ask AI reports missing access or evidence without saving an uncited answer', async t => {
+  const f = fixture(t, { providerFactory: () => ({ async runTurn(input) {
+    return { text: input.instructions.includes('Evaluate the supplied wiki search results') ? 'NO_WIKI_CONTEXT' : 'Claim [P:99].' };
+  } }) });
+  const h = await highlight(f);
+  const ask = async () => completed(f.service, (await f.service.createTask({ highlightIds: [h.id], action: 'question' })).id);
+  assert.equal((await ask()).errorCode, 'research-token-required');
+  enableResearch(f, []);
+  assert.equal((await ask()).errorCode, 'insufficient-research');
+  enableResearch(f);
+  const invalid = await ask();
+  assert.equal(invalid.errorCode, 'research-citations-required');
+  assert.equal(invalid.response, '');
 });
 
 test('invalid citations and unsupported image requests fail safely without changing notes', async t => {
@@ -516,8 +624,9 @@ test('filename citations support parentheses and concept updates retain existing
 test('reading responses accept links to selected sources while rejecting unrelated links', async t => {
   const f = fixture(t, { providerFactory: () => ({ async runTurn(input) {
     const id = input.messages[0].text.match(/\[H:([^\]]+)\]/)[1];
-    return { text: `Explanation [H:${id}] (source: [paper.txt](/#file/paper.txt)).` };
+    return { text: `Explanation [P:1] [H:${id}] (source: [paper.txt](/#file/paper.txt)).` };
   } }) });
+  enableResearch(f);
   const h = await highlight(f);
   const task = await f.service.createTask({ action: 'question', highlightIds: [h.id] });
   const result = await completed(f.service, task.id);
@@ -528,7 +637,8 @@ test('reading responses accept links to selected sources while rejecting unrelat
 });
 
 test('reading assistance retains an answer when the model omits passage reference syntax', async t => {
-  const f = fixture(t, { providerFactory: () => ({ async runTurn() { return { text: 'The selected passage describes stable rotation.' }; } }) });
+  const f = fixture(t, { providerFactory: () => ({ async runTurn() { return { text: 'The selected passage describes stable rotation [P:1].' }; } }) });
+  enableResearch(f);
   const h = await highlight(f);
   const task = await f.service.createTask({ action: 'question', highlightIds: [h.id] });
   const result = await completed(f.service, task.id);

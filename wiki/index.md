@@ -5,6 +5,7 @@ Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pul
 File navigation: source citations and source lists open saved files in the reading workspace; wiki page references in pages and chat link to their pages and share the same link styling, including pulsar names containing plus signs and standalone references formatted as inline code.
 
 Related knowledge: connection previews show concise AI-generated wiki page summaries with spacing below their titles, render Markdown and use wiki link styling for their titles.
+Saved wiki connections in the reading sidebar share the link styling used in chat and wiki pages. [Reading interface](../public/reading.js)
 
 Browser tab: PulsarWiki uses its favicon as the tab icon.
 
@@ -27,6 +28,10 @@ Markdown tables share the chat style and scroll horizontally when needed; the ch
 Reading assistance: Ask AI shows animated dots while generating a concise explanation in one or two paragraphs, with citations to selected passages. The question and answer appear in closely spaced borderless boxes, with completion status below the answer. Highlight colours appear as individual swatches; assisted highlights show blue as their selected colour and disable other colour choices. Saved responses show the user question, can be expanded from a five-line preview, and can start a new chat with the selected passages and response.
 
 Agent guidance: [GEMINI.md](../GEMINI.md) requires clickable file references in chat and wiki content, including linked source citations.
+
+Ask AI searches the current wiki first and links relevant pages in the answer. If the wiki pass cannot produce a valid cited answer, it searches sciX/NASA ADS for peer-reviewed journal articles and includes linked MNRAS-style in-text citations and a reference list. The online search requires an ADS token. [Reading assistance](../agent/reading-service.js)
+
+Ask AI retries an unusable literature search plan and can search ADS using keywords from the typed question. [Literature search](../agent/reading-service.js)
 
 ## Pillar 1: Foundational Physics
 - [[neutron-star]]: The ultra-dense physical nature of pulsars and the nuclear Equation of State.

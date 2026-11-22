@@ -300,9 +300,35 @@ class SourceDiscoveryService {
   }
 
   async fetchText(url, options, label) {
-    const response = await this.fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
+    const timeout = AbortSignal.timeout(15000);
+    const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+    const response = await this.fetch(url, { ...options, signal });
     if (!response.ok) throw new Error(`${label} returned ${response.status}.`);
     return response.text();
+  }
+
+  async searchRefereedArticles(topics, { signal } = {}) {
+    const searches = topics.map(topic => usefulTerms(topic, 6))
+      .filter(terms => terms.length)
+      .map(terms => `(${terms.map(term => `abs:"${escapeQueryValue(term)}"`).join(' AND ')})`);
+    if (!searches.length) return [];
+    const params = new URLSearchParams({
+      q: `(${searches.join(' OR ')}) AND property:refereed AND doctype:article`,
+      fl: 'bibcode,title,author,year,pub,volume,page,eid,abstract,doi',
+      rows: '12',
+      sort: 'score desc',
+    });
+    const payload = JSON.parse(await this.fetchText(`${ADS_API}?${params}`, {
+      headers: { Authorization: `Bearer ${this.adsToken}` }, signal,
+    }, 'NASA ADS'));
+    const papers = parseAdsResponse(payload);
+    return deduplicate(papers.flatMap((paper, index) => {
+      const doc = payload.response.docs[index];
+      if (!paper.recordUrl || !doc.title?.length || !doc.pub?.trim() || !paper.abstract?.trim() ||
+          !paper.authors[0]?.trim() || !/^\d{4}$/.test(doc.year)) return [];
+      const page = Array.isArray(doc.page) ? doc.page[0] : doc.page;
+      return [{ ...paper, year: String(doc.year), volume: doc.volume, page: doc.eid || page }];
+    }));
   }
 
   async authorOrcids(papers) {
