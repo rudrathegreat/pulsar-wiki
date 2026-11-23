@@ -11,6 +11,7 @@ const chokidar = require('chokidar');
 const { AsyncLocalStorage } = require('node:async_hooks');
 const { initializeWorkspace, createWorkspace, validateWorkspace, describe } = require('./agent/workspaces');
 const { createWorkspaceZip } = require('./agent/workspace-export');
+const { listProjectFolder, openExplorerFile } = require('./agent/workspace-files');
 const { searchWorkspace } = require('./agent/workspace-search');
 const { pickFolder } = require('./agent/folder-picker');
 const { AgentService, AgentServiceError } = require('./agent/agent-service');
@@ -340,6 +341,40 @@ app.use('/api', (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     return workspaceScope.run(workspace, next);
   });
+});
+
+function explorerError(res, error, message) {
+  if (['ENOENT', 'ENOTDIR', 'ELOOP', 'EISDIR'].includes(error.code)) {
+    return res.status(404).json({ error: 'This project entry is unavailable.' });
+  }
+  return res.status(500).json({ error: message });
+}
+
+app.get('/api/workspaces/explorer', async (req, res) => {
+  const workspace = currentWorkspace();
+  try {
+    const entries = await listProjectFolder(workspace.rootDir, req.query.path ?? '');
+    res.json({ name: describe(workspace).name, entries });
+  } catch (error) {
+    explorerError(res, error, 'This project folder could not be read.');
+  }
+});
+
+app.get('/api/workspaces/explorer/download', async (req, res) => {
+  try {
+    const input = await openExplorerFile(currentWorkspace().rootDir, req.query.path);
+    if (res.destroyed) {
+      input.destroy();
+      return;
+    }
+    res.attachment(path.posix.basename(req.query.path)).type('application/octet-stream');
+    await pipeline(input, res);
+  } catch (error) {
+    if (!res.headersSent && !res.destroyed) {
+      res.removeHeader('Content-Disposition');
+      explorerError(res, error, 'This project file could not be opened.');
+    }
+  }
 });
 
 app.get('/api/workspaces/export', async (_req, res) => {

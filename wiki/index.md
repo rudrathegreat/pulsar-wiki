@@ -13,6 +13,8 @@ Browser tab: PulsarWiki uses its favicon as the tab icon.
 
 Sidebar navigation: hover or focus an icon to see a shadow-free tooltip explaining what it opens or changes.
 
+Select the sidebar folder icon to browse the active project in **Project files**. Expand folders to navigate the tree, open wiki pages, sources, notebooks, and references in their PulsarWiki views, or download other project files. Use File → Open project to switch folders. [Project files interface](../public/workspace-explorer.js)
+
 The workspace top bar shows the full folder path on the right. The File, Edit, Selection, Go, and Help menus open with a 6 px gap below the bar. The File menu creates wiki files and chats, adds or uploads sources, opens saved items and projects, and exports the active project as a ZIP. The ZIP includes the wiki, sources, notebooks, references, instructions, and saved workspace data such as chats and reading notes. [Workspace File menu](../public/index.html) [Top bar layout](../public/style.css) [Project export](../agent/workspace-export.js)
 
 The Edit menu lists Undo, Redo, Cut, Copy, Paste, Find, and Replace with platform-specific shortcuts. Find opens 6 px below the top bar, centred horizontally, and searches saved source files, wiki pages, and Jupyter notebooks as you type. It suggests completions and shows each result with a linked name, location details to its right, and a grey-highlighted excerpt. Markdown excerpts render with formatting and links. Source results use their display names. Select **Go to location** to open the matched passage or notebook cell. Find runs locally without AI. Replace edits the active text field. [Workspace Edit menu](../public/index.html) [Find styles](../public/style.css) [Workspace search](../agent/workspace-search.js)
@@ -110,4 +112,4 @@ All 41 wiki pages were updated to use the two-sentence declaration format. [[log
 ---
 *Last updated: 2026-11-23*
 
-**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-23. This update documented the declaration format and its use across the wiki.
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-23. This update documented the sidebar file explorer and where to switch projects.

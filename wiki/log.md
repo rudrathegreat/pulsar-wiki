@@ -437,4 +437,6 @@ All major updates to the wiki are recorded here.
 
 | 2026-11-23 | Wiki documentation | Aligned the agent instructions and all 41 wiki declarations with the two-sentence example. [Page format](../GEMINI.md#page-format) |
 
-**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-23. This update recorded the revision of the instructions and wiki declarations.
+| 2026-11-23 | Workspace / application | Added an in-app project file explorer to the sidebar folder icon. [Project files interface](../public/workspace-explorer.js) [Workspace file access](../agent/workspace-files.js) |
+
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-23. This update recorded the addition of the sidebar file explorer.

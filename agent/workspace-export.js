@@ -1,9 +1,9 @@
 'use strict';
 
 const fs = require('node:fs/promises');
-const { O_RDONLY, O_NOFOLLOW, O_NONBLOCK } = require('node:fs').constants;
 const path = require('node:path');
 const { ZipFile } = require('yazl');
+const { openProjectFile } = require('./workspace-files');
 
 const PROJECT_PATHS = ['wiki', 'raw', 'notebooks', 'GEMINI.md', 'AGENTS.md', 'CLAUDE.md', 'references.bib', '.gitignore'];
 const SAVED_DATA_PATHS = [
@@ -38,21 +38,6 @@ async function collectEntries(root, archivePath, entries, optional = false) {
     }
   } else if (stat.isFile()) {
     entries.push({ file, archivePath, stat });
-  }
-}
-
-async function openProjectFile(file) {
-  if (path.relative(file, await fs.realpath(file))) throw new Error('A project file was moved during export.');
-  const handle = await fs.open(file, O_RDONLY | (O_NOFOLLOW || 0) | (O_NONBLOCK || 0));
-  try {
-    const actual = await handle.stat();
-    const current = await fs.lstat(file);
-    if (!actual.isFile() || !current.isFile() || actual.dev !== current.dev || actual.ino !== current.ino
-        || path.relative(file, await fs.realpath(file))) throw new Error('A project file was moved during export.');
-    return handle.createReadStream();
-  } catch (error) {
-    await handle.close();
-    throw error;
   }
 }
 

@@ -3656,6 +3656,61 @@ button:disabled {
 [data-theme="dark"] .source-action-dialog input { background: #222; }
 
 .source-action-dialog input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+#workspace-explorer {
+  margin: auto;
+  padding: 0;
+  width: min(540px, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(620px, calc(100dvh - 32px));
+  background: var(--surface);
+  color: var(--text-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+#workspace-explorer[open] { display: flex; flex-direction: column; }
+#workspace-explorer::backdrop { background: rgb(0 0 0 / .45); }
+.explorer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-sub);
+}
+.explorer-heading { min-width: 0; overflow-wrap: anywhere; }
+.explorer-heading h2 { font-size: 15px; font-weight: 600; }
+#workspace-explorer-name { color: var(--text-2); font-size: 12px; margin-top: 3px; }
+.explorer-actions { display: flex; flex-shrink: 0; gap: 6px; }
+.explorer-scroll { overflow: auto; padding: 8px 12px 12px; }
+.explorer-list { list-style: none; margin: 0; padding: 0; }
+.explorer-list .explorer-list {
+  margin-left: 13px;
+  padding-left: 7px;
+  border-left: 1px solid var(--border-sub);
+}
+.explorer-row {
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.explorer-row:hover { background: var(--surface-2); }
+.explorer-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.explorer-folder::marker { color: var(--text-2); font-size: 11px; }
+.explorer-file { display: block; padding-left: 23px; }
+.explorer-status { padding: 6px 8px; color: var(--text-2); font-size: 12px; }
+
 #workspace-open-item {
   width: 100%;
   padding: 4px;
