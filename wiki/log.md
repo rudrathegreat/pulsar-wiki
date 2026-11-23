@@ -445,4 +445,8 @@ All major updates to the wiki are recorded here.
 
 | 2026-11-24 | Workspace / application | Limited the Project files tree to the raw, wiki, and notebooks folders and their browsable contents. [Folder listing](../agent/workspace-files.js) |
 
-**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-24. This update recorded the restricted folder listing in Project files.
+| 2026-11-24 | Workspace / application | Added a grey hover highlight to file rows in Project files. [Explorer styles](../public/style.css) |
+
+| 2026-11-24 | Workspace / application | Applied the grey hover highlight to folder rows in Project files. [Explorer styles](../public/style.css) |
+
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-24. This update recorded the grey hover highlight on folder rows in Project files.

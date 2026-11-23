@@ -3700,7 +3700,7 @@ button:disabled {
   cursor: pointer;
 }
 .explorer-file { border: 0 !important; }
-.explorer-row:hover { background: var(--surface-2) !important; }
+.explorer-row:hover { background: var(--surface-3) !important; }
 .explorer-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .explorer-folder { list-style: none; }
 .explorer-folder::-webkit-details-marker { display: none; }

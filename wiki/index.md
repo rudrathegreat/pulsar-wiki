@@ -13,7 +13,7 @@ Browser tab: PulsarWiki uses its favicon as the tab icon.
 
 Sidebar navigation: hover or focus an icon to see a shadow-free tooltip explaining what it opens or changes.
 
-Select the sidebar folder icon to open **Project files** in the main content area. The tree starts with `raw`, `wiki`, and `notebooks`. Select a folder chevron to browse its contents, and use the file icons to identify file types. Open wiki pages, sources, and notebooks in their PulsarWiki views, or download other files from these folders. Use File → Open project to switch projects. [Project files interface](../public/workspace-explorer.js) [Folder listing](../agent/workspace-files.js)
+Select the sidebar folder icon to open **Project files** in the main content area. The tree starts with `raw`, `wiki`, and `notebooks`. Select a folder chevron to browse its contents, and use the file icons to identify file types. Hover over a file or folder to highlight its row in grey. Open wiki pages, sources, and notebooks in their PulsarWiki views, or download other files from these folders. Use File → Open project to switch projects. [Project files interface](../public/workspace-explorer.js) [Folder listing](../agent/workspace-files.js)
 
 The workspace top bar shows the full folder path on the right. The File, Edit, Selection, Go, and Help menus open with a 6 px gap below the bar. The File menu creates wiki files and chats, adds or uploads sources, opens saved items and projects, and exports the active project as a ZIP. The ZIP includes the wiki, sources, notebooks, references, instructions, and saved workspace data such as chats and reading notes. [Workspace File menu](../public/index.html) [Top bar layout](../public/style.css) [Project export](../agent/workspace-export.js)
 
@@ -112,4 +112,4 @@ All 41 wiki pages were updated to use the two-sentence declaration format. [[log
 ---
 *Last updated: 2026-11-24*
 
-**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-24. This update documented which folders appear in Project files and how to browse their contents.
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-24. This update documented the grey hover highlight on file and folder rows in Project files.
