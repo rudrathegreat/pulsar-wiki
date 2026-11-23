@@ -426,3 +426,5 @@ All major updates to the wiki are recorded here.
 | 2026-11-23 | Workspace / application | Excluded inline source citations and plain-text references to saved source filenames from wiki Find matches. [Workspace search](../agent/workspace-search.js) |
 
 | 2026-11-23 | Workspace / application | Added a 6 px gap between the top bar and the Find search bar. [Find styles](../public/style.css) |
+
+| 2026-11-23 | Workspace / application | Removed the parenthetical from the Connect to related knowledge button label. [Reading helper](../public/index.html) |

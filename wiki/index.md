@@ -4,7 +4,7 @@ Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pul
 
 File navigation: source citations and source lists open saved files in the reading workspace; wiki page references in pages and chat link to their pages and share the same link styling, including pulsar names containing plus signs and standalone references formatted as inline code.
 
-Related knowledge: connection previews show concise AI-generated wiki page summaries with spacing below their titles, render Markdown and use wiki link styling for their titles.
+Related knowledge: the reading helper opens connection previews with the **Connect to related knowledge** button. Previews show concise AI-generated wiki page summaries with spacing below their titles, render Markdown and use wiki link styling for their titles.
 Saved wiki connections in the reading sidebar share the link styling used in chat and wiki pages. [Reading interface](../public/reading.js)
 
 Browser tab: PulsarWiki uses its favicon as the tab icon.
