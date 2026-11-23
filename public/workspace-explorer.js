@@ -2,9 +2,7 @@
   'use strict';
 
   const byId = id => document.getElementById(id);
-  const dialog = byId('workspace-explorer');
   const root = byId('workspace-explorer-entries');
-  const trigger = byId('workspace-explorer-toggle');
   const refresh = byId('workspace-explorer-refresh');
   const endpoint = '/api/workspaces/explorer';
   let rootLoaded = false;
@@ -29,10 +27,7 @@
     row.textContent = entry.name;
     if (action) {
       row.type = 'button';
-      row.addEventListener('click', () => {
-        dialog.close();
-        void action();
-      });
+      row.addEventListener('click', () => { void action(); });
     } else {
       row.href = window.WorkspaceSession.url(`${endpoint}/download?${new URLSearchParams({ path })}`);
       row.download = entry.name;
@@ -100,10 +95,10 @@
     rootLoading = false;
   }
 
-  trigger.addEventListener('click', () => {
-    dialog.showModal();
-    if (!rootLoaded) void loadRoot();
-  });
-  byId('workspace-explorer-close').addEventListener('click', () => dialog.close());
+  window.WorkspaceExplorer = {
+    show() {
+      if (!rootLoaded) void loadRoot();
+    },
+  };
   refresh.addEventListener('click', () => { void loadRoot(); });
 })();

@@ -409,6 +409,7 @@ function showPanel(name, { historyMode = 'push' } = {}) {
   }
   if (name === 'handover') loadHandoverWorkspace();
   if (name === 'notebooks') window.ResearchNotebooks?.show();
+  if (name === 'explorer') window.WorkspaceExplorer.show();
 }
 
 const PILLAR_LABELS = [
@@ -2472,7 +2473,7 @@ window.openRawFile = openRawFile;
 
 function handleWikiRoute({ migrateLegacyHash = false } = {}) {
   // Older document/source links can have a wiki pathname: the explicit hash wins.
-  if (/^#(?:sources|files|chat|graph|handover|notebooks|notebook|file|reading|settings)(?:[/?]|$)/.test(location.hash)) return false;
+  if (/^#(?:sources|files|chat|graph|handover|notebooks|notebook|file|reading|settings|explorer)(?:[/?]|$)/.test(location.hash)) return false;
   let page = wikiPageFromPath(location.pathname);
   if (page && location.pathname !== wikiPath(page)) history.replaceState(null, '', wikiPath(page) + location.search);
   if (!page && location.hash.startsWith('#wiki/')) {
@@ -2518,7 +2519,7 @@ async function handleAppRoute() {
     showPanel('files', { historyMode: 'none' });
     return true;
   }
-  if (['#chat', '#graph', '#handover', '#notebooks', '#settings'].includes(hash)) {
+  if (['#chat', '#graph', '#handover', '#notebooks', '#settings', '#explorer'].includes(hash)) {
     showPanel(hash.slice(1), { historyMode: 'none' });
     return true;
   }

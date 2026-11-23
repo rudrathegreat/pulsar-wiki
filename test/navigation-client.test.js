@@ -27,6 +27,7 @@ function client(initial = '/wiki/timing') {
     location, URLSearchParams,
     document: { body: element('body'), getElementById: element, querySelectorAll: () => [], addEventListener: (type, listener) => { handlers[type] = listener; } },
     window: { addEventListener: (type, listener) => { handlers[type] = listener; },
+      WorkspaceExplorer: { show() { opened.push('explorer'); } },
       ResearchNotebooks: { show() {}, async route(hash) { if (!hash.startsWith('#notebook/')) return false; opened.push(hash); return true; } },
       ActiveReading: { closeHelper() {}, async route(hash) { if (!hash.startsWith('#reading/')) return false; opened.push(hash); return true; } },
       ReferencesEditor: { open() { opened.push('references'); } },
@@ -91,7 +92,7 @@ test('workspace Find links restore a wiki match range on navigation and reload',
   assert.deepEqual(reloaded.opened, [['telescope', 12, 18]]);
 });
 
-for (const panel of ['chat', 'graph', 'handover', 'notebooks', 'settings']) {
+for (const panel of ['chat', 'graph', 'handover', 'notebooks', 'settings', 'explorer']) {
   test(`${panel} has a URL and reload restores that tab`, async () => {
     const c = client(); c.showPanel(panel);
     assert.equal(c.entries.at(-1), `/#${panel}`);
@@ -101,6 +102,17 @@ for (const panel of ['chat', 'graph', 'handover', 'notebooks', 'settings']) {
     assert.equal(reloaded.entries.length, 1);
   });
 }
+
+test('Project files loads when opened and when restored through browser history', async () => {
+  const c = client();
+  c.showPanel('explorer');
+  c.showPanel('chat');
+  await c.travel(-1);
+  assert.equal(c.state.panel, 'explorer');
+  assert.deepEqual(c.opened, ['explorer', 'explorer']);
+  await c.travel(1);
+  assert.equal(c.state.panel, 'chat');
+});
 
 for (const view of ['add', 'upload', 'saved', 'references']) {
   test(`Sources ${view} survives reload even with an older wiki pathname`, async () => {

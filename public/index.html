@@ -58,7 +58,7 @@
   <!-- Icon bar -->
   <nav id="iconbar">
     <img class="iconbar-logo" src="/pulsar-wiki-logo.svg" alt="PulsarWiki" width="26" height="38"/>
-    <button class="icon-btn" id="workspace-explorer-toggle" data-tooltip="Browse project files" aria-label="Project files" aria-haspopup="dialog" aria-controls="workspace-explorer" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg></button>
+    <button class="icon-btn" id="workspace-explorer-toggle" data-panel="explorer" data-tooltip="Browse project files" aria-label="Project files" aria-controls="panel-explorer" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg></button>
     <button class="icon-btn active" id="ib-wiki" data-tooltip="Browse wiki pages" aria-label="Wiki" data-panel="wiki">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
     </button>
@@ -237,6 +237,19 @@
     </header>
     <!-- Content area -->
     <div id="content">
+
+      <section class="panel" id="panel-explorer" aria-labelledby="workspace-explorer-title">
+        <header class="explorer-header">
+          <div class="explorer-heading">
+            <h2 id="workspace-explorer-title">Project files</h2>
+            <p id="workspace-explorer-name"></p>
+          </div>
+          <button id="workspace-explorer-refresh" class="btn" type="button">Refresh</button>
+        </header>
+        <div class="explorer-scroll">
+          <ul id="workspace-explorer-entries" class="explorer-list" aria-label="Project files"></ul>
+        </div>
+      </section>
 
       <!-- Wiki panel -->
       <div class="panel active" id="panel-wiki">
@@ -677,22 +690,6 @@
   </div><!-- /main -->
 </div><!-- /app -->
 
-<dialog id="workspace-explorer" aria-labelledby="workspace-explorer-title">
-  <header class="explorer-header">
-    <div class="explorer-heading">
-      <h2 id="workspace-explorer-title">Project files</h2>
-      <p id="workspace-explorer-name"></p>
-    </div>
-    <div class="explorer-actions">
-      <button id="workspace-explorer-refresh" class="btn" type="button">Refresh</button>
-      <button id="workspace-explorer-close" class="btn" type="button" autofocus>Close</button>
-    </div>
-  </header>
-  <div class="explorer-scroll">
-    <ul id="workspace-explorer-entries" class="explorer-list" aria-label="Project files"></ul>
-  </div>
-</dialog>
-
 <dialog id="workspace-open-dialog" class="source-action-dialog" aria-labelledby="workspace-open-title">
   <h3 id="workspace-open-title"></h3>
   <form id="workspace-open-form">
@@ -797,7 +794,7 @@
 <script src="/reference-orcids.js"></script>
 <script src="/references.js"></script>
 <script src="/source-selects.js"></script>
-<script src="/app.js"></script>
 <script src="/workspace-explorer.js"></script>
+<script src="/app.js"></script>
 </body>
 </html>

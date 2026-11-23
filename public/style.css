@@ -3657,22 +3657,14 @@ button:disabled {
 
 .source-action-dialog input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-#workspace-explorer {
-  margin: auto;
-  padding: 0;
-  width: min(540px, calc(100vw - 32px));
-  max-width: none;
-  max-height: min(620px, calc(100dvh - 32px));
-  background: var(--surface);
-  color: var(--text-1);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
+#panel-explorer.active {
+  display: flex !important;
+  flex-direction: column;
 }
-#workspace-explorer[open] { display: flex; flex-direction: column; }
-#workspace-explorer::backdrop { background: rgb(0 0 0 / .45); }
 .explorer-header {
   display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
@@ -3682,8 +3674,7 @@ button:disabled {
 .explorer-heading { min-width: 0; overflow-wrap: anywhere; }
 .explorer-heading h2 { font-size: 15px; font-weight: 600; }
 #workspace-explorer-name { color: var(--text-2); font-size: 12px; margin-top: 3px; }
-.explorer-actions { display: flex; flex-shrink: 0; gap: 6px; }
-.explorer-scroll { overflow: auto; padding: 8px 12px 12px; }
+.explorer-scroll { flex: 1; min-height: 0; overflow: auto; padding: 8px 12px 12px; }
 .explorer-list { list-style: none; margin: 0; padding: 0; }
 .explorer-list .explorer-list {
   margin-left: 13px;
