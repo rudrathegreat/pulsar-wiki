@@ -32,16 +32,17 @@
     const shown = names.slice(0, limit).map((name, index) => `<span data-orcid-index="${index}">${author(name, paper.authorOrcids?.[index])}</span>`).join(', ');
     return shown ? shown + (names.length > limit ? ` +${names.length - limit}` : '') : 'Authors unavailable';
   }
-  async function hydrate(container, papers) {
+  async function hydrate(container, papers, { signal } = {}) {
     // Keep references to the original nodes: a late lookup must never update a new view.
     const targets = [...container.querySelectorAll('[data-orcid-paper]')].map(node => ({ node, paper: papers.find(p => String(p.id) === node.dataset.orcidPaper) })).filter(item => item.paper);
-    for (let start = 0; start < targets.length; start += 50) {
+    for (let start = 0; !signal?.aborted && start < targets.length; start += 50) {
       const batch = targets.slice(start, start + 50);
       try {
         const data = await readJsonResponse(await workspaceFetch('/api/sources/orcids', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, signal,
           body: JSON.stringify({ papers: batch.map(({ paper }) => ({ authors: paper.authors, title: paper.title, doi: paper.doi, arxivId: paper.arxivId, bibcode: paper.bibcode })) }),
         }), 'Author profiles');
+        if (signal?.aborted) return;
         batch.forEach(({ node, paper }, index) => {
           const ids = data.orcids?.[index];
           if (!Array.isArray(ids)) return;

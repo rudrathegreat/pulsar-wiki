@@ -559,19 +559,29 @@ app.get('/api/sources/filters', requireLocalSession, (_req, res) => {
   res.json({ filters: SOURCE_FILTERS, adsConfigured: Boolean(currentWorkspace().sourceDiscovery.adsToken) });
 });
 
+function sourceResponseSignal(response) {
+  const controller = new AbortController();
+  response.once('close', () => {
+    if (!response.writableFinished) controller.abort();
+  });
+  return controller.signal;
+}
+
 app.post('/api/sources/orcids', requireLocalSession, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  try { return res.json(await currentWorkspace().sourceDiscovery.authorOrcids(req.body?.papers)); }
-  catch (error) { return res.status(400).json({ error: error.message }); }
+  const signal = sourceResponseSignal(res);
+  try { return res.json(await currentWorkspace().sourceDiscovery.authorOrcids(req.body?.papers, { signal })); }
+  catch (error) { if (!signal.aborted) return res.status(400).json({ error: error.message }); }
 });
 
 app.post('/api/sources/search', requireLocalSession, async (req, res) => {
   const query = String(req.body?.query || '').trim();
   if (!query) return res.status(400).json({ error: 'Enter a research question, keywords, title, DOI, or paper link.' });
+  const signal = sourceResponseSignal(res);
   try {
-    return res.json(await currentWorkspace().sourceDiscovery.search(query, { limit: req.body?.limit, sort: req.body?.sort, filters: req.body?.filters }));
+    return res.json(await currentWorkspace().sourceDiscovery.search(query, { limit: req.body?.limit, sort: req.body?.sort, filters: req.body?.filters, signal }));
   } catch (error) {
-    return res.status(502).json({ error: error.message || 'The paper search could not be completed.' });
+    if (!signal.aborted) return res.status(502).json({ error: error.message || 'The paper search could not be completed.' });
   }
 });
 
@@ -591,8 +601,9 @@ app.post('/api/sources/:id/keywords', requireLocalMutation, async (req, res) => 
 });
 
 app.get('/api/sources/:id/related', requireLocalSession, async (req, res) => {
-  try { return res.json(await currentWorkspace().sourceDiscovery.related(req.params.id, req.query)); }
-  catch (error) { return res.status(400).json({ error: error.message || 'Related papers could not be loaded.' }); }
+  const signal = sourceResponseSignal(res);
+  try { return res.json(await currentWorkspace().sourceDiscovery.related(req.params.id, req.query, { signal })); }
+  catch (error) { if (!signal.aborted) return res.status(400).json({ error: error.message || 'Related papers could not be loaded.' }); }
 });
 
 app.post('/api/sources/import', requireLocalMutation, async (req, res) => {

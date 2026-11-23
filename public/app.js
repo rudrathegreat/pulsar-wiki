@@ -202,18 +202,18 @@ const api = {
     }), 'Wiki page');
   },
   async getRawList() { return readJsonResponse(await workspaceFetch('/api/raw'), 'Source files'); },
-  async searchSources(query, limit = 20, options = {}) {
+  async searchSources(query, limit = 20, options = {}, signal) {
     return readJsonResponse(await workspaceFetch('/api/sources/search', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, limit, ...options }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, limit, ...options }), signal,
     }), 'Paper search');
   },
-  async getRelatedSources(id, paper = {}, page = {}) {
+  async getRelatedSources(id, paper = {}, page = {}, signal) {
     const identity = new URLSearchParams();
     for (const key of ['provider', 'bibcode', 'doi', 'arxivId']) {
       if (paper[key]) identity.set(key, paper[key]);
     }
     if (page.group) { identity.set('group', page.group); identity.set('start', String(page.start)); }
-    return readJsonResponse(await workspaceFetch(`/api/sources/${encodeURIComponent(id)}/related?${identity}`), 'Related papers');
+    return readJsonResponse(await workspaceFetch(`/api/sources/${encodeURIComponent(id)}/related?${identity}`, { signal }), 'Related papers');
   },
   async citeSource(id) {
     return readJsonResponse(await workspaceFetch(`/api/sources/${encodeURIComponent(id)}/cite`, {
@@ -287,7 +287,6 @@ const state = {
   sourcePaperLink: false,
   sourcePaperHistory: [],
   sourcePapers: new Map(),
-  sourceDetailRequest: 0,
   sourceFilters: [],
   sourceJobTimer: null,
   graphData: null,
@@ -376,6 +375,10 @@ function panelUrl(name) {
 
 function showPanel(name, { historyMode = 'push' } = {}) {
   if (name === 'files' && historyMode !== 'none' && state.sourcePaperLink) closeSourceDetail();
+  if (state.panel === 'files' && name !== 'files') {
+    if (state.sourceDetailController) closeSourceDetail({ restoreResults: false });
+    state.sourceResultsController?.abort();
+  }
   // Documents and individual notebooks manage their more specific URLs themselves.
   if (name !== 'document') updateAppHistory(panelUrl(name), historyMode);
   if (name !== state.panel) {
@@ -1427,6 +1430,8 @@ const SOURCE_FILTERS = [
 
 function setSourceView(name, { historyMode = 'push' } = {}) {
   if (state.sourcePaperLink) closeSourceDetail();
+  else if (name !== 'add' && state.sourceDetailController) closeSourceDetail({ restoreResults: false });
+  if (name !== 'add') state.sourceResultsController?.abort();
   state.sourceView = ['add', 'upload', 'saved', 'references'].includes(name) ? name : 'add';
   if (state.panel === 'files') updateAppHistory(panelUrl('files'), historyMode);
   document.querySelectorAll('[data-source-view]').forEach(button => {
@@ -1551,6 +1556,7 @@ async function citeSource(id, button) {
 }
 
 function renderSourceResults(results) {
+  state.sourceResultsController?.abort();
   state.sourceResults = Array.isArray(results) ? results : [];
   for (const paper of state.sourceResults) {
     state.sourcePapers.set(paper.id, paper);
@@ -1566,7 +1572,10 @@ function renderSourceResults(results) {
     : state.sourceResults.length
       ? '<div class="source-empty"><strong>No papers to show</strong><p>All results are already downloaded. Change the downloaded papers filter to show them.</p></div>'
       : '<div class="source-empty"><strong>No matching papers found</strong><p>Try fewer terms, a broader date range, or remove a filter.</p></div>';
-  void window.AuthorOrcids?.hydrate(dom.sourceResults, visible);
+  if (window.AuthorOrcids && visible.length && !state.sourceDetailController) {
+    state.sourceResultsController = new AbortController();
+    void window.AuthorOrcids.hydrate(dom.sourceResults, visible, { signal: state.sourceResultsController.signal });
+  }
   updateSourceSelection();
 }
 
@@ -1583,14 +1592,25 @@ function updateSourceSelection() {
   currentImport.title = paper?.downloaded ? 'Already downloaded' : paper && !paper.canImport ? 'No open arXiv PDF is available for import' : '';
 }
 
-function closeSourceDetail() {
+function closeSourceDetail({ restoreResults = true } = {}) {
   state.activeSourceId = null;
   state.sourcePaperLink = false;
-  state.sourceDetailRequest++;
+  state.sourceDetailController?.abort();
+  state.sourceDetailController = null;
+  state.loadMoreRelated = null;
   state.sourcePaperHistory = [];
   $('source-paper-page').hidden = true;
   $('source-search-page').hidden = false;
-  renderSourceResults(state.sourceResults);
+  if (restoreResults) renderSourceResults(state.sourceResults);
+  else updateSourceSelection();
+}
+
+function startSourceDetail() {
+  state.sourceResultsController?.abort();
+  state.sourceDetailController?.abort();
+  state.sourceDetailController = new AbortController();
+  state.loadMoreRelated = null;
+  return state.sourceDetailController.signal;
 }
 
 async function openLinkedPaper(bibcode) {
@@ -1599,9 +1619,9 @@ async function openLinkedPaper(bibcode) {
   state.sourcePaperLink = true;
   state.activeSourceId = null;
   state.sourcePaperHistory = [];
-  const request = ++state.sourceDetailRequest;
+  const signal = startSourceDetail();
   const detailWorkspace = workspaceId;
-  const current = () => state.sourceDetailRequest === request && state.panel === 'files' && workspaceId === detailWorkspace;
+  const current = () => !signal.aborted && state.panel === 'files' && workspaceId === detailWorkspace;
   $('source-search-page').hidden = true;
   $('source-paper-page').hidden = false;
   $('source-paper-back').textContent = 'Back to results';
@@ -1611,7 +1631,7 @@ async function openLinkedPaper(bibcode) {
   $('panel-files').scrollTop = 0;
   updateSourceSelection();
   try {
-    const data = await api.searchSources(`bibcode:${bibcode} source:ads`, 1, { filters: { refereed: 'all' } });
+    const data = await api.searchSources(`bibcode:${bibcode} source:ads`, 1, { filters: { refereed: 'all' } }, signal);
     if (!current()) return;
     const paper = data.results.find(result => result.bibcode === bibcode);
     if (!paper) throw new Error(data.warnings?.[0] || 'NASA ADS has no matching paper record.');
@@ -1628,9 +1648,9 @@ async function showSourceDetail(id, remember = true) {
   if (!paper) return;
   if (remember && state.activeSourceId) state.sourcePaperHistory.push(state.activeSourceId);
   state.activeSourceId = id;
-  const request = ++state.sourceDetailRequest;
+  const signal = startSourceDetail();
   const detailWorkspace = workspaceId;
-  const current = () => workspaceId === detailWorkspace && state.sourceDetailRequest === request && state.activeSourceId === id;
+  const current = () => !signal.aborted && workspaceId === detailWorkspace && state.activeSourceId === id;
   $('source-search-page').hidden = true;
   $('source-paper-page').hidden = false;
   $('source-paper-back').textContent = state.sourcePaperHistory.length ? 'Back to previous paper' : 'Back to results';
@@ -1644,7 +1664,7 @@ async function showSourceDetail(id, remember = true) {
     <section class="source-paper-keywords"><h3>Keywords</h3><div class="source-result-tags" id="paper-keywords-${escHtml(id)}" aria-label="AI keywords from abstract" aria-live="polite">${sourceKeywordMarkup(paper)}</div></section>
     ${paper.recordUrl ? `<a class="source-record-link" href="${escHtml(paper.recordUrl)}" target="_blank" rel="noreferrer">Open publication record</a>` : ''}`;
   typesetMath($('source-paper-abstract'));
-  void window.AuthorOrcids?.hydrate($('source-paper-metadata'), [paper]);
+  void window.AuthorOrcids?.hydrate($('source-paper-metadata'), [paper], { signal });
   $('source-paper-title').focus({ preventScroll: true });
   $('panel-files').scrollTop = 0;
   updateSourceSelection();
@@ -1652,7 +1672,7 @@ async function showSourceDetail(id, remember = true) {
   relations.innerHTML = '<p class="source-related-loading"><span class="document-spinner"></span>Loading references and citations...</p>';
   void loadSourceKeywords([paper], current);
   try {
-    const data = await api.getRelatedSources(id, paper);
+    const data = await api.getRelatedSources(id, paper, undefined, signal);
     if (!current()) return;
     const groups = Object.fromEntries(['references', 'citations'].map(key => [key, (data.groups || []).find(item => item.key === key) || { key, results: [] }]));
     const addPapers = papers => {
@@ -1674,7 +1694,7 @@ async function showSourceDetail(id, remember = true) {
           ${group.hasMore ? `<button class="btn" type="button" data-related-more="${key}" ${group.loading ? 'disabled' : ''}>${group.loading ? 'Loading?' : 'Show more'}</button>` : ''}</section>`;
       }).join('');
       updateSourceSelection();
-      void window.AuthorOrcids?.hydrate(relations, related);
+      void window.AuthorOrcids?.hydrate(relations, related, { signal });
     };
     for (const group of Object.values(groups)) addPapers(group.results || []);
     render();
@@ -1686,7 +1706,7 @@ async function showSourceDetail(id, remember = true) {
       group.error = '';
       render();
       try {
-        const page = await api.getRelatedSources(id, paper, { group: key, start: group.nextStart });
+        const page = await api.getRelatedSources(id, paper, { group: key, start: group.nextStart }, signal);
         if (!current()) return;
         const next = (page.groups || []).find(item => item.key === key);
         if (!next || next.error) throw new Error(next?.error || 'Could not load more papers.');
@@ -1714,10 +1734,11 @@ async function runSourceSearch() {
     return;
   }
   if (!$('source-search-form').reportValidity()) return;
-  const request = (state.sourceSearchRequest || 0) + 1;
-  state.sourceSearchRequest = request;
+  state.sourceSearchController?.abort();
+  state.sourceSearchController = new AbortController();
+  const { signal } = state.sourceSearchController;
   const searchWorkspace = workspaceId;
-  const current = () => state.sourceSearchRequest === request && workspaceId === searchWorkspace;
+  const current = () => !signal.aborted && workspaceId === searchWorkspace;
   const options = {
     sort: $('source-sort').value,
     filters: {
@@ -1730,13 +1751,14 @@ async function runSourceSearch() {
   dom.sourceSearchStatus.className = 'source-search-status visible loading';
   dom.sourceSearchStatus.innerHTML = '<span class="document-spinner"></span><span>Searching for papers...</span>';
   state.selectedSourceIds.clear();
-  closeSourceDetail();
+  state.sourceResultsController?.abort();
+  closeSourceDetail({ restoreResults: false });
   state.sourcePapers.clear();
   state.sourceResults = [];
   dom.sourceResults.innerHTML = '';
   $('source-results-header').hidden = true;
   try {
-    const data = await api.searchSources(query, 20, options);
+    const data = await api.searchSources(query, 20, options, signal);
     if (!current()) return;
     state.sourceFilters = data.filters || SOURCE_FILTERS;
     renderSourceResults(data.results);

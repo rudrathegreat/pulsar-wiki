@@ -62,6 +62,24 @@ test('existing references resolve exact ADS titles and reject ambiguous matches'
   assert.deepEqual((await service.authorOrcids([{ title: 'Pulsar timing', authors: ['Ada Pulsar'] }])).orcids, [[null]]);
 });
 
+test('cancelling author enrichment stops the batch and leaves the paper available for a new lookup', async () => {
+  const calls = [];
+  const controller = new AbortController();
+  const service = new SourceDiscoveryService({ rawDir: '.', adsToken: '', fetchImpl(url, { signal }) {
+    calls.push(url);
+    if (calls.length > 4) return Response.json({ message: { author: [{ given: 'Ada', ORCID: ID }] } });
+    return new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
+  } });
+  const papers = Array.from({ length: 5 }, (_, i) => ({ doi: `10.1234/paper${i}`, authors: ['Ada'] }));
+  const pending = service.authorOrcids(papers, { signal: controller.signal });
+  assert.equal(calls.length, 4);
+  controller.abort();
+  await assert.rejects(pending, { name: 'AbortError' });
+  assert.equal(calls.length, 4);
+  assert.deepEqual((await service.authorOrcids([papers[0]])).orcids, [[ID]]);
+  assert.equal(calls.length, 5);
+});
+
 test('imports preserve positional ORCID IDs in editable BibTeX', t => {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulsarwiki-orcid-'));
   t.after(() => fs.rmSync(rootDir, { recursive: true, force: true }));

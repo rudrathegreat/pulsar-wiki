@@ -29,6 +29,35 @@ test('refereed literature search retries a temporary ADS error and skips malform
   assert.deepEqual(papers.map(paper => paper.title), ['Pulsar timing noise']);
 });
 
+test('SciX search retries a timeout and returns the recovered result', async () => {
+  const requests = [];
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', async fetchImpl(url) {
+    requests.push(url);
+    if (requests.length === 1) throw new DOMException('Timed out', 'TimeoutError');
+    return Response.json({ response: { docs: [{ bibcode: '2008ApJ...679..675V', title: ['Pulsar timing'] }] } });
+  } });
+  const result = await service.search('pulsar source:scix');
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0], requests[1]);
+  assert.equal(result.results[0].title, 'Pulsar timing');
+  assert.deepEqual(result.warnings, []);
+});
+
+test('cancelling paper detail requests stops both related calls without retrying', async () => {
+  const calls = [];
+  const controller = new AbortController();
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', fetchImpl(url, { signal }) {
+    calls.push(signal);
+    return new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
+  } });
+  service.remember([{ id: 'paper', bibcode: '2008ApJ...679..675V' }]);
+  const pending = service.related('paper', {}, { signal: controller.signal });
+  assert.equal(calls.length, 2);
+  controller.abort();
+  await assert.rejects(pending, { name: 'AbortError' });
+  assert.ok(calls.every(signal => signal.aborted));
+});
+
 const ARXIV_FEED = `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
   <entry>
@@ -364,9 +393,9 @@ for (const outcome of ['empty', 'error', 'invalid response']) {
       return new Response(ARXIV_FEED);
     } });
     const result = await service.search('pulsar', { filters: { refereed: 'all' } });
-    assert.equal(calls.length, 2);
+    assert.equal(calls.length, outcome === 'error' ? 3 : 2);
     assert.ok(calls[0].startsWith('https://api.adsabs.harvard.edu/'));
-    assert.ok(calls[1].startsWith('https://export.arxiv.org/'));
+    assert.ok(calls.at(-1).startsWith('https://export.arxiv.org/'));
     assert.equal(result.results[0].provider, 'arXiv');
     assert.equal(result.warnings.length, outcome === 'empty' ? 0 : 1);
   });

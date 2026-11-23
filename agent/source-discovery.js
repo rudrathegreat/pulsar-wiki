@@ -300,12 +300,29 @@ class SourceDiscoveryService {
     return entry.result;
   }
 
-  async fetchText(url, options, label) {
-    const timeout = AbortSignal.timeout(15000);
+  async fetchText(url, options, label, timeoutMs = 15000) {
+    options.signal?.throwIfAborted();
+    const timeout = AbortSignal.timeout(timeoutMs);
     const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
     const response = await this.fetch(url, { ...options, signal });
-    if (!response.ok) throw Object.assign(new Error(`${label} returned ${response.status}.`), { status: response.status });
+    if (!response.ok) {
+      void response.body?.cancel().catch(() => {});
+      throw Object.assign(new Error(`${label} returned ${response.status}.`), { status: response.status });
+    }
     return response.text();
+  }
+
+  async fetchAdsSearch(params, { signal, retryTimeoutMs = 15000 } = {}) {
+    const url = `${ADS_API}?${params}`;
+    const options = { headers: { Authorization: `Bearer ${this.adsToken}` }, signal };
+    try {
+      return await this.fetchText(url, options, 'NASA ADS');
+    } catch (error) {
+      signal?.throwIfAborted();
+      if (!(error instanceof TypeError || error.name === 'TimeoutError' || [500, 502, 503, 504].includes(error.status))) throw error;
+      await delay(250, undefined, { signal });
+      return this.fetchText(url, options, 'NASA ADS', retryTimeoutMs);
+    }
   }
 
   async searchRefereedArticles(topics, { signal } = {}) {
@@ -319,17 +336,7 @@ class SourceDiscoveryService {
       rows: '12',
       sort: 'score desc',
     });
-    const url = `${ADS_API}?${params}`;
-    const options = { headers: { Authorization: `Bearer ${this.adsToken}` }, signal };
-    let body;
-    try {
-      body = await this.fetchText(url, options, 'NASA ADS');
-    } catch (error) {
-      signal?.throwIfAborted();
-      if (!(error instanceof TypeError || error.name === 'TimeoutError' || [500, 502, 503, 504].includes(error.status))) throw error;
-      await delay(250, undefined, { signal });
-      body = await this.fetchText(url, options, 'NASA ADS');
-    }
+    const body = await this.fetchAdsSearch(params, { signal });
     const payload = JSON.parse(body);
     if (!Array.isArray(payload?.response?.docs)) throw new SyntaxError('NASA ADS returned an invalid search response.');
     const docs = payload.response.docs.filter(doc => doc && Array.isArray(doc.author) && doc.author.length &&
@@ -343,14 +350,16 @@ class SourceDiscoveryService {
     }));
   }
 
-  async authorOrcids(papers) {
+  async authorOrcids(papers, { signal } = {}) {
     if (!Array.isArray(papers) || papers.length > 50 || papers.some(paper => !paper || !Array.isArray(paper.authors) || paper.authors.length > 3000 || paper.authors.some(name => typeof name !== 'string' || name.length > 500))) {
       throw new Error('Provide up to 50 papers with author names.');
     }
     const output = new Array(papers.length);
+    const pending = new Map();
     let next = 0;
     await Promise.all(Array.from({ length: Math.min(4, papers.length) }, async () => {
       while (next < papers.length) {
+        signal?.throwIfAborted();
         const index = next++;
         const paper = papers[index];
         const doi = typeof paper.doi === 'string' ? paper.doi.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '').trim().slice(0, 512) : '';
@@ -359,37 +368,40 @@ class SourceDiscoveryService {
         const title = typeof paper.title === 'string' ? paper.title.trim().slice(0, 1000) : '';
         const key = JSON.stringify([doi, bibcode, arxivId, title, Boolean(this.adsToken)]);
         if (!doi && !bibcode && !arxivId && !title) { output[index] = paper.authors.map(() => null); continue; }
-        let cached = this.orcidCache.get(key);
-        if (!cached || cached.expires < this.now()) {
-          const promise = (async () => {
+        const cached = this.orcidCache.get(key);
+        let lookup = cached?.expires > this.now() ? cached.records : pending.get(key);
+        if (!lookup) {
+          lookup = (async () => {
             const records = [];
             let resolvedDoi = doi;
             if (this.adsToken) {
               try {
                 const q = bibcode ? `bibcode:"${escapeQueryValue(bibcode)}"` : doi ? `doi:"${escapeQueryValue(doi)}"` : arxivId ? `identifier:"arXiv:${escapeQueryValue(arxivId)}"` : `title:"${escapeQueryValue(title)}"`;
                 const params = new URLSearchParams({ q, fl: 'title,doi,author,orcid_pub,orcid_user', rows: '2' });
-                const payload = JSON.parse(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` } }, 'NASA ADS'));
+                const payload = JSON.parse(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` }, signal }, 'NASA ADS'));
                 const docs = payload.response?.docs || [];
                 const titleKey = value => String(value || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
                 const matches = !doi && !bibcode && !arxivId ? docs.filter(doc => titleKey(doc.title?.[0]) === titleKey(title)) : docs;
                 const doc = matches.length === 1 ? matches[0] : null;
                 if (!resolvedDoi && doc) resolvedDoi = Array.isArray(doc.doi) ? doc.doi[0] : doc.doi;
                 if (Array.isArray(doc?.author)) doc.author.forEach((name, i) => records.push({ name, orcid: normalizeOrcid(doc.orcid_pub?.[i]) || normalizeOrcid(doc.orcid_user?.[i]) }));
-              } catch { /* Try DOI metadata independently. */ }
+              } catch { signal?.throwIfAborted(); }
             }
             if (resolvedDoi && /^10\.\d{4,9}\/\S+$/i.test(resolvedDoi)) {
               try {
-                const payload = JSON.parse(await this.fetchText(`https://api.crossref.org/works/${encodeURIComponent(resolvedDoi)}`, { headers: { Accept: 'application/json' } }, 'Crossref'));
+                const payload = JSON.parse(await this.fetchText(`https://api.crossref.org/works/${encodeURIComponent(resolvedDoi)}`, { headers: { Accept: 'application/json' }, signal }, 'Crossref'));
                 if (Array.isArray(payload.message?.author)) payload.message.author.forEach(item => records.push({ name: [item.given, item.family].filter(Boolean).join(' ') || item.name, orcid: item.ORCID }));
-              } catch { /* Missing IDs leave names as text. */ }
+              } catch { signal?.throwIfAborted(); }
             }
+            signal?.throwIfAborted();
+            this.orcidCache.set(key, { records, expires: this.now() + 10 * 60 * 1000 });
+            if (this.orcidCache.size > 1000) this.orcidCache.delete(this.orcidCache.keys().next().value);
             return records;
           })();
-          cached = { promise, expires: this.now() + 10 * 60 * 1000 };
-          this.orcidCache.set(key, cached);
-          if (this.orcidCache.size > 1000) this.orcidCache.delete(this.orcidCache.keys().next().value);
+          pending.set(key, lookup);
         }
-        const records = await cached.promise;
+        const records = await lookup;
+        signal?.throwIfAborted();
         output[index] = matchAuthors(paper.authors, records);
         // Retain discovered IDs for a subsequent import of this same work.
         for (const { result } of this.cache.values()) {
@@ -403,7 +415,8 @@ class SourceDiscoveryService {
     return { orcids: output };
   }
 
-  async search(input, { limit = 20, sort = 'default', filters = {} } = {}) {
+  async search(input, { limit = 20, sort = 'default', filters = {}, signal } = {}) {
+    signal?.throwIfAborted();
     const query = classifyQuery(input);
     const sorts = { default: 'score desc', citations: 'citation_count desc', recent: 'date desc', author: 'first_author asc' };
     if (!Object.hasOwn(sorts, sort)) throw new Error('Choose a valid sort order.');
@@ -439,16 +452,18 @@ class SourceDiscoveryService {
       const base = route === 'reviews' ? `reviews(abs:"${escapeQueryValue(searchQuery.terms)}")` : buildAdsQuery(searchQuery);
       const userFilters = route === 'reviews' ? [buildAdsQuery(query, false), ...clauses.slice(1)].filter(Boolean) : clauses.slice(1);
       const params = new URLSearchParams({ q: [base, ...userFilters].join(' AND '), fl: 'bibcode,title,author,orcid_pub,orcid_user,year,pub,pubdate,abstract,doi,identifier,citation_count,reference_count', rows: String(candidateRows), sort: questionRoute ? sorts.default : sorts[sort] });
-      settled.push(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` } }, 'NASA ADS')
+      settled.push(await this.fetchAdsSearch(params, { signal, retryTimeoutMs: 25000 })
         .then(JSON.parse).then(parseAdsResponse).then(results => ({ source: 'NASA ADS', results })).catch(error => ({ source: 'NASA ADS', results: [], error: error.message })));
     }
+    signal?.throwIfAborted();
     if (!requiresAds && (sourceFilter === 'arxiv' || (!sourceFilter && !settled.some(item => item.results.length)))) {
       if (route === 'reviews') searchWarnings.push('arXiv does not support sciX review search; keyword results are shown.');
       const arxivQuery = year === '' ? searchQuery : { ...searchQuery, filters: { ...searchQuery.filters, year: [String(year)] } };
       const url = `${ARXIV_API}?search_query=${encodeURIComponent(buildArxivQuery(arxivQuery))}&start=0&max_results=${candidateRows}&sortBy=${sort === 'recent' && !questionRoute ? 'submittedDate' : 'relevance'}&sortOrder=descending`;
-      settled.push(await this.fetchText(url, { headers: { 'User-Agent': 'PulsarWiki/1.0 source discovery' } }, 'arXiv')
+      settled.push(await this.fetchText(url, { headers: { 'User-Agent': 'PulsarWiki/1.0 source discovery' }, signal }, 'arXiv')
         .then(parseArxivFeed).then(results => ({ source: 'arXiv', results })).catch(error => ({ source: 'arXiv', results: [], error: error.message })));
     }
+    signal?.throwIfAborted();
     const warnings = [...searchWarnings, ...settled.filter(item => item.error).map(item => `${item.source}: ${item.error}`)];
     let candidates = deduplicate(settled.flatMap(item => item.results));
     let ranking = 'provider';
@@ -460,6 +475,7 @@ class SourceDiscoveryService {
         warnings.push('AI relevance ranking was unavailable; results use the search order.');
       }
     }
+    signal?.throwIfAborted();
     candidates = candidates.slice(0, rows);
     if (questionRoute && sort !== 'default') {
       candidates.sort((a, b) => {
@@ -476,7 +492,8 @@ class SourceDiscoveryService {
     return { query: { intent: query.intent, terms: query.terms, filters: query.filters }, results, warnings, ranking, route, filters: FILTERS };
   }
 
-  async related(id, identity = {}) {
+  async related(id, identity = {}, { signal } = {}) {
+    signal?.throwIfAborted();
     let source = this.cached(id);
     // Browser cards can outlive the short-lived search cache. Recover only
     // citation identifiers, never client-supplied import URLs or file metadata.
@@ -506,9 +523,12 @@ class SourceDiscoveryService {
       if (!query) return unavailable('No ADS identifier is available for this paper.');
       try {
         const params = new URLSearchParams({ q: query, fl: fields, rows: '1' });
-        const payload = JSON.parse(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` } }, 'NASA ADS'));
+        const payload = JSON.parse(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` }, signal }, 'NASA ADS'));
         bibcode = parseAdsResponse(payload)[0]?.bibcode;
-      } catch (error) { return unavailable(`Citation links could not be loaded: ${error.message}`); }
+      } catch (error) {
+        signal?.throwIfAborted();
+        return unavailable(`Citation links could not be loaded: ${error.message}`);
+      }
       if (!bibcode) return unavailable('This paper has no matching NASA ADS record.');
     }
     const groups = await Promise.all([
@@ -517,7 +537,8 @@ class SourceDiscoveryService {
     ].filter(search => !groupKey || search.key === groupKey).map(async search => {
       const params = new URLSearchParams({ q: `${search.operator}(bibcode:"${escapeQueryValue(bibcode)}")`, fl: fields, rows: String(limit), start: String(start), sort: 'date desc' });
       try {
-        const payload = JSON.parse(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` } }, 'NASA ADS'));
+        const payload = JSON.parse(await this.fetchText(`${ADS_API}?${params}`, { headers: { Authorization: `Bearer ${this.adsToken}` }, signal }, 'NASA ADS'));
+        signal?.throwIfAborted();
         const results = this.markDownloaded(parseAdsResponse(payload).filter(result => result.bibcode !== bibcode));
         this.remember(results);
         const fetched = Array.isArray(payload.response?.docs) ? payload.response.docs.length : 0;
@@ -526,6 +547,7 @@ class SourceDiscoveryService {
         const hasMore = Number.isSafeInteger(total) ? nextStart < total : fetched === limit;
         return { key: search.key, label: search.label, results, limit, nextStart, hasMore };
       } catch (error) {
+        signal?.throwIfAborted();
         return { key: search.key, label: search.label, results: [], error: `Could not load ${search.label.toLowerCase()}: ${error.message}` };
       }
     }));

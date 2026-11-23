@@ -13,9 +13,9 @@ function client(searchSources) {
     return nodes.get(id);
   };
   for (const [id, value] of Object.entries({ 'source-search-input': 'pulsar', 'source-sort': 'default', 'source-refereed': 'refereed', 'source-collection': 'all' })) element(id).value = value;
-  const context = { $: element, workspaceId: 'one', state: { selectedSourceIds: new Set(), sourcePapers: new Map() }, api: { searchSources }, SOURCE_FILTERS: [],
+  const context = { AbortController, $: element, workspaceId: 'one', state: { selectedSourceIds: new Set(), sourcePapers: new Map() }, api: { searchSources }, SOURCE_FILTERS: [],
     dom: { sourceSearchInput: element('source-search-input'), sourceFilterSuggestions: element('suggestions'), sourceSearchStatus: element('status'), sourceResults: element('results') },
-    closeSourceDetail() {}, loadSourceKeywords() {}, stripEmoji: String,
+    closeSourceDetail(options) { assert.equal(options.restoreResults, false); }, loadSourceKeywords() {}, stripEmoji: String,
     renderSourceResults(results) { context.rendered = results; context.state.sourceResults = results; },
   };
   vm.createContext(context);
@@ -42,9 +42,11 @@ test('search sends default and changed controls to the API', async () => {
 
 test('late searches cannot replace newer filtered results or errors', async () => {
   const pending = [];
-  const c = client(() => new Promise((resolve, reject) => pending.push({ resolve, reject })));
+  const c = client((_query, _limit, _options, signal) => new Promise((resolve, reject) => pending.push({ resolve, reject, signal })));
   const first = c.context.runSourceSearch();
   const second = c.context.runSourceSearch();
+  assert.equal(pending[0].signal.aborted, true);
+  assert.equal(pending[1].signal.aborted, false);
   pending[1].resolve({ results: ['new'] });
   await second;
   pending[0].resolve({ results: ['old'] });

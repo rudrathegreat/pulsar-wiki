@@ -12,7 +12,8 @@ function client(getRelatedSources = async () => ({ groups: [] })) {
     if (!nodes.has(id)) nodes.set(id, { innerHTML: '', textContent: '', hidden: false, disabled: false, focus() {}, classList: { toggle() {} } });
     return nodes.get(id);
   };
-  const context = { workspaceId: 'workspace1', state: { sourceResults: [paper], sourcePapers: new Map([[paper.id, paper]]), sourcePaperHistory: [], sourceDetailRequest: 0, selectedSourceIds: new Set() },
+  const context = { AbortController, workspaceId: 'workspace1', state: { sourceResults: [paper], sourcePapers: new Map([[paper.id, paper]]), sourcePaperHistory: [], selectedSourceIds: new Set() },
+    document: { querySelectorAll: () => [] },
     window: {},
     showPanel(panel) { context.state.panel = panel; },
     api: { getRelatedSources, async getSourceKeywords() { return { keywords: ['Timing'] }; } },
@@ -206,6 +207,32 @@ test('paper details provide the displayed paper identifiers to citation lookup',
   });
   await c.context.showSourceDetail(paper.id);
 });
+
+test('leaving a linked paper for a new search cancels its lookups without reloading old results', async () => {
+  let relatedSignal;
+  const c = client(async (_id, _paper, _page, signal) => {
+    relatedSignal = signal;
+    return { groups: [] };
+  });
+  const authorLookups = [];
+  c.context.window.AuthorOrcids = {
+    ...require('../public/orcid'),
+    hydrate: (node, papers, { signal }) => authorLookups.push({ node, papers, signal }),
+  };
+  const bibcode = '2008ApJ...679..675V';
+  const linked = { ...paper, id: 'linked', bibcode };
+  c.context.api.searchSources = async () => ({ results: [linked] });
+  c.context.renderSourceResults([paper]);
+  await c.context.openLinkedPaper(bibcode);
+  assert.equal(authorLookups[0].signal.aborted, true);
+  assert.equal(relatedSignal, authorLookups[1].signal);
+  await Promise.resolve();
+  const lookupsBeforeClosing = authorLookups.length;
+  c.context.closeSourceDetail({ restoreResults: false });
+  assert.equal(relatedSignal.aborted, true);
+  assert.equal(authorLookups.length, lookupsBeforeClosing);
+  assert.equal(c.element('source-search-page').hidden, false);
+});
 test('late relation success and failure cannot overwrite a newer paper or workspace', async () => {
   const pending = [];
   const c = client(() => new Promise((resolve, reject) => pending.push({ resolve, reject })));
@@ -242,6 +269,7 @@ test('author profile links appear in search cards, full details and related pape
   await c.context.showSourceDetail('linked');
   assert.ok(c.element('source-paper-metadata').innerHTML.includes(`href="https://orcid.org/${id}"`));
   assert.ok(c.element('source-paper-relations').innerHTML.includes(`href="https://orcid.org/${id}"`));
+  c.context.closeSourceDetail({ restoreResults: false });
   c.context.renderSourceResults([related]);
   assert.ok(c.element('results').innerHTML.includes(`href="https://orcid.org/${id}"`));
   assert.equal(lookups.length, 3);

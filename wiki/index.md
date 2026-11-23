@@ -25,6 +25,8 @@ Paper discovery: searches use one keyword, sciX review, or AI-ranked research-qu
 
 Ask AI paper citations and reference links open the paper details in Sources, where an available open arXiv PDF can be imported. [Sources interface](../public/app.js)
 
+Sources cancels outstanding paper and author lookups when a new search replaces the view. SciX searches retry temporary failures once with a longer timeout. [Sources interface](../public/app.js) [Literature search](../agent/source-discovery.js)
+
 Markdown tables share the chat style and scroll horizontally when needed; the change log displays its historical entries in a single table.
 
 Reading assistance: The Ask AI answer box shows progress messages on the left and the same closely spaced animated dots as chat on the right. The Stop request button appears below the answer box while the request runs. A concise explanation with citations to selected passages then appears in the same box, with completion status below it. The question and answer appear in closely spaced borderless boxes. Highlight colours appear as individual swatches; assisted highlights show blue as their selected colour and disable other colour choices. Saved responses show the user question, can be expanded from a five-line preview, and can start a new chat with the selected passages and response. [Reading interface](../public/reading.js)

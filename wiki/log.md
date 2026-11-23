@@ -392,3 +392,5 @@ All major updates to the wiki are recorded here.
 | 2026-11-23 | Reading / application | Added a retry for temporary ADS failures, skipped malformed paper records, and made Ask AI report the type of ADS failure. [Literature search](../agent/source-discovery.js) [Ask AI errors](../agent/reading-service.js) |
 
 | 2026-11-23 | Reading / application | Linked Ask AI paper citations and references to the Sources paper detail view with its import action. [Citation links](../agent/reading-references.js) [Sources interface](../public/app.js) |
+
+| 2026-11-23 | Sources / application | Cancelled obsolete paper detail and author profile requests, removed the old-results reload when starting a search, and gave SciX searches a longer second attempt after temporary failures. [Sources interface](../public/app.js) [Literature search](../agent/source-discovery.js) |
