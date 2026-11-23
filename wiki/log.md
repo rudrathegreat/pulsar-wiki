@@ -402,3 +402,9 @@ All major updates to the wiki are recorded here.
 | 2026-11-23 | Workspace / application | Added Undo, Redo, Cut, Copy, Paste, Find, and Replace to the Edit menu with platform-specific shortcuts. [Workspace Edit menu](../public/index.html) |
 
 | 2026-11-23 | Workspace / application | Expanded the File menu with creation and saved-item actions, renamed Change folder to Open project, and added project ZIP downloads. [Workspace File menu](../public/index.html) [Project export](../agent/workspace-export.js) |
+
+| 2026-11-23 | Workspace / application | Added a Help menu link to the published [[project-handover|Project Handover]] wiki page. [Workspace Help menu](../public/index.html) |
+
+| 2026-11-23 | Workspace / application | Added a disabled pulsar wiki docs button to the Help menu. [Workspace Help menu](../public/index.html) |
+
+| 2026-11-23 | Workspace / application | Renamed the Help menu placeholder to PulsarWiki Docs. [Workspace Help menu](../public/index.html) |
