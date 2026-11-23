@@ -114,7 +114,7 @@ class ReadingService {
           const pdfRoot = path.dirname(require.resolve('pdfjs-dist/package.json'));
           pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), isEvalSupported: false, standardFontDataUrl: path.join(pdfRoot, 'standard_fonts').replace(/\\/g, '/') + '/', cMapUrl: path.join(pdfRoot, 'cmaps').replace(/\\/g, '/') + '/', cMapPacked: true }).promise;
           const labels = await pdf.getPageLabels();
-          result = cached || { hash: digest, pages: Array(pdf.numPages).fill(null), labels: labels || Array.from({ length: pdf.numPages }, (_, i) => String(i + 1)), extractionVersion: EXTRACTION_VERSION };
+          result = cached || { hash: digest, pages: Array(pdf.numPages).fill(null), searchPages: Array(pdf.numPages).fill(''), labels: labels || Array.from({ length: pdf.numPages }, (_, i) => String(i + 1)), extractionVersion: EXTRACTION_VERSION };
           const requested = selectedPages === null ? Array.from({ length: pdf.numPages }, (_, i) => i + 1) : [...new Set(selectedPages)];
           for (const number of requested) {
             if (!Number.isInteger(number) || number < 1 || number > pdf.numPages) throw new ReadingError('Page not found.', 'page-not-found', 404);
@@ -123,6 +123,7 @@ class ReadingService {
             const content = await page.getTextContent();
             // Match the browser text layer's item offsets exactly.
             result.pages[number - 1] = { page: number, label: labels?.[number - 1] || String(number), text: content.items.map(i => i.str || '').join('') };
+            result.searchPages[number - 1] = content.items.map(i => (i.str || '') + (i.hasEOL ? '\n' : '')).join('');
             page.cleanup();
             await new Promise(resolve => setImmediate(resolve));
           }

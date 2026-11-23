@@ -11,6 +11,7 @@ const chokidar = require('chokidar');
 const { AsyncLocalStorage } = require('node:async_hooks');
 const { initializeWorkspace, createWorkspace, validateWorkspace, describe } = require('./agent/workspaces');
 const { createWorkspaceZip } = require('./agent/workspace-export');
+const { searchWorkspace } = require('./agent/workspace-search');
 const { pickFolder } = require('./agent/folder-picker');
 const { AgentService, AgentServiceError } = require('./agent/agent-service');
 const { ChatGPTAuthError, ChatGPTAuthService } = require('./agent/chatgpt-auth');
@@ -716,6 +717,18 @@ app.get('/api/graph', (_req, res) => {
     nodes.push({ id: name, group: categories[name] || 0, links: linkCounts[name] || 0 });
   });
   res.json({ nodes, edges });
+});
+
+app.get('/api/workspaces/search', async (req, res) => {
+  const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  if (query.length > 512) return res.status(400).json({ error: 'Enter up to 512 characters.' });
+  const signal = sourceResponseSignal(res);
+  try {
+    const matches = await searchWorkspace(currentWorkspace(), query, { displayNames: sourceDisplayNames(), signal });
+    if (!signal.aborted) res.json(matches);
+  } catch {
+    if (!signal.aborted) res.status(500).json({ error: 'The workspace documents could not be searched.' });
+  }
 });
 
 app.get('/api/search', (req, res) => {

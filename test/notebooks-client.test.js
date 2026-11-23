@@ -48,6 +48,16 @@ test('simultaneous notebook opens wait for the same workspace fetch and retain h
   assert.match(c.node('notebook-preview').innerHTML, /data-notebook-cell="original-cell"/);
 });
 
+test('a workspace Find link opens the current notebook at its matching cell', async () => {
+  const c = client(async url => url === '/api/notebooks'
+    ? { ...state(), runtime: { state: 'starting', python: 'python' } }
+    : snapshot());
+  assert.equal(await c.api.route('#notebook/?path=scratch.ipynb&cell=original-cell'), true);
+  assert.equal(c.n.selected, book.id);
+  assert.equal(c.n.historical, null);
+  assert.match(c.node('notebook-preview').innerHTML, /class="notebook-cell selected" data-notebook-cell="original-cell"/);
+});
+
 test('opening Notebooks starts Python once and keeps loading until the editor bridge is ready', async () => {
   let runtimeState = 'stopped';
   const c = client(async url => {

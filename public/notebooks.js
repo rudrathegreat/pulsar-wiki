@@ -63,6 +63,7 @@
   }
   async function open(id, options = {}) {
     showPanel('notebooks', { historyMode: 'none' }); await show();
+    if (options.path) id = n.data?.notebooks.find(book => book.available && book.path === options.path)?.id;
     n.selected = id; n.historical = options.revision ? { revision: Number(options.revision), cellId: options.cellId } : null;
     const book = entry(); if (!book) throw new Error('This notebook is not in the active workspace.');
 
@@ -211,6 +212,12 @@
   }
   function download(value, name, type) { const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type })); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
   async function route(hashValue = location.hash) {
+    if (hashValue.startsWith('#notebook/?')) {
+      const query = new URLSearchParams(hashValue.slice('#notebook/?'.length));
+      if (!query.get('path')) return false;
+      await open(null, { path: query.get('path'), cellId: query.get('cell'), history: false });
+      return true;
+    }
     const match = /^#notebook\/([a-f0-9-]{36})(?:\?(.*))?$/.exec(hashValue); if (!match) return false;
     const query = new URLSearchParams(match[2]); await open(match[1], { revision: query.get('revision') || undefined, cellId: query.get('cell'), history: false }); return true;
   }

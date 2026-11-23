@@ -165,6 +165,26 @@ test('server remembers selections and isolates simultaneous projects across APIs
   assert.equal((await request('/api/wiki/project-one', { id: second.id })).status, 404);
   assert.equal((await (await request('/api/search?q=Only', { id: first.id })).json()).length, 1);
   assert.equal((await (await request('/api/search?q=Only', { id: second.id })).json()).length, 0);
+  const raw = path.join(firstPath, 'raw');
+  fs.writeFileSync(path.join(raw, 'multiline source.txt'), 'PSR\nB1913+16');
+  fs.copyFileSync(path.join(__dirname, '..', 'raw', '1011.0718.pdf'), path.join(raw, 'binary pulsar.pdf'));
+  const notebook = path.join(firstPath, 'notebooks', 'analyses', 'pulsar study.ipynb');
+  fs.mkdirSync(path.dirname(notebook));
+  const notebookContents = JSON.stringify({ nbformat: 4, metadata: {}, cells: [{ cell_type: 'code', id: 'timing', source: ['target = "PSR B1913+16"'], outputs: [{ text: 'Calculated residual' }] }] });
+  fs.writeFileSync(notebook, notebookContents);
+  fs.writeFileSync(path.join(firstPath, 'wiki', 'timing-result.md'), '# Results\n\nMeasurements of PSR B1913+16');
+  const find = (query, id = first.id) => request(`/api/workspaces/search?q=${encodeURIComponent(query)}`, { id }).then(response => response.json());
+  const found = await find('psr b1913+16');
+  assert.equal(found.unavailable, 0);
+  assert.deepEqual(found.results.map(result => result.type), ['Wiki', 'Source', 'Source', 'Notebook']);
+  assert.equal(found.results[0].url, '/wiki/timing-result');
+  assert.match(found.results[1].matches[0].url, /^\/#file\/binary%20pulsar\.pdf\?page=\d+$/);
+  assert.equal(found.results[2].matches[0].text, 'PSR B1913+16');
+  assert.equal(found.results[3].matches[0].url, '/#notebook/?path=analyses%2Fpulsar%20study.ipynb&cell=timing');
+  assert.equal((await find('calculated residual')).results[0].matches[0].location, 'Cell 1 output');
+  assert.deepEqual(await find('psr b1913+16', second.id), { results: [], unavailable: 0 });
+  assert.equal(fs.readFileSync(notebook, 'utf8'), notebookContents);
+  assert.equal(fs.existsSync(path.join(firstPath, '.pulsarwiki', 'notebooks', 'catalog.json')), false);
   assert.ok((await (await request('/api/graph', { id: first.id })).json()).nodes.some(node => node.id === 'project-one'));
   assert.ok(!(await (await request('/api/graph', { id: second.id })).json()).nodes.some(node => node.id === 'project-one'));
 

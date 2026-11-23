@@ -13,7 +13,7 @@ Sidebar navigation: hover or focus an icon to see a shadow-free tooltip explaini
 
 The workspace top bar shows the full folder path on the right. The File, Edit, Selection, Go, and Help menus open with a 6 px gap below the bar. The File menu creates wiki files and chats, adds or uploads sources, opens saved items and projects, and exports the active project as a ZIP. The ZIP includes the wiki, sources, notebooks, references, instructions, and saved workspace data such as chats and reading notes. [Workspace File menu](../public/index.html) [Top bar layout](../public/style.css) [Project export](../agent/workspace-export.js)
 
-The Edit menu lists Undo, Redo, Cut, Copy, Paste, Find, and Replace with platform-specific shortcuts. Find searches the active text field, paper, or page. Replace edits the active text field. [Workspace Edit menu](../public/index.html)
+The Edit menu lists Undo, Redo, Cut, Copy, Paste, Find, and Replace with platform-specific shortcuts. Find searches saved source files, wiki pages, and Jupyter notebooks for case-insensitive keywords or phrases. It runs locally without AI and links results to their documents. Replace edits the active text field. [Workspace Edit menu](../public/index.html) [Workspace search](../agent/workspace-search.js)
 
 The Help menu opens the published [[project-handover|Project Handover]] wiki page and includes a disabled PulsarWiki Docs button. [Workspace Help menu](../public/index.html)
 
@@ -102,4 +102,4 @@ Ask AI uses the highlight to identify the subject of the question and looks for 
 - [[active-reading]]: PDF reading with highlight helpers, AI responses linked to selected passages, wiki notes, and reference discovery.
 
 ---
-*Last updated: 2026-11-15*
+*Last updated: 2026-11-23*

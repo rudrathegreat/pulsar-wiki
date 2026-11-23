@@ -248,6 +248,9 @@ const api = {
   },
   async getGraph() { return readJsonResponse(await workspaceFetch('/api/graph'), 'Wiki graph'); },
   async search(query) { return readJsonResponse(await workspaceFetch(`/api/search?q=${encodeURIComponent(query)}`), 'Search'); },
+  async searchWorkspace(query, signal) {
+    return readJsonResponse(await workspaceFetch(`/api/workspaces/search?q=${encodeURIComponent(query)}`, { signal }), 'Workspace search');
+  },
   async uploadFile(file, onProgress) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -3077,10 +3080,13 @@ const workspaceEditMenu = $('workspace-edit-menu');
 const workspaceFind = $('workspace-find');
 const workspaceFindQuery = $('workspace-find-query');
 const workspaceFindStatus = $('workspace-find-status');
+const workspaceFindResults = $('workspace-find-results');
+const workspaceReplaceRow = $('workspace-replace-row');
 const workspaceEditStatus = $('workspace-edit-status');
 const macEditShortcuts = /Mac|iPhone|iPad/.test(navigator.platform);
 let workspaceMenuField = null;
 let workspaceFindField = null;
+let workspaceFindController = null;
 let workspaceEditStatusTimer;
 
 if (macEditShortcuts) {
@@ -3128,20 +3134,22 @@ function openWorkspaceFind(replace) {
   const field = workspaceEditField();
   if (replace && (!field || field.readOnly || field.type === 'password')) return false;
   closeWorkspaceMenu();
-  const paperFind = $('reading-find');
-  if (!replace && (!field || field === paperFind) && paperFind.getClientRects().length) {
-    workspaceFind.hidden = true;
-    paperFind.focus();
-    paperFind.select();
-    return true;
-  }
   const previousField = workspaceFind.hidden ? null : workspaceFindField;
   workspaceFindField = field?.type === 'password' ? null : field;
+  const wasReplacing = !workspaceReplaceRow.hidden;
+  if (wasReplacing !== replace) clearWorkspaceSearch();
   if (workspaceFindField && field.selectionEnd > field.selectionStart && workspaceFindField !== previousField) {
-    workspaceFindQuery.value = field.value.slice(field.selectionStart, field.selectionEnd);
+    workspaceFindQuery.value = field.value.slice(field.selectionStart, replace ? field.selectionEnd : Math.min(field.selectionEnd, field.selectionStart + 512));
+    clearWorkspaceSearch();
   }
-  $('workspace-replace-row').hidden = !replace;
-  workspaceFindStatus.textContent = '';
+  workspaceReplaceRow.hidden = !replace;
+  workspaceFind.classList.toggle('searching-workspace', !replace);
+  const label = replace ? 'Find text to replace' : 'Search workspace documents';
+  workspaceFindQuery.placeholder = label;
+  workspaceFindQuery.setAttribute('aria-label', label);
+  if (replace) workspaceFindQuery.removeAttribute('maxlength');
+  else workspaceFindQuery.maxLength = 512;
+  $('workspace-find-submit').textContent = replace ? 'Find next' : 'Search';
   workspaceEditStatus.hidden = true;
   workspaceFind.hidden = false;
   workspaceFindQuery.focus();
@@ -3150,20 +3158,50 @@ function openWorkspaceFind(replace) {
 }
 
 function closeWorkspaceFind() {
+  if (workspaceFindController) clearWorkspaceSearch();
   workspaceFind.hidden = true;
   workspaceTextField(workspaceFindField)?.focus();
   workspaceFindField = null;
 }
 
-function findWorkspaceText(replace = false) {
+function clearWorkspaceSearch() {
+  workspaceFindController?.abort();
+  workspaceFindController = null;
+  workspaceFindResults.replaceChildren();
+  workspaceFindResults.hidden = true;
+  workspaceFindStatus.textContent = '';
+}
+
+async function findWorkspaceDocuments() {
+  clearWorkspaceSearch();
+  const query = workspaceFindQuery.value.trim();
+  if (!query) return workspaceFindQuery.focus();
+  const controller = new AbortController();
+  workspaceFindController = controller;
+  workspaceFindStatus.textContent = 'Searching workspace documents…';
+  try {
+    const { results, unavailable } = await api.searchWorkspace(query, controller.signal);
+    if (controller.signal.aborted) return;
+    const summary = results.length ? `${results.length} matching ${results.length === 1 ? 'document' : 'documents'}.` : 'No matching documents.';
+    workspaceFindStatus.textContent = `${summary}${unavailable ? ` Text could not be searched in ${unavailable} ${unavailable === 1 ? 'file' : 'files'}.` : ''}`;
+    workspaceFindResults.innerHTML = results.map(result => {
+      const wiki = result.type === 'Wiki' ? ` data-find-page="${escHtml(wikiPageFromPath(result.url))}"` : '';
+      return `<li><small>${escHtml(result.type)}</small><a href="${escHtml(result.url)}"${wiki}>${escHtml(result.label)}</a>
+        ${result.matches.map(match => `<a class="workspace-find-match" href="${escHtml(match.url)}"${wiki}>${match.location ? `<small>${escHtml(match.location)}</small>` : ''}${escHtml(match.text)}</a>`).join('')}</li>`;
+    }).join('');
+    workspaceFindResults.hidden = !results.length;
+  } catch (error) {
+    if (!controller.signal.aborted) workspaceFindStatus.textContent = error.message;
+  } finally {
+    if (workspaceFindController === controller) workspaceFindController = null;
+  }
+}
+
+function findWorkspaceEditorText(replace = false) {
   const query = workspaceFindQuery.value;
   if (!query) return workspaceFindQuery.focus();
   const field = workspaceTextField(workspaceFindField);
-  if (!field) {
-    workspaceFindStatus.textContent = !replace && window.find?.(query, false, false, true)
-      ? '' : 'No matches.';
-    return;
-  }
+  if (!field || field.readOnly) return;
   const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
   if (replace && !field.readOnly) {
     pattern.lastIndex = field.selectionStart;
@@ -3231,15 +3269,22 @@ workspaceEditMenu.addEventListener('mousedown', event => {
 });
 workspaceFind.addEventListener('submit', event => {
   event.preventDefault();
-  findWorkspaceText();
+  if (workspaceReplaceRow.hidden) void findWorkspaceDocuments();
+  else findWorkspaceEditorText();
 });
-workspaceFindQuery.addEventListener('input', () => { workspaceFindStatus.textContent = ''; });
+workspaceFindQuery.addEventListener('input', clearWorkspaceSearch);
+workspaceFindResults.addEventListener('click', event => {
+  const link = event.target.closest('a[data-find-page]');
+  if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  void openPage(link.dataset.findPage);
+});
 $('workspace-replacement').addEventListener('keydown', event => {
   if (event.key !== 'Enter' || event.isComposing) return;
   event.preventDefault();
-  findWorkspaceText(true);
+  findWorkspaceEditorText(true);
 });
-$('workspace-replace-current').addEventListener('click', () => findWorkspaceText(true));
+$('workspace-replace-current').addEventListener('click', () => findWorkspaceEditorText(true));
 $('workspace-find-close').addEventListener('click', closeWorkspaceFind);
 
 function closeWorkspaceMenu(restoreFocus = false) {
