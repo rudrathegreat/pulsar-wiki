@@ -217,7 +217,6 @@
       el('reading-helper-body').innerHTML = html;
       el('reading-helper-error').textContent = '';
       el('reading-helper-details').hidden = false;
-      el('reading-selection-toolbar').classList.add('expanded');
       positionHelper();
       return;
     }
@@ -231,7 +230,6 @@
       r.helper.expanded = false;
       el('reading-helper-details').hidden = true;
       el('reading-helper-body').innerHTML = '';
-      el('reading-selection-toolbar').classList.remove('expanded');
       for (const action of ['wiki', 'ask', 'note', 'connect', 'notebook']) el(`reading-selection-${action}`).setAttribute('aria-expanded', 'false');
       positionHelper();
     } else el('reading-dialog').close();
@@ -614,7 +612,6 @@
     el('reading-helper-details').hidden = true;
     el('reading-helper-body').innerHTML = '';
     el('reading-helper-error').textContent = '';
-    el('reading-selection-toolbar').classList.remove('expanded');
     updateSelectionColors(highlightId);
     const toolbar = el('reading-selection-toolbar'); toolbar.hidden = false;
     positionHelper();

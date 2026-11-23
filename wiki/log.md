@@ -428,3 +428,5 @@ All major updates to the wiki are recorded here.
 | 2026-11-23 | Workspace / application | Added a 6 px gap between the top bar and the Find search bar. [Find styles](../public/style.css) |
 
 | 2026-11-23 | Workspace / application | Removed the parenthetical from the Connect to related knowledge button label. [Reading helper](../public/index.html) |
+
+| 2026-11-23 | Workspace / application | Kept the reading helper the same width when selecting an action and opened its details below the action buttons. [Reading helper layout](../public/reading.css) |
