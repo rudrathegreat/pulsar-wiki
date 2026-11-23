@@ -69,15 +69,16 @@
 
     if (n.ready && !n.historical && book.available) {
       $('notebook-frame').hidden = false; $('notebook-preview').hidden = true;
-      await bridge('open', { path: book.path, cellId: options.cellId });
-    } else await preview(id, options.revision, options.cellId);
+      await bridge('open', { path: book.path, cellId: options.cellId, cellIndex: options.cellIndex });
+    } else await preview(id, options.revision, options.cellId, options.cellIndex);
     if (options.history !== false) history.pushState(null, '', `/#notebook/${id}${options.revision ? `?revision=${options.revision}${options.cellId ? `&cell=${encodeURIComponent(options.cellId)}` : ''}` : ''}`);
   }
   function image(mime, data, alt) {
     return ['image/png', 'image/jpeg'].includes(mime) && typeof data === 'string' && /^[A-Za-z0-9+/=\s]+$/.test(data) ? `<img src="data:${mime};base64,${data.replace(/\s/g, '')}" alt="${e(alt)}"/>` : '';
   }
-  async function preview(id, revision, cellId) {
+  async function preview(id, revision, cellId, cellIndex) {
     const snapshot = await request(`/${id}${revision ? `?revision=${revision}` : ''}`);
+    cellId ||= snapshot.notebook.cells[cellIndex]?.id;
     $('notebook-frame').hidden = true; $('notebook-preview').hidden = false;
     const cellHtml = cell => {
       let content = cell.cell_type === 'markdown' ? `<div class="md-body">${md(bodyText(cell.source))}</div>` : `<pre><code>${e(bodyText(cell.source))}</code></pre>`;
@@ -215,7 +216,9 @@
     if (hashValue.startsWith('#notebook/?')) {
       const query = new URLSearchParams(hashValue.slice('#notebook/?'.length));
       if (!query.get('path')) return false;
-      await open(null, { path: query.get('path'), cellId: query.get('cell'), history: false });
+      const index = query.get('cellIndex');
+      const cellIndex = index !== null && /^\d+$/.test(index) ? Number(index) : undefined;
+      await open(null, { path: query.get('path'), cellId: query.get('cell'), cellIndex, history: false });
       return true;
     }
     const match = /^#notebook\/([a-f0-9-]{36})(?:\?(.*))?$/.exec(hashValue); if (!match) return false;
@@ -227,6 +230,13 @@
   $('notebook-stop').addEventListener('click', guard(async () => { await flush(); await request('/runtime/stop', 'POST', {}); disconnect(); await refresh(); if (entry()) await preview(n.selected); message('Python stopped. Saved notebooks and history are preserved.'); }));
   $('notebook-python-save').addEventListener('click', guard(async () => { message('Checking Python…'); await request('/runtime/python', 'PUT', { python: $('notebook-python').value }); await refresh(); message(n.data.runtime.environment?.ready ? 'Python environment is ready.' : 'Install the missing packages in this Python environment.'); }));
   $('notebook-tray-close').addEventListener('click', () => { n.tray = ''; $('notebook-tray').hidden = true; }); $('notebook-dialog-close').addEventListener('click', () => $('notebook-dialog').close());
-  document.addEventListener('click', guard(async event => { const link = event.target.closest('a[href^="/#notebook/"]'); if (link && event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey) { event.preventDefault(); await route(new URL(link.href).hash); history.pushState(null, '', link.getAttribute('href')); } }));
+  document.addEventListener('click', guard(async event => {
+    if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    const link = event.target.closest('a[href^="/#notebook/"]');
+    if (!link) return;
+    event.preventDefault();
+    await route(new URL(link.href).hash);
+    history.pushState(null, '', link.getAttribute('href'));
+  }));
   window.ResearchNotebooks = { show, open: guard(open), route, transfer: guard(transferDialog), prepareToLeave, theme: theme => { if (n.ready) void guard(() => bridge('theme', { theme }))(); } };
 })();

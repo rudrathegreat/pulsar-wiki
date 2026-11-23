@@ -24,7 +24,7 @@ function client(initial = '/wiki/timing') {
   }
   visit(initial);
   const context = {
-    location,
+    location, URLSearchParams,
     document: { body: element('body'), getElementById: element, querySelectorAll: () => [], addEventListener: (type, listener) => { handlers[type] = listener; } },
     window: { addEventListener: (type, listener) => { handlers[type] = listener; },
       ResearchNotebooks: { show() {}, async route(hash) { if (!hash.startsWith('#notebook/')) return false; opened.push(hash); return true; } },
@@ -39,7 +39,7 @@ function client(initial = '/wiki/timing') {
     renderChatGPTSettings() {}, refreshChatGPTStatus: async () => {}, refreshAdsSettings: async () => {},
     renderSourceSidebar() {}, loadFiles: async () => {}, showGraph() {}, loadHandoverWorkspace() {}, highlightSidebarItem() {},
     async openPage(page, options = {}) {
-      opened.push(page);
+      opened.push(options.matchRange ? [page, options.matchRange.start, options.matchRange.end] : page);
       context.client.state.currentPage = page;
       context.client.updateAppHistory(`/wiki/${page}`, options.historyMode);
       context.client.showPanel('wiki', { historyMode: 'none' });
@@ -74,6 +74,21 @@ test('source review links open the specific saved chat even from wiki URLs', asy
   assert.equal(await c.handleAppRoute(), true);
   assert.deepEqual(c.opened, ['chat:source-review']);
   assert.equal(c.state.panel, 'chat');
+});
+
+test('workspace Find links restore a wiki match range on navigation and reload', async () => {
+  const c = client();
+  const match = '/wiki/telescope?start=12&end=18';
+  c.updateAppHistory(match);
+  await c.handleAppRoute();
+  assert.deepEqual(c.opened, [['telescope', 12, 18]]);
+  await c.travel(-1);
+  assert.equal(c.opened.at(-1), 'timing');
+  await c.travel(1);
+  assert.deepEqual(c.opened.at(-1), ['telescope', 12, 18]);
+  const reloaded = client(match);
+  await reloaded.handleAppRoute();
+  assert.deepEqual(reloaded.opened, [['telescope', 12, 18]]);
 });
 
 for (const panel of ['chat', 'graph', 'handover', 'notebooks', 'settings']) {

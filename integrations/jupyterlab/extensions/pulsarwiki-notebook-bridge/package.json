@@ -19,7 +19,7 @@
     "extension": true,
     "outputDir": "extensions/pulsarwiki-notebook-bridge",
     "_build": {
-      "load": "static/remoteEntry.0f3b7cd2c4536175f448.js",
+      "load": "static/remoteEntry.b0896fb3235f2ee7314d.js",
       "extension": "./extension"
     }
   }

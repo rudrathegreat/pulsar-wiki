@@ -14,7 +14,7 @@ function client({ performanceRecorder = null } = {}) {
   const staticIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]));
   const element = () => ({ style: {}, dataset: {}, value: '', children: [], listeners: {}, attributes: {}, hidden: false, innerHTML: '', offsetWidth: 350, offsetHeight: 45, classList: { add() {}, remove() {}, toggle() {} }, addEventListener(type, listener) { this.listeners[type] = listener; }, querySelectorAll() { return []; }, querySelector() { return null; }, contains() { return false; }, focus() {}, setAttribute(key, value) { this.attributes[key] = value; }, showModal() { this.open = true; }, close() { this.open = false; }, append(child) { this.children.push(child); }, getBoundingClientRect() { return { left: 100, top: 100, right: 500, bottom: 900, width: 400, height: 800 }; } });
   const document = { activeElement: null, listeners: {}, getElementById(id) { if (!staticIds.has(id) && ![...nodes.values()].some(node => node.innerHTML.includes(`id="${id}"`))) return null; if (!nodes.has(id)) nodes.set(id, element()); return nodes.get(id); }, querySelectorAll() { return []; }, addEventListener(type, listener) { this.listeners[type] = listener; }, createElement(tag) { const node = element(); if (tag === 'template') node.content = { querySelectorAll() { return []; } }; return node; } };
-  const context = { document, window: { addEventListener() {}, getSelection() { return null; }, requestAnimationFrame: callback => setTimeout(callback, 0), cancelAnimationFrame: clearTimeout, innerWidth: 1200, innerHeight: 900 }, state: { panel: 'document' }, setTimeout, clearTimeout, ReadableStream, URL, URLSearchParams, Node: { TEXT_NODE: 3 }, renderMd(v) { return v; }, typesetMath() {} };
+  const context = { document, window: { addEventListener() {}, getSelection() { return null; }, requestAnimationFrame: callback => setTimeout(callback, 0), cancelAnimationFrame: clearTimeout, innerWidth: 1200, innerHeight: 900 }, location: { hash: '' }, state: { panel: 'document' }, setTimeout, clearTimeout, ReadableStream, URL, URLSearchParams, Node: { TEXT_NODE: 3 }, renderMd(v) { return v; }, typesetMath() {} };
   context.window.WorkspaceSession = { fetch: (...args) => context.fetch(...args), url: value => value };
   if (performanceRecorder) context.window.ReadingPerformance = { create({ sample }) { performanceRecorder.sample = sample; return performanceRecorder; } };
   vm.createContext(context);
@@ -24,6 +24,33 @@ function client({ performanceRecorder = null } = {}) {
 function populate(c) {
   c.r.data = { documents: [{ id: 'document-one', aliases: ['paper.pdf'], available: true }], highlights: [{ id: 'highlight-one', documentId: 'document-one', text: 'Measured timing result.', kind: 'text', color: 'yellow', categories: ['result'], revision: 2, anchors: [{ page: 1, label: '1', rects: [[10, 20, 40, 30]] }] }, { id: 'highlight-two', documentId: 'document-one', text: 'Assumption.', kind: 'text', color: 'blue', categories: [], revision: 1, anchors: [{ page: 2, label: '2', rects: [[10, 20, 40, 30]] }] }], annotations: [{ id: 'annotation-private', highlightId: 'highlight-one', text: 'Do not send unchecked notes', revision: 1 }, { id: 'annotation-selected', highlightId: 'highlight-two', text: 'Checked assumption note', revision: 3 }], collections: [], relationships: [], tasks: [], artifacts: [], discoveries: [] };
 }
+
+test('workspace Find selects a PDF passage across a line break using text-layer offsets', async () => {
+  const c = client();
+  const hash = '#file/paper.pdf?page=1&start=7&end=19';
+  c.context.location = { hash };
+  c.context.api = { getRawList: async () => [{ name: 'paper.pdf', ext: 'pdf' }] };
+  const ranges = [];
+  const first = { dataset: { textStart: '6', textLength: '5' }, firstChild: { textContent: 'pulse' } };
+  const second = { dataset: { textStart: '11', textLength: '6' }, firstChild: { textContent: 'timing' } };
+  c.context.openRawFile = async () => {
+    c.context.state.documentSession = 1;
+    c.r.pages.set(1, {
+      content: { items: [{ str: 'Intro.', hasEOL: true }, { str: 'pulse', hasEOL: true }, { str: 'timing' }] },
+      textLayer: { textDivs: [first, second] },
+    });
+  };
+  const offsets = [];
+  c.document.createRange = () => ({
+    setStart(node, offset) { offsets.push([node, offset]); },
+    setEnd(node, offset) { offsets.push([node, offset]); },
+    getClientRects() { return []; },
+  });
+  c.context.window.getSelection = () => ({ removeAllRanges() {}, addRange(range) { ranges.push(range); } });
+  assert.equal(await c.route(hash), true);
+  assert.deepEqual(offsets, [[first.firstChild, 0], [second.firstChild, 6]]);
+  assert.equal(ranges.length, 1);
+});
 
 test('selection toolbar shows blue only for a passage with completed AI assistance', () => {
   const c = client(); populate(c);
@@ -116,6 +143,8 @@ test('clicking a wiki source link opens the named file in the reading workspace'
   c.context.history = { pushState(_state, _title, url) { urls.push(url); } };
   let prevented = false;
   const link = { href: 'http://localhost/#file/paper%20%3F%23.pdf' };
+  await c.document.listeners.click({ target: { closest: () => link }, button: 0, defaultPrevented: true });
+  assert.equal(opened.length, 0);
   await c.document.listeners.click({ target: { closest: () => link }, button: 0, preventDefault() { prevented = true; } });
   assert.equal(prevented, true);
   assert.deepEqual(urls, ['/#file/paper%20%3F%23.pdf']);

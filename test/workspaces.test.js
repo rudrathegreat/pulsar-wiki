@@ -170,18 +170,27 @@ test('server remembers selections and isolates simultaneous projects across APIs
   fs.copyFileSync(path.join(__dirname, '..', 'raw', '1011.0718.pdf'), path.join(raw, 'binary pulsar.pdf'));
   const notebook = path.join(firstPath, 'notebooks', 'analyses', 'pulsar study.ipynb');
   fs.mkdirSync(path.dirname(notebook));
-  const notebookContents = JSON.stringify({ nbformat: 4, metadata: {}, cells: [{ cell_type: 'code', id: 'timing', source: ['target = "PSR B1913+16"'], outputs: [{ text: 'Calculated residual' }] }] });
+  const notebookContents = JSON.stringify({ nbformat: 4, metadata: {}, cells: [
+    { cell_type: 'code', id: 'timing', source: ['target = "PSR B1913+16"'], outputs: [{ text: 'Calculated residual' }] },
+    { cell_type: 'markdown', source: ['Legacy notebook cell'] },
+  ] });
   fs.writeFileSync(notebook, notebookContents);
-  fs.writeFileSync(path.join(firstPath, 'wiki', 'timing-result.md'), '# Results\n\nMeasurements of PSR B1913+16');
+  fs.writeFileSync(path.join(firstPath, 'wiki', 'timing-result.md'), '# Results\n\nMeasurements of PSR B1913+16\nSecond occurrence: PSR B1913+16');
   const find = (query, id = first.id) => request(`/api/workspaces/search?q=${encodeURIComponent(query)}`, { id }).then(response => response.json());
   const found = await find('psr b1913+16');
   assert.equal(found.unavailable, 0);
   assert.deepEqual(found.results.map(result => result.type), ['Wiki', 'Source', 'Source', 'Notebook']);
   assert.equal(found.results[0].url, '/wiki/timing-result');
-  assert.match(found.results[1].matches[0].url, /^\/#file\/binary%20pulsar\.pdf\?page=\d+$/);
+  assert.equal(found.results[0].name, 'timing-result.md');
+  assert.deepEqual(found.results[0].matches.map(match => match.location), ['Line 3', 'Line 4']);
+  assert.deepEqual(found.results[0].matches.map(match => match.url), ['/wiki/timing-result?start=27&end=39', '/wiki/timing-result?start=59&end=71']);
+  assert.match(found.results[1].matches[0].url, /^\/#file\/binary%20pulsar\.pdf\?page=\d+&start=\d+&end=\d+$/);
   assert.equal(found.results[2].matches[0].text, 'PSR B1913+16');
+  assert.equal(found.results[2].matches[0].url, '/#file/multiline%20source.txt?start=0&end=12');
   assert.equal(found.results[3].matches[0].url, '/#notebook/?path=analyses%2Fpulsar%20study.ipynb&cell=timing');
   assert.equal((await find('calculated residual')).results[0].matches[0].location, 'Cell 1 output');
+  assert.match((await find('legacy notebook')).results[0].matches[0].url, /&cellIndex=1$/);
+  assert.ok((await find('measur')).suggestions.includes('Measurements'));
   assert.deepEqual(await find('psr b1913+16', second.id), { results: [], unavailable: 0 });
   assert.equal(fs.readFileSync(notebook, 'utf8'), notebookContents);
   assert.equal(fs.existsSync(path.join(firstPath, '.pulsarwiki', 'notebooks', 'catalog.json')), false);

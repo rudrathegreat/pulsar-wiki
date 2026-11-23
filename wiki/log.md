@@ -414,3 +414,5 @@ All major updates to the wiki are recorded here.
 | 2026-11-23 | Workspace / application | Added a 6 px gap between the top bar and its dropdown menus. [Top bar layout](../public/style.css) |
 
 | 2026-11-23 | Workspace / application | Expanded Edit → Find to run a local keyword search across saved sources, wiki pages, and Jupyter notebooks, with linked snippets and PDF page and notebook cell locations. [Find interface](../public/index.html) [Workspace search](../agent/workspace-search.js) |
+
+| 2026-11-23 | Workspace / application | Centred Find, added live search and autocomplete, and gave each result a filename, source type, highlighted excerpt, and Go to location link. [Find interface](../public/index.html) [Workspace search](../agent/workspace-search.js) |

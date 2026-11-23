@@ -221,8 +221,9 @@
       <span id="workspace-current-path"></span>
       <form id="workspace-find" class="workspace-find" role="search" aria-label="Find and replace" hidden>
         <div class="workspace-find-row">
-          <input id="workspace-find-query" type="search" placeholder="Search workspace documents" aria-label="Search workspace documents" aria-controls="workspace-find-results" autocomplete="off"/>
-          <button class="btn" id="workspace-find-submit" type="submit">Search</button>
+          <input id="workspace-find-query" type="search" placeholder="Search workspace documents" aria-label="Search workspace documents" aria-controls="workspace-find-results" list="workspace-find-suggestions" autocomplete="off"/>
+          <datalist id="workspace-find-suggestions"></datalist>
+          <button class="btn" id="workspace-find-submit" type="submit" hidden>Find next</button>
           <button class="btn" id="workspace-find-close" type="button" aria-label="Close find">Close</button>
         </div>
         <div class="workspace-find-row" id="workspace-replace-row" hidden>

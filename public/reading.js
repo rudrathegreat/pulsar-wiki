@@ -713,10 +713,73 @@
     }
     if (hashValue.startsWith('#file/')) {
       const [file, query] = hashValue.slice(6).split('?'); const name = decodeURIComponent(file);
+      const currentHash = location.hash;
       const files = await api.getRawList(); const source = files.find(f => f.name === name);
-      if (source) { await openRawFile(name, source.ext, source, false); if (query && r.pdf) await navigate(Number(new URLSearchParams(query).get('page')) || 1); return true; }
+      if (currentHash !== location.hash) return true;
+      if (source) {
+        const opening = openRawFile(name, source.ext, source, false);
+        const session = state.documentSession;
+        await opening;
+        if (query && session === state.documentSession) await revealSourceFindMatch(new URLSearchParams(query));
+        return true;
+      }
     }
     return false;
+  }
+
+  async function revealSourceFindMatch(params) {
+    const generation = r.generation;
+    const page = Number(params.get('page')) || 1;
+    if (r.pdf) await navigate(page);
+    if (generation !== r.generation || !params.has('start') || !params.has('end')) return;
+    const rendered = r.pages.get(page);
+    if (!rendered?.textLayer) return;
+    const start = Number(params.get('start'));
+    const end = Number(params.get('end'));
+    if (!Number.isSafeInteger(start) || start < 0 || !Number.isSafeInteger(end) || end <= start) return;
+
+    // The search index inserts newlines at PDF line breaks. The text layer's
+    // offsets count only the characters inside its text spans.
+    let offset = 0;
+    let breaksBeforeStart = 0;
+    let breaksBeforeEnd = 0;
+    for (const item of rendered.content?.items || []) {
+      offset += (item.str || '').length;
+      if (item.hasEOL) {
+        if (offset < start) breaksBeforeStart++;
+        if (offset < end) breaksBeforeEnd++;
+        offset++;
+      }
+      if (offset >= end) break;
+    }
+    selectReadingText(rendered, start - breaksBeforeStart, end - breaksBeforeEnd);
+  }
+
+  function selectReadingText(page, start, end) {
+    if (start >= end) return false;
+    let begin;
+    let finish;
+    for (const span of page.textLayer.textDivs) {
+      const spanStart = Number(span.dataset.textStart);
+      const spanEnd = spanStart + Number(span.dataset.textLength);
+      if (!span.firstChild) continue;
+      if (start >= spanStart && start < spanEnd) begin = { node: span.firstChild, offset: start - spanStart };
+      if (end > spanStart && end <= spanEnd) {
+        finish = { node: span.firstChild, offset: end - spanStart };
+        break;
+      }
+    }
+    if (!begin || !finish) return false;
+    const range = document.createRange();
+    range.setStart(begin.node, begin.offset);
+    range.setEnd(finish.node, finish.offset);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    const stage = el('document-stage');
+    const rect = range.getClientRects()[0];
+    if (rect) stage.scrollTop += rect.top - stage.getBoundingClientRect().top - stage.clientHeight / 2;
+    return true;
   }
 
   function assistanceFor(h) {
@@ -842,9 +905,7 @@
     if (!r.findResults.length) { notify('No text matches. Scanned pages may need a visual selection.'); return; }
     const found = r.findResults[r.findIndex++ % r.findResults.length]; await navigate(found.page);
     if (generation !== r.generation || !r.pages.get(found.page)?.textLayer) return;
-    const p = r.pages.get(found.page); const range = document.createRange(); let begin = null; let finish = null;
-    for (const span of p.textLayer.textDivs) { const start = Number(span.dataset.textStart); const end = start + Number(span.dataset.textLength); if (!begin && found.start >= start && found.start < end) begin = { node: span.firstChild, offset: found.start - start }; if (found.end > start && found.end <= end) finish = { node: span.firstChild, offset: found.end - start }; }
-    if (begin && finish) { range.setStart(begin.node, begin.offset); range.setEnd(finish.node, finish.offset); const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range); begin.node.parentElement.scrollIntoView({ block: 'center' }); captureSelection(); }
+    if (selectReadingText(r.pages.get(found.page), found.start, found.end)) captureSelection();
     notify(`Match ${(r.findIndex - 1) % r.findResults.length + 1} of ${r.findResults.length}`);
   }
 
@@ -1106,6 +1167,7 @@
   el('reading-find').addEventListener('keydown', guard(event => { if (event.key === 'Enter') return findNext(); }));
   document.addEventListener('keydown', event => { if (event.key === 'Escape') closeHelper(); });
   document.addEventListener('click', guard(async event => {
+    if (event.defaultPrevented) return;
     const link = event.target.closest('a[href^="/#reading"], a[href^="/#file/"]');
     if (link && !event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) {
       event.preventDefault();

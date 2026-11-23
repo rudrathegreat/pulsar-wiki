@@ -471,7 +471,7 @@ function updateWikiHistory(page, mode) {
   updateAppHistory(wikiPath(page), mode);
 }
 
-async function openPage(name, { historyMode = 'push' } = {}) {
+async function openPage(name, { historyMode = 'push', matchRange } = {}) {
   const page = normalizeWikiPageName(name);
   if (!page) return;
   updateWikiHistory(page, historyMode);
@@ -482,7 +482,7 @@ async function openPage(name, { historyMode = 'push' } = {}) {
   dom.wikiBody.innerHTML = '<div class="wiki-loading">Loading...</div>';
   try {
     const data = await api.getWikiPage(page);
-    if (state.currentPage !== page) return;
+    if (state.currentPage !== page || state.panel !== 'wiki') return;
     dom.wikiBody.innerHTML = `<div class="md-body">${renderWikiPageMd(page, data.content)}</div>`;
     typesetMath(dom.wikiBody);
     const editAction = document.createElement('button');
@@ -498,10 +498,70 @@ async function openPage(name, { historyMode = 'push' } = {}) {
       openPage(link.dataset.page);
     }));
     $('panel-wiki').scrollTop = 0;
+    if (matchRange) revealWikiFindMatch(dom.wikiBody.querySelector('.md-body'), page, data.content, matchRange);
   } catch (error) {
     const message = error.message === 'Not found' ? `Page not found: ${page}` : error.message;
     dom.wikiBody.innerHTML = `<div class="wiki-empty"><p class="wiki-empty-copy">${escHtml(message)}</p></div>`;
   }
+}
+
+function revealWikiFindMatch(body, page, content, { start, end }) {
+  if (end > content.length) return;
+  const keyword = content.slice(start, end);
+  if (!keyword.trim()) return;
+  const pattern = workspaceFindPattern(keyword);
+  const sourceMatches = [...content.matchAll(pattern)];
+  const index = sourceMatches.findIndex(match => match.index === start);
+  if (index < 0) return;
+
+  const nodes = [];
+  let text = '';
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (node.nodeType === Node.TEXT_NODE) {
+      nodes.push({ node, start: text.length });
+      text += node.nodeValue;
+    } else if (/^(?:BR|P|H[1-6]|LI|TD|TH|PRE|DIV|BLOCKQUOTE|HR)$/.test(node.tagName)) {
+      text += '\n';
+    }
+  }
+  const renderedMatches = [...text.matchAll(pattern)];
+  if (renderedMatches.length === sourceMatches.length) {
+    const match = renderedMatches[index];
+    const matchEnd = match.index + match[0].length;
+    const first = nodes.find(entry => match.index >= entry.start && match.index < entry.start + entry.node.length);
+    const last = nodes.find(entry => matchEnd > entry.start && matchEnd <= entry.start + entry.node.length);
+    if (first && last) {
+      const range = document.createRange();
+      range.setStart(first.node, match.index - first.start);
+      range.setEnd(last.node, matchEnd - last.start);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      const panel = $('panel-wiki');
+      const rect = range.getClientRects()[0];
+      if (rect) panel.scrollTop += rect.top - panel.getBoundingClientRect().top - panel.clientHeight / 2;
+      return;
+    }
+  }
+
+  // Matches inside Markdown syntax (such as link destinations) have no rendered text.
+  const source = document.createElement('pre');
+  source.className = 'wiki-find-source';
+  const mark = document.createElement('mark');
+  mark.textContent = keyword;
+  source.append(content.slice(0, start), mark, content.slice(end));
+  const back = document.createElement('a');
+  back.href = wikiPath(page);
+  back.textContent = 'View rendered page';
+  back.addEventListener('click', event => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    void openPage(page);
+  });
+  body.replaceWith(back, source);
+  mark.scrollIntoView({ block: 'center' });
 }
 
 function editWikiPage(page, content, editAction, notebookAction) {
@@ -2398,7 +2458,10 @@ async function refreshWiki() {
 
 // ── Utility ────────────────────────────────────────────────────────
 function escHtml(s) {
-  return stripEmoji(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return escapeHtmlText(stripEmoji(s));
+}
+function escapeHtmlText(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function escAttr(s) { return String(s).replace(/'/g,"\\'"); }
 
@@ -2411,13 +2474,18 @@ function handleWikiRoute({ migrateLegacyHash = false } = {}) {
   // Older document/source links can have a wiki pathname: the explicit hash wins.
   if (/^#(?:sources|files|chat|graph|handover|notebooks|notebook|file|reading|settings)(?:[/?]|$)/.test(location.hash)) return false;
   let page = wikiPageFromPath(location.pathname);
-  if (page && location.pathname !== wikiPath(page)) history.replaceState(null, '', wikiPath(page));
+  if (page && location.pathname !== wikiPath(page)) history.replaceState(null, '', wikiPath(page) + location.search);
   if (!page && location.hash.startsWith('#wiki/')) {
     try { page = normalizeWikiPageName(decodeURIComponent(location.hash.slice(6))); } catch { page = ''; }
     if (page && migrateLegacyHash) history.replaceState(null, '', wikiPath(page));
   }
   if (!page) return false;
-  void openPage(page, { historyMode: 'none' });
+  const params = new URLSearchParams(location.search);
+  const start = Number(params.get('start'));
+  const end = Number(params.get('end'));
+  const matchRange = params.has('start') && Number.isSafeInteger(start) && start >= 0 && Number.isSafeInteger(end) && end > start
+    ? { start, end } : undefined;
+  void openPage(page, { historyMode: 'none', matchRange });
   return true;
 }
 
@@ -3081,12 +3149,14 @@ const workspaceFind = $('workspace-find');
 const workspaceFindQuery = $('workspace-find-query');
 const workspaceFindStatus = $('workspace-find-status');
 const workspaceFindResults = $('workspace-find-results');
+const workspaceFindSuggestions = $('workspace-find-suggestions');
 const workspaceReplaceRow = $('workspace-replace-row');
 const workspaceEditStatus = $('workspace-edit-status');
 const macEditShortcuts = /Mac|iPhone|iPad/.test(navigator.platform);
 let workspaceMenuField = null;
 let workspaceFindField = null;
 let workspaceFindController = null;
+let workspaceFindTimer;
 let workspaceEditStatusTimer;
 
 if (macEditShortcuts) {
@@ -3147,24 +3217,32 @@ function openWorkspaceFind(replace) {
   const label = replace ? 'Find text to replace' : 'Search workspace documents';
   workspaceFindQuery.placeholder = label;
   workspaceFindQuery.setAttribute('aria-label', label);
-  if (replace) workspaceFindQuery.removeAttribute('maxlength');
-  else workspaceFindQuery.maxLength = 512;
-  $('workspace-find-submit').textContent = replace ? 'Find next' : 'Search';
+  if (replace) {
+    workspaceFindQuery.removeAttribute('maxlength');
+    workspaceFindQuery.removeAttribute('list');
+  } else {
+    workspaceFindQuery.maxLength = 512;
+    workspaceFindQuery.setAttribute('list', 'workspace-find-suggestions');
+  }
+  $('workspace-find-submit').hidden = !replace;
   workspaceEditStatus.hidden = true;
   workspaceFind.hidden = false;
   workspaceFindQuery.focus();
   workspaceFindQuery.select();
+  if (!replace && !workspaceFindController && workspaceFindResults.hidden) scheduleWorkspaceFind();
   return true;
 }
 
-function closeWorkspaceFind() {
-  if (workspaceFindController) clearWorkspaceSearch();
+function closeWorkspaceFind(restoreFocus = true) {
+  clearWorkspaceSearch();
+  workspaceFindSuggestions.replaceChildren();
   workspaceFind.hidden = true;
-  workspaceTextField(workspaceFindField)?.focus();
+  if (restoreFocus) workspaceTextField(workspaceFindField)?.focus();
   workspaceFindField = null;
 }
 
 function clearWorkspaceSearch() {
+  clearTimeout(workspaceFindTimer);
   workspaceFindController?.abort();
   workspaceFindController = null;
   workspaceFindResults.replaceChildren();
@@ -3172,22 +3250,50 @@ function clearWorkspaceSearch() {
   workspaceFindStatus.textContent = '';
 }
 
+function scheduleWorkspaceFind() {
+  clearWorkspaceSearch();
+  workspaceFindSuggestions.replaceChildren();
+  if (workspaceReplaceRow.hidden && workspaceFindQuery.value.trim()) {
+    workspaceFindTimer = setTimeout(findWorkspaceDocuments, 250);
+  }
+}
+
+function workspaceFindPattern(query) {
+  const escaped = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  return new RegExp(escaped, 'giu');
+}
+
+function highlightWorkspaceFind(text, query) {
+  let html = '';
+  let offset = 0;
+  for (const match of text.matchAll(workspaceFindPattern(query))) {
+    html += escapeHtmlText(text.slice(offset, match.index)) + `<mark>${escapeHtmlText(match[0])}</mark>`;
+    offset = match.index + match[0].length;
+  }
+  return html + escapeHtmlText(text.slice(offset));
+}
+
 async function findWorkspaceDocuments() {
   clearWorkspaceSearch();
-  const query = workspaceFindQuery.value.trim();
+  const query = workspaceFindQuery.value.trim().slice(0, 512);
   if (!query) return workspaceFindQuery.focus();
   const controller = new AbortController();
   workspaceFindController = controller;
   workspaceFindStatus.textContent = 'Searching workspace documents…';
   try {
-    const { results, unavailable } = await api.searchWorkspace(query, controller.signal);
+    const { results, unavailable, suggestions = [] } = await api.searchWorkspace(query, controller.signal);
     if (controller.signal.aborted) return;
     const summary = results.length ? `${results.length} matching ${results.length === 1 ? 'document' : 'documents'}.` : 'No matching documents.';
     workspaceFindStatus.textContent = `${summary}${unavailable ? ` Text could not be searched in ${unavailable} ${unavailable === 1 ? 'file' : 'files'}.` : ''}`;
-    workspaceFindResults.innerHTML = results.map(result => {
-      const wiki = result.type === 'Wiki' ? ` data-find-page="${escHtml(wikiPageFromPath(result.url))}"` : '';
-      return `<li><small>${escHtml(result.type)}</small><a href="${escHtml(result.url)}"${wiki}>${escHtml(result.label)}</a>
-        ${result.matches.map(match => `<a class="workspace-find-match" href="${escHtml(match.url)}"${wiki}>${match.location ? `<small>${escHtml(match.location)}</small>` : ''}${escHtml(match.text)}</a>`).join('')}</li>`;
+    workspaceFindSuggestions.innerHTML = suggestions.map(value => `<option value="${escapeHtmlText(value)}"></option>`).join('');
+    workspaceFindResults.innerHTML = results.flatMap(result => {
+      const matches = result.matches.length ? result.matches : [{ url: result.url, text: result.matchingName || result.label }];
+      const filename = result.name || result.label;
+      const type = result.type === 'Source' ? 'Raw source' : result.type;
+      return matches.map(match => `<li><strong>${escapeHtmlText(filename)}</strong>
+        <small>${escapeHtmlText(type)}${match.location ? ` · ${escapeHtmlText(match.location)}` : ''}</small>
+        <p class="workspace-find-match">${highlightWorkspaceFind(match.text, query)}</p>
+        <a class="btn" href="${escapeHtmlText(match.url)}">Go to location</a></li>`);
     }).join('');
     workspaceFindResults.hidden = !results.length;
   } catch (error) {
@@ -3272,12 +3378,18 @@ workspaceFind.addEventListener('submit', event => {
   if (workspaceReplaceRow.hidden) void findWorkspaceDocuments();
   else findWorkspaceEditorText();
 });
-workspaceFindQuery.addEventListener('input', clearWorkspaceSearch);
+workspaceFindQuery.addEventListener('input', event => {
+  if (!event.isComposing) scheduleWorkspaceFind();
+});
+workspaceFindQuery.addEventListener('compositionstart', clearWorkspaceSearch);
+workspaceFindQuery.addEventListener('compositionend', scheduleWorkspaceFind);
 workspaceFindResults.addEventListener('click', event => {
-  const link = event.target.closest('a[data-find-page]');
+  const link = event.target.closest('a[href]');
   if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
-  void openPage(link.dataset.findPage);
+  closeWorkspaceFind(false);
+  updateAppHistory(link.getAttribute('href'));
+  void restoreAppRoute();
 });
 $('workspace-replacement').addEventListener('keydown', event => {
   if (event.key !== 'Enter' || event.isComposing) return;
@@ -3285,7 +3397,7 @@ $('workspace-replacement').addEventListener('keydown', event => {
   findWorkspaceEditorText(true);
 });
 $('workspace-replace-current').addEventListener('click', () => findWorkspaceEditorText(true));
-$('workspace-find-close').addEventListener('click', closeWorkspaceFind);
+$('workspace-find-close').addEventListener('click', () => closeWorkspaceFind());
 
 function closeWorkspaceMenu(restoreFocus = false) {
   const menu = workspaceMenus.querySelector('details[open]');

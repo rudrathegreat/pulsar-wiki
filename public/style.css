@@ -110,7 +110,12 @@ body.workspace-ready #workspace-welcome { display: none; }
   font: inherit;
 }
 #workspace-find-status:not(:empty) { margin-top: 6px; color: var(--text-2); }
-.workspace-find.searching-workspace { width: 520px; }
+.workspace-find.searching-workspace {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: 560px;
+}
 #workspace-find-results {
   max-height: min(55vh, 460px);
   overflow-y: auto;
@@ -119,10 +124,11 @@ body.workspace-ready #workspace-welcome { display: none; }
   list-style: none;
   overflow-wrap: anywhere;
 }
-#workspace-find-results li { padding: 8px; border-top: 1px solid var(--border); }
-#workspace-find-results a { color: var(--text-1); }
-#workspace-find-results .workspace-find-match { display: block; margin-top: 4px; color: var(--text-2); }
-#workspace-find-results small { color: var(--text-2); margin-inline-end: 8px; }
+#workspace-find-results li { display: grid; gap: 5px; padding: 10px 8px; border-top: 1px solid var(--border); }
+.workspace-find-match, #workspace-find-results small { color: var(--text-2); }
+#workspace-find-results a { justify-self: start; text-decoration: none; }
+#workspace-find-results mark, .wiki-find-source mark { background: var(--highlight-yellow); color: #111; }
+.wiki-find-source { margin-top: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 #workspace-current-path {
   min-width: 0;
   margin-left: auto;

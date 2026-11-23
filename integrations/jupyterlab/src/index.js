@@ -50,7 +50,11 @@ export default {
             if (widget.context.model.dirty) throw Error('Material was saved on disk. This notebook has newer unsaved edits; save a copy or resolve Jupyter’s file conflict before reloading.');
             await widget.context.revert();
           }
-          if (message.cellId) { const index = widget.content.widgets.findIndex(cell => cell.model.id === message.cellId); if (index >= 0) { widget.content.activeCellIndex = index; await widget.content.scrollToItem(index); } }
+          const index = message.cellId ? widget.content.widgets.findIndex(cell => cell.model.id === message.cellId) : message.cellIndex;
+          if (Number.isInteger(index) && index >= 0 && index < widget.content.widgets.length) {
+            widget.content.activeCellIndex = index;
+            await widget.content.scrollToItem(index);
+          }
           result = selection();
         } else if (message.command === 'theme') await themes.setTheme(message.theme === 'light' ? 'JupyterLab Light' : 'JupyterLab Dark');
         else if (message.command === 'close') { await saveAll(); const widgets = []; tracker.forEach(widget => widgets.push(widget)); for (const widget of widgets) widget.close(); }
