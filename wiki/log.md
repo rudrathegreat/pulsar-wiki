@@ -420,3 +420,7 @@ All major updates to the wiki are recorded here.
 | 2026-11-23 | Workspace / application | Centred Find vertically, hid the search field clear icon, moved result locations beside linked names, used source display names and extension-free wiki and PDF labels, and switched match highlights to grey in both themes. [Find results](../public/app.js) [Find styles](../public/style.css) |
 
 | 2026-11-23 | Workspace / application | Moved Find back below the top bar and rendered Markdown in search excerpts from wiki pages, Markdown sources, and Markdown notebook cells. [Find results](../public/app.js) [Workspace search](../agent/workspace-search.js) |
+
+| 2026-11-23 | Workspace / application | Excluded wiki pages’ **Sources** fields from Find results and autocomplete. [Workspace search](../agent/workspace-search.js) |
+
+| 2026-11-23 | Workspace / application | Excluded inline source citations and plain-text references to saved source filenames from wiki Find matches. [Workspace search](../agent/workspace-search.js) |

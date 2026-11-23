@@ -15,6 +15,8 @@ The workspace top bar shows the full folder path on the right. The File, Edit, S
 
 The Edit menu lists Undo, Redo, Cut, Copy, Paste, Find, and Replace with platform-specific shortcuts. Find opens below the top bar, centred horizontally, and searches saved source files, wiki pages, and Jupyter notebooks as you type. It suggests completions and shows each result with a linked name, location details to its right, and a grey-highlighted excerpt. Markdown excerpts render with formatting and links. Source results use their display names. Select **Go to location** to open the matched passage or notebook cell. Find runs locally without AI. Replace edits the active text field. [Workspace Edit menu](../public/index.html) [Workspace search](../agent/workspace-search.js)
 
+Find skips **Sources** fields, inline source links, and saved source filenames mentioned in wiki text when matching keywords and suggesting completions. [Workspace search](../agent/workspace-search.js)
+
 The Help menu opens the published [[project-handover|Project Handover]] wiki page and includes a disabled PulsarWiki Docs button. [Workspace Help menu](../public/index.html)
 
 Settings updates appear in a dismissible notification that follows the active theme, names the new settings, and links to Settings. To announce a future addition, give its heading or label a unique `data-settings-update` value. [Settings markup](../public/index.html)

@@ -5,6 +5,10 @@ const path = require('node:path');
 
 const normalize = text => text.replace(/\s+/g, ' ').trim();
 const notebookText = value => Array.isArray(value) ? value.join('') : typeof value === 'string' ? value : '';
+const escapePattern = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const sourceLink = /\[(?:\\.|[^\]\\\r\n])*\]\(<?\/#(?:file|reading)\/(?:\([^()\r\n]*\)|[^()\r\n])*\)/gi;
+// Keep Markdown offsets intact without letting a phrase match across a citation.
+const maskReference = reference => '\0'.repeat(reference.length);
 
 async function* files(directory, recursive = false, prefix = '') {
   const entries = await fs.readdir(directory, { withFileTypes: true });
@@ -23,7 +27,7 @@ async function searchWorkspace(workspace, query, { displayNames = {}, signal } =
   let unavailable = 0;
   const needle = normalize(query);
   if (!needle) return { results, unavailable };
-  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escaped = escapePattern(needle);
   const pattern = new RegExp(escaped.replaceAll(' ', '\\s+'), 'giu');
   const completion = new RegExp(`(?<![\\p{L}\\p{N}])${escaped}[\\p{L}\\p{N}_+-]+`, 'iu');
 
@@ -40,20 +44,24 @@ async function searchWorkspace(workspace, query, { displayNames = {}, signal } =
     return `${start > 55 ? '…' : ''}${context}${end + 85 < text.length ? '…' : ''}`;
   }
 
-  function* textSections(text, markdown = false) {
+  function* textSections(text, markdown = false, skipWikiSources = false) {
+    // The wiki's Sources field can contain inline links or a list on following lines.
+    const separator = skipWikiSources
+      ? /^ {0,3}\*\*Sources\*\*:[^\r\n]*(?:\r?\n(?![ \t]*\r?$| {0,3}(?:\*\*[^\r\n]+\*\*:|#{1,6}[ \t]|---[ \t]*\r?$))[^\r\n]+)*|\r?\n[ \t]*\r?\n/gim
+      : /\r?\n[ \t]*\r?\n/g;
     let start = 0;
     let line = 1;
-    for (const breakAt of text.matchAll(/\r?\n[ \t]*\r?\n/g)) {
+    for (const breakAt of text.matchAll(separator)) {
       const section = text.slice(start, breakAt.index);
       yield { text: section, start, line, markdown };
       start = breakAt.index + breakAt[0].length;
-      line += 2 + (section.match(/\n/g) || []).length;
+      line += (section.match(/\n/g) || []).length + (breakAt[0].match(/\n/g) || []).length;
     }
     yield { text: text.slice(start), start, line, markdown };
   }
 
-  async function collect(directory, type, include, read) {
-    for await (const name of files(directory, type === 'Notebook')) {
+  async function collect(names, type, include, read) {
+    for await (const name of names) {
       signal?.throwIfAborted();
       if (!include(name)) continue;
       const label = type === 'Source' && typeof displayNames[name] === 'string' ? displayNames[name] : name;
@@ -64,8 +72,9 @@ async function searchWorkspace(workspace, query, { displayNames = {}, signal } =
         const sections = await read(name, url);
         for (const section of sections) {
           signal?.throwIfAborted();
-          if (suggestions.size < 8) suggest(completion.exec(normalize(section.text))?.[0]);
-          for (const match of section.text.matchAll(pattern)) {
+          const searchable = section.searchable ?? section.text;
+          if (suggestions.size < 8) suggest(completion.exec(normalize(searchable))?.[0]);
+          for (const match of searchable.matchAll(pattern)) {
             const start = match.index;
             const end = start + match[0].length;
             let location = section.location;
@@ -93,11 +102,26 @@ async function searchWorkspace(workspace, query, { displayNames = {}, signal } =
     }
   }
 
-  await collect(workspace.wikiDir, 'Wiki', name => name.endsWith('.md'), async name => {
+  const sourceNames = [];
+  for await (const name of files(workspace.rawDir)) sourceNames.push(name);
+  const filenames = sourceNames.filter(name => path.extname(name)).sort((a, b) => b.length - a.length);
+  const bareSource = filenames.length
+    ? new RegExp(`(?<![\\p{L}\\p{N}_.-])(?:${filenames.map(escapePattern).join('|')})(?![\\p{L}\\p{N}_-]|\\.[\\p{L}\\p{N}])`, 'giu')
+    : null;
+
+  function* wikiSections(text) {
+    for (const section of textSections(text, true, true)) {
+      const withoutLinks = section.text.replace(sourceLink, maskReference);
+      const searchable = bareSource ? withoutLinks.replace(bareSource, maskReference) : withoutLinks;
+      yield { ...section, searchable };
+    }
+  }
+
+  await collect(files(workspace.wikiDir), 'Wiki', name => name.endsWith('.md'), async name => {
     const text = await fs.readFile(path.join(workspace.wikiDir, name), 'utf8');
-    return textSections(text, true);
+    return wikiSections(text);
   });
-  await collect(workspace.rawDir, 'Source', () => true, async (name, url) => {
+  await collect(sourceNames, 'Source', () => true, async (name, url) => {
     const extension = path.extname(name).toLowerCase();
     if (extension === '.pdf') {
       const { searchPages, labels } = await workspace.readingService.extract(name);
@@ -107,7 +131,7 @@ async function searchWorkspace(workspace, query, { displayNames = {}, signal } =
     const text = await workspace.wikiTools.sourceText(name);
     return textSections(text, extension === '.md' || extension === '.markdown');
   });
-  await collect(path.join(workspace.rootDir, 'notebooks'), 'Notebook', name => name.endsWith('.ipynb') && !path.basename(name).startsWith('.'), async (name, url) => {
+  await collect(files(path.join(workspace.rootDir, 'notebooks'), true), 'Notebook', name => name.endsWith('.ipynb') && !path.basename(name).startsWith('.'), async (name, url) => {
     const book = JSON.parse(await fs.readFile(path.join(workspace.rootDir, 'notebooks', name), 'utf8'));
     if (!Array.isArray(book.cells)) throw new Error('Invalid notebook cells.');
     return book.cells.flatMap((cell, index) => {

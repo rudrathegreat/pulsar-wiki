@@ -167,6 +167,7 @@ test('server remembers selections and isolates simultaneous projects across APIs
   assert.equal((await (await request('/api/search?q=Only', { id: second.id })).json()).length, 0);
   const raw = path.join(firstPath, 'raw');
   fs.writeFileSync(path.join(raw, 'multiline source.txt'), 'PSR\nB1913+16');
+  fs.writeFileSync(path.join(raw, 'catalogue.md'), 'An observing catalogue.');
   fs.copyFileSync(path.join(__dirname, '..', 'raw', '1011.0718.pdf'), path.join(raw, 'binary pulsar.pdf'));
   const notebook = path.join(firstPath, 'notebooks', 'analyses', 'pulsar study.ipynb');
   fs.mkdirSync(path.dirname(notebook));
@@ -175,7 +176,26 @@ test('server remembers selections and isolates simultaneous projects across APIs
     { cell_type: 'markdown', source: ['**Legacy notebook** cell'] },
   ] });
   fs.writeFileSync(notebook, notebookContents);
-  fs.writeFileSync(path.join(firstPath, 'wiki', 'timing-result.md'), '# Results\n\nMeasurements of PSR B1913+16\nSecond occurrence: PSR B1913+16');
+  const firstMeasurement = 'Measurements of PSR B1913+16 (source: [PSR B1913+16](/#file/catalogue.md))';
+  const wikiText = [
+    '# Results',
+    '',
+    '**Summary**: Timing observations.',
+    '**Sources**: [PSR B1913+16 catalogue.md](/#file/catalogue.md)',
+    '- [[citation-only]]',
+    '**Last updated**: 2026-11-23',
+    '',
+    firstMeasurement,
+    'Second occurrence: PSR B1913+16',
+  ].join('\r\n');
+  fs.writeFileSync(path.join(firstPath, 'wiki', 'timing-result.md'), wikiText);
+  fs.writeFileSync(path.join(firstPath, 'wiki', 'references-only.md'), '# References\n\n**Sources**: [PSR B1913+16 catalogue.md](/#file/catalogue.md)');
+  fs.writeFileSync(path.join(firstPath, 'wiki', 'background.md'), [
+    '# Background',
+    'See [PSR B1913+16](/#file/catalogue.md?search=citation-query) for details.',
+    'Additional context is in [citation-passage](/#reading/document/highlight).',
+    'The archived file is catalogue.md.',
+  ].join('\n\n'));
   const find = (query, id = first.id) => request(`/api/workspaces/search?q=${encodeURIComponent(query)}`, { id }).then(response => response.json());
   const found = await find('psr b1913+16');
   assert.equal(found.unavailable, 0);
@@ -183,9 +203,13 @@ test('server remembers selections and isolates simultaneous projects across APIs
   assert.equal(found.results[0].url, '/wiki/timing-result');
   assert.equal(found.results[0].name, 'timing-result.md');
   assert.equal(found.results[0].matches[0].markdown, true);
-  assert.equal(found.results[0].matches[0].text, 'Measurements of PSR B1913+16\nSecond occurrence: PSR B1913+16');
-  assert.deepEqual(found.results[0].matches.map(match => match.location), ['Line 3', 'Line 4']);
-  assert.deepEqual(found.results[0].matches.map(match => match.url), ['/wiki/timing-result?start=27&end=39', '/wiki/timing-result?start=59&end=71']);
+  assert.equal(found.results[0].matches[0].text, `${firstMeasurement}\r\nSecond occurrence: PSR B1913+16`);
+  assert.deepEqual(found.results[0].matches.map(match => match.location), ['Line 8', 'Line 9']);
+  const bodyStart = wikiText.indexOf('Measurements');
+  const offsets = [wikiText.indexOf('PSR B1913+16', bodyStart), wikiText.lastIndexOf('PSR B1913+16')];
+  assert.deepEqual(found.results[0].matches.map(match => match.url), offsets.map(start => `/wiki/timing-result?start=${start}&end=${start + 'PSR B1913+16'.length}`));
+  assert.deepEqual((await find('catalogue')).results.map(({ type, name }) => ({ type, name })), [{ type: 'Source', name: 'catalogue.md' }]);
+  assert.deepEqual(await find('citat'), { results: [], unavailable: 0 });
   assert.match(found.results[1].matches[0].url, /^\/#file\/binary%20pulsar\.pdf\?page=\d+&start=\d+&end=\d+$/);
   assert.equal(found.results[2].matches[0].text, 'PSR B1913+16');
   assert.equal(found.results[2].matches[0].markdown, undefined);

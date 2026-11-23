@@ -3273,7 +3273,7 @@ function highlightWorkspaceFind(text, pattern) {
   return html + escapeHtmlText(text.slice(offset));
 }
 
-function renderWorkspaceFindExcerpt(match, pattern) {
+function renderWorkspaceFindExcerpt(match, pattern, wiki) {
   if (!match.markdown || !window.ActiveReading) {
     return `<p class="workspace-find-match">${highlightWorkspaceFind(match.text, pattern)}</p>`;
   }
@@ -3284,9 +3284,10 @@ function renderWorkspaceFindExcerpt(match, pattern) {
   typesetMath(excerpt);
   const walker = document.createTreeWalker(excerpt, NodeFilter.SHOW_TEXT);
   const textNodes = [];
+  const excluded = wiki ? '.katex, a[href^="/#file/"], a[href^="/#reading/"]' : '.katex';
   while (walker.nextNode()) {
     const node = walker.currentNode;
-    if (node.nodeValue.search(pattern) >= 0 && !node.parentElement.closest('.katex')) textNodes.push(node);
+    if (node.nodeValue.search(pattern) >= 0 && !node.parentElement.closest(excluded)) textNodes.push(node);
   }
   const range = document.createRange();
   for (const node of textNodes) {
@@ -3318,7 +3319,7 @@ async function findWorkspaceDocuments() {
       return matches.map(match => `<li><div class="workspace-find-result-heading">
         <span class="md-body"><a href="${escapeHtmlText(result.url)}">${escapeHtmlText(label)}</a></span>
         <small>${escapeHtmlText(type)}${match.location ? ` · ${escapeHtmlText(match.location)}` : ''}</small></div>
-        ${renderWorkspaceFindExcerpt(match, pattern)}
+        ${renderWorkspaceFindExcerpt(match, pattern, result.type === 'Wiki')}
         <a class="btn" href="${escapeHtmlText(match.url)}">Go to location</a></li>`);
     }).join('');
     workspaceFindResults.hidden = !results.length;
