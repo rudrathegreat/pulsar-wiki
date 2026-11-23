@@ -162,9 +162,19 @@
             <button id="workspace-close" type="button">Close folder</button>
           </div>
         </details>
-        <details name="workspace-menu">
+        <details id="workspace-edit-menu" name="workspace-menu">
           <summary>Edit</summary>
           <div class="workspace-menu-list">
+            <button type="button" data-edit-command="undo" aria-keyshortcuts="Control+Z">Undo <kbd aria-hidden="true">Ctrl+Z</kbd></button>
+            <button type="button" data-edit-command="redo" aria-keyshortcuts="Control+Y">Redo <kbd aria-hidden="true">Ctrl+Y</kbd></button>
+            <hr/>
+            <button type="button" data-edit-command="cut" aria-keyshortcuts="Control+X">Cut <kbd aria-hidden="true">Ctrl+X</kbd></button>
+            <button type="button" data-edit-command="copy" aria-keyshortcuts="Control+C">Copy <kbd aria-hidden="true">Ctrl+C</kbd></button>
+            <button type="button" data-edit-command="paste" aria-keyshortcuts="Control+V">Paste <kbd aria-hidden="true">Ctrl+V</kbd></button>
+            <hr/>
+            <button type="button" data-edit-command="find" aria-keyshortcuts="Control+F">Find <kbd aria-hidden="true">Ctrl+F</kbd></button>
+            <button type="button" data-edit-command="replace" aria-keyshortcuts="Control+H">Replace <kbd aria-hidden="true">Ctrl+H</kbd></button>
+            <hr/>
             <button id="workspace-edit-page" type="button" disabled>Edit wiki page</button>
           </div>
         </details>
@@ -196,6 +206,19 @@
         </details>
       </nav>
       <span id="workspace-current-path"></span>
+      <form id="workspace-find" class="workspace-find" role="search" aria-label="Find and replace" hidden>
+        <div class="workspace-find-row">
+          <input id="workspace-find-query" type="search" placeholder="Find" aria-label="Find text" autocomplete="off"/>
+          <button class="btn" type="submit">Find next</button>
+          <button class="btn" id="workspace-find-close" type="button" aria-label="Close find">Close</button>
+        </div>
+        <div class="workspace-find-row" id="workspace-replace-row" hidden>
+          <input id="workspace-replacement" type="text" placeholder="Replace with" aria-label="Replace with" autocomplete="off"/>
+          <button class="btn" id="workspace-replace-current" type="button">Replace</button>
+        </div>
+        <p id="workspace-find-status" role="status"></p>
+      </form>
+      <p id="workspace-edit-status" class="workspace-find" role="status" hidden></p>
     </header>
     <!-- Content area -->
     <div id="content">

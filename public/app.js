@@ -3073,6 +3073,174 @@ dom.chatAbort.addEventListener('click', () => {
 
 // ── Bootstrap ──────────────────────────────────────────────────────
 const workspaceMenus = $('workspace-menus');
+const workspaceEditMenu = $('workspace-edit-menu');
+const workspaceFind = $('workspace-find');
+const workspaceFindQuery = $('workspace-find-query');
+const workspaceFindStatus = $('workspace-find-status');
+const workspaceEditStatus = $('workspace-edit-status');
+const macEditShortcuts = /Mac|iPhone|iPad/.test(navigator.platform);
+let workspaceMenuField = null;
+let workspaceFindField = null;
+let workspaceEditStatusTimer;
+
+if (macEditShortcuts) {
+  const shortcuts = {
+    undo: 'Meta+Z', redo: 'Meta+Shift+Z', cut: 'Meta+X', copy: 'Meta+C',
+    paste: 'Meta+V', find: 'Meta+F', replace: 'Meta+Alt+F',
+  };
+  for (const button of workspaceEditMenu.querySelectorAll('[data-edit-command]')) {
+    const shortcut = shortcuts[button.dataset.editCommand];
+    button.setAttribute('aria-keyshortcuts', shortcut);
+    button.querySelector('kbd').textContent = shortcut.replace('Meta', '⌘').replace('Shift', '⇧').replace('Alt', '⌥').replaceAll('+', '');
+  }
+}
+
+function workspaceTextField(field) {
+  return typeof field?.selectionStart === 'number' && !field.matches(':disabled')
+    && field.getClientRects().length ? field : null;
+}
+
+function workspaceEditField() {
+  const focused = document.activeElement;
+  const field = workspaceMenus.contains(focused) ? workspaceMenuField : focused;
+  const target = workspaceFind.contains(field) ? workspaceFindField : field;
+  const editors = document.querySelectorAll('#wiki-page-editor, #references-editor, #handover-editor');
+  return workspaceTextField(target) || Array.from(editors).find(workspaceTextField)
+    || null;
+}
+
+function updateWorkspaceEditMenu() {
+  const field = workspaceEditField();
+  const selectedText = field && field.selectionStart !== field.selectionEnd;
+  const writable = field && !field.readOnly;
+  const disabled = {
+    undo: !writable, redo: !writable, paste: !writable,
+    cut: !writable || !selectedText,
+    copy: !selectedText && window.getSelection()?.isCollapsed !== false,
+    replace: !writable || field.type === 'password',
+  };
+  for (const button of workspaceEditMenu.querySelectorAll('[data-edit-command]')) {
+    button.disabled = Boolean(disabled[button.dataset.editCommand]);
+  }
+}
+
+function openWorkspaceFind(replace) {
+  const field = workspaceEditField();
+  if (replace && (!field || field.readOnly || field.type === 'password')) return false;
+  closeWorkspaceMenu();
+  const paperFind = $('reading-find');
+  if (!replace && (!field || field === paperFind) && paperFind.getClientRects().length) {
+    workspaceFind.hidden = true;
+    paperFind.focus();
+    paperFind.select();
+    return true;
+  }
+  const previousField = workspaceFind.hidden ? null : workspaceFindField;
+  workspaceFindField = field?.type === 'password' ? null : field;
+  if (workspaceFindField && field.selectionEnd > field.selectionStart && workspaceFindField !== previousField) {
+    workspaceFindQuery.value = field.value.slice(field.selectionStart, field.selectionEnd);
+  }
+  $('workspace-replace-row').hidden = !replace;
+  workspaceFindStatus.textContent = '';
+  workspaceEditStatus.hidden = true;
+  workspaceFind.hidden = false;
+  workspaceFindQuery.focus();
+  workspaceFindQuery.select();
+  return true;
+}
+
+function closeWorkspaceFind() {
+  workspaceFind.hidden = true;
+  workspaceTextField(workspaceFindField)?.focus();
+  workspaceFindField = null;
+}
+
+function findWorkspaceText(replace = false) {
+  const query = workspaceFindQuery.value;
+  if (!query) return workspaceFindQuery.focus();
+  const field = workspaceTextField(workspaceFindField);
+  if (!field) {
+    workspaceFindStatus.textContent = !replace && window.find?.(query, false, false, true)
+      ? '' : 'No matches.';
+    return;
+  }
+  const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  if (replace && !field.readOnly) {
+    pattern.lastIndex = field.selectionStart;
+  } else {
+    pattern.lastIndex = field.selectionEnd;
+  }
+  let match = pattern.exec(field.value);
+  if (!match) {
+    pattern.lastIndex = 0;
+    match = pattern.exec(field.value);
+  }
+  if (!match) {
+    workspaceFindStatus.textContent = 'No matches.';
+    return;
+  }
+  field.focus();
+  field.setSelectionRange(match.index, match.index + match[0].length);
+  if (replace && !field.readOnly) {
+    const value = $('workspace-replacement').value;
+    const changed = document.execCommand(value ? 'insertText' : 'delete', false, value);
+    workspaceFindStatus.textContent = changed ? 'Replaced one match.' : 'The match could not be replaced.';
+  } else {
+    workspaceFindStatus.textContent = '';
+  }
+}
+
+async function runWorkspaceEdit(command) {
+  const field = workspaceEditField();
+  if (command === 'find' || command === 'replace') {
+    openWorkspaceFind(command === 'replace');
+    return;
+  }
+  closeWorkspaceMenu();
+  if (command === 'copy' && (!field || field.selectionStart === field.selectionEnd)) {
+    document.execCommand('copy');
+    return;
+  }
+  if (!field) return;
+  field.focus();
+  if (command !== 'paste') {
+    document.execCommand(command);
+    return;
+  }
+  const { value, selectionStart, selectionEnd } = field;
+  try {
+    const text = await navigator.clipboard.readText();
+    if (document.activeElement === field && workspaceTextField(field) && !field.readOnly
+        && field.value === value && field.selectionStart === selectionStart && field.selectionEnd === selectionEnd && text) {
+      document.execCommand('insertText', false, text);
+    }
+  } catch {
+    workspaceEditStatus.textContent = macEditShortcuts ? 'Press ⌘V to paste.' : 'Press Ctrl+V to paste.';
+    workspaceEditStatus.hidden = false;
+    clearTimeout(workspaceEditStatusTimer);
+    workspaceEditStatusTimer = setTimeout(() => { workspaceEditStatus.hidden = true; }, 4500);
+  }
+}
+
+workspaceMenus.addEventListener('focusin', event => {
+  if (!workspaceMenus.contains(event.relatedTarget)) workspaceMenuField = event.relatedTarget;
+});
+workspaceEditMenu.addEventListener('mousedown', event => {
+  if (event.button === 0 && window.getSelection()?.isCollapsed === false
+      && !workspaceTextField(document.activeElement)) event.preventDefault();
+});
+workspaceFind.addEventListener('submit', event => {
+  event.preventDefault();
+  findWorkspaceText();
+});
+workspaceFindQuery.addEventListener('input', () => { workspaceFindStatus.textContent = ''; });
+$('workspace-replacement').addEventListener('keydown', event => {
+  if (event.key !== 'Enter' || event.isComposing) return;
+  event.preventDefault();
+  findWorkspaceText(true);
+});
+$('workspace-replace-current').addEventListener('click', () => findWorkspaceText(true));
+$('workspace-find-close').addEventListener('click', closeWorkspaceFind);
 
 function closeWorkspaceMenu(restoreFocus = false) {
   const menu = workspaceMenus.querySelector('details[open]');
@@ -3089,10 +3257,15 @@ workspaceMenus.addEventListener('click', event => {
   const summary = event.target.closest('summary');
   if (summary) {
     $('workspace-edit-page').disabled = !currentWikiEditAction();
+    if (workspaceEditMenu.contains(summary)) updateWorkspaceEditMenu();
     return;
   }
   const item = event.target.closest('.workspace-menu-list > :is(button, a)');
   if (!item) return;
+  if (item.dataset.editCommand) {
+    void runWorkspaceEdit(item.dataset.editCommand);
+    return;
+  }
   if (item.dataset.page) {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
@@ -3119,7 +3292,18 @@ document.addEventListener('focusin', event => {
   if (!workspaceMenus.contains(event.target)) closeWorkspaceMenu();
 });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape') closeWorkspaceMenu(workspaceMenus.contains(document.activeElement));
+  if (event.key === 'Escape') {
+    if (workspaceMenus.querySelector('details[open]')) closeWorkspaceMenu(workspaceMenus.contains(document.activeElement));
+    else if (!workspaceFind.hidden) closeWorkspaceFind();
+    return;
+  }
+  if (event.defaultPrevented || event.isComposing || !document.body.classList.contains('workspace-ready')
+      || document.querySelector('dialog[open]') || event.shiftKey) return;
+  const key = event.key.toLowerCase();
+  const find = key === 'f' && !event.altKey;
+  const replace = macEditShortcuts ? key === 'f' && event.altKey : key === 'h' && !event.altKey;
+  const modifier = macEditShortcuts ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+  if (modifier && (find || replace) && openWorkspaceFind(replace)) event.preventDefault();
 });
 
 (async function init() {

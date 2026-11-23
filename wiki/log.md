@@ -398,3 +398,5 @@ All major updates to the wiki are recorded here.
 | 2026-11-23 | Workspace / application | Added File, Edit, Selection, Go, and Help menus, moved folder actions into File, and displayed the full path below the right-aligned folder name on hover or focus. [Workspace top bar](../public/index.html) |
 
 | 2026-11-23 | Workspace / application | Replaced the folder name and tooltip with the full folder path on the right side of the top bar. [Workspace top bar](../public/index.html) |
+
+| 2026-11-23 | Workspace / application | Added Undo, Redo, Cut, Copy, Paste, Find, and Replace to the Edit menu with platform-specific shortcuts. [Workspace Edit menu](../public/index.html) |
