@@ -25,7 +25,7 @@ function client(initial = '/wiki/timing') {
   visit(initial);
   const context = {
     location,
-    document: { body: element('body'), getElementById: element, querySelectorAll: () => [] },
+    document: { body: element('body'), getElementById: element, querySelectorAll: () => [], addEventListener: (type, listener) => { handlers[type] = listener; } },
     window: { addEventListener: (type, listener) => { handlers[type] = listener; },
       ResearchNotebooks: { show() {}, async route(hash) { if (!hash.startsWith('#notebook/')) return false; opened.push(hash); return true; } },
       ActiveReading: { closeHelper() {}, async route(hash) { if (!hash.startsWith('#reading/')) return false; opened.push(hash); return true; } },
@@ -45,6 +45,7 @@ function client(initial = '/wiki/timing') {
       context.client.showPanel('wiki', { historyMode: 'none' });
     },
     async openRawFile(name) { opened.push(name); context.client.showPanel('document'); },
+    async openLinkedPaper(bibcode) { opened.push(bibcode); context.client.showPanel('files', { historyMode: 'none' }); },
     async selectThread(id) { opened.push(`chat:${id}`); },
   };
   vm.createContext(context);
@@ -55,14 +56,14 @@ function client(initial = '/wiki/timing') {
   const viewStart = source.indexOf('function setSourceView(');
   const viewEnd = source.indexOf('function formatPaperDate');
   const routeStart = source.indexOf('function handleWikiRoute(');
-  const routeEnd = source.indexOf("window.addEventListener('hashchange', restoreAppRoute);") + "window.addEventListener('hashchange', restoreAppRoute);".length;
+  const routeEnd = source.indexOf('let aiTarget = null;');
   vm.runInContext(`${source.slice(helperStart, helperEnd)}
     ${source.slice(stateStart, stateEnd)}
     ${source.slice(viewStart, viewEnd)}
     ${source.slice(routeStart, routeEnd)}
     globalThis.client = { state, showPanel, setSourceView, handleAppRoute, updateAppHistory };
   `, context);
-  return { ...context.client, location, entries, opened, async travel(delta) {
+  return { ...context.client, location, entries, opened, click: handlers.click, async travel(delta) {
     position += delta; visit(entries[position]);
     await handlers.popstate({ type: 'popstate' }); await handlers.hashchange({ type: 'hashchange' });
   } };
@@ -127,6 +128,30 @@ test('explicit documents, reading passages and notebooks take priority over wiki
     assert.equal(c.opened.length, 1);
     assert.equal(c.entries.length, 1);
   }
+});
+
+test('Sources paper URLs restore the exact ADS record', async () => {
+  const c = client('/wiki/timing#sources/add/paper/2024A%26A...123..456A');
+  assert.equal(await c.handleAppRoute(), true);
+  assert.deepEqual(c.opened, ['2024A&A...123..456A']);
+  assert.equal(c.state.panel, 'files');
+  assert.equal(c.entries.length, 1);
+  assert.equal(await client('/#sources/add/paper/%ZZ').handleAppRoute(), false);
+});
+
+test('clicking a paper citation opens Sources in the same tab and can go Back', async () => {
+  const reading = '/#reading/document/passage';
+  const c = client(reading);
+  const paper = '/#sources/add/paper/2013MNRAS.431.2378S';
+  let prevented = false;
+  c.click({ button: 0, target: { closest: () => ({ getAttribute: () => paper }) }, preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.deepEqual(c.entries, [reading, paper]);
+  assert.deepEqual(c.opened, ['2013MNRAS.431.2378S']);
+  assert.equal(c.state.panel, 'files');
+  await c.travel(-1);
+  assert.equal(c.location.hash, '#reading/document/passage');
+  assert.equal(c.opened.at(-1), '#reading/document/passage');
 });
 
 test('legacy wiki and source links remain supported and malformed filenames are safe', async () => {

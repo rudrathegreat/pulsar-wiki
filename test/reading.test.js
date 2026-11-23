@@ -268,7 +268,7 @@ test('Ask AI falls back to refereed articles after the wiki check and renders li
   assert.match(searches[0].searchParams.get('q'), /abs:"pulsar".*OR.*abs:"residuals".*AND property:refereed AND doctype:article/);
   assert.match(f.calls[0].messages[0].text, /Timing residuals are used to study pulsar timing noise/);
   assert.doesNotMatch(f.calls[0].messages[0].text, /Missing abstract/);
-  const url = 'https://ui.adsabs.harvard.edu/abs/2013MNRAS.431.2378S/abstract';
+  const url = '/#sources/add/paper/2013MNRAS.431.2378S';
   assert.equal(result.response, `The wiki did not provide a cited answer.\n\nThe residuals reveal noise [(R.M. Shannon & J.M. Cordes 2013)](${url}). Selected passages: [H:${h.id}]\n\n### References\n\n- [Shannon R.M., Cordes J.M., 2013, MNRAS, 431, 2378](${url})`);
 });
 
@@ -369,7 +369,7 @@ test('Ask AI keeps a properties question focused on the highlighted pulsar when 
     adsToken: 'test-token',
     async searchRefereedArticles(topics) {
       searches.push(topics);
-      return [{ title: 'Timing PSR J0740+6620', abstract: 'PSR J0740+6620 has a spin period of 2.89 ms.', authors: ['Example, A.'], year: '2020', publication: 'ApJ', recordUrl: 'https://ui.adsabs.harvard.edu/abs/2020ApJ...900...01U/abstract' }];
+      return [{ title: 'Timing PSR J0740+6620', abstract: 'PSR J0740+6620 has a spin period of 2.89 ms.', authors: ['Example, A.'], year: '2020', publication: 'ApJ', bibcode: '2020ApJ...900...01U' }];
     },
   };
   const h = await highlight(f, 'object.txt', 'PSR J0740+6620');

@@ -327,7 +327,7 @@ test('Ask AI shows progress and the completed response in the same answer box', 
     poll = callback;
   };
   const snapshot = { highlights: structuredClone([c.r.data.highlights[0]]), documents: c.r.data.documents, annotations: [], wikiPages: [], discoveries: [], responses: [] };
-  const task = { id: 'task-inline', action: 'question', status: 'completed', response: 'The inline timing explanation.', snapshot };
+  const task = { id: 'task-inline', action: 'question', status: 'completed', response: 'The inline timing explanation. [Paper](https://ui.adsabs.harvard.edu/abs/2024A%26A...123..456A/abstract)', snapshot };
   let current = { ...task, status: 'queued', response: '' };
   c.context.fetch = async (url, options) => {
     if (url === '/api/reading/tasks' && options.method === 'POST') submitted = JSON.parse(options.body);
@@ -358,6 +358,7 @@ test('Ask AI shows progress and the completed response in the same answer box', 
   assert.equal(c.nodes.get('reading-task-pending').hidden, true);
   assert.equal(c.nodes.get('reading-task-controls').hidden, true);
   assert.match(c.nodes.get('reading-task-complete').innerHTML, /inline timing explanation/);
+  assert.match(c.nodes.get('reading-task-complete').innerHTML, /\[Paper\]\(\/#sources\/add\/paper\/2024A%26A\.\.\.123\.\.456A\)/);
   assert.equal(c.nodes.get('reading-task-status').textContent, 'completed');
   assert.match(c.nodes.get('reading-task-actions').innerHTML, /Add to wiki.*New chat from response/);
   c.context.api = { getWikiList: async () => [{ name: 'paper' }] };

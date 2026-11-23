@@ -284,6 +284,7 @@ const state = {
   selectedSourceIds: new Set(),
   sourceImportRunning: false,
   activeSourceId: null,
+  sourcePaperLink: false,
   sourcePaperHistory: [],
   sourcePapers: new Map(),
   sourceDetailRequest: 0,
@@ -374,6 +375,7 @@ function panelUrl(name) {
 }
 
 function showPanel(name, { historyMode = 'push' } = {}) {
+  if (name === 'files' && historyMode !== 'none' && state.sourcePaperLink) closeSourceDetail();
   // Documents and individual notebooks manage their more specific URLs themselves.
   if (name !== 'document') updateAppHistory(panelUrl(name), historyMode);
   if (name !== state.panel) {
@@ -1424,6 +1426,7 @@ const SOURCE_FILTERS = [
 ];
 
 function setSourceView(name, { historyMode = 'push' } = {}) {
+  if (state.sourcePaperLink) closeSourceDetail();
   state.sourceView = ['add', 'upload', 'saved', 'references'].includes(name) ? name : 'add';
   if (state.panel === 'files') updateAppHistory(panelUrl('files'), historyMode);
   document.querySelectorAll('[data-source-view]').forEach(button => {
@@ -1582,11 +1585,42 @@ function updateSourceSelection() {
 
 function closeSourceDetail() {
   state.activeSourceId = null;
+  state.sourcePaperLink = false;
   state.sourceDetailRequest++;
   state.sourcePaperHistory = [];
   $('source-paper-page').hidden = true;
   $('source-search-page').hidden = false;
   renderSourceResults(state.sourceResults);
+}
+
+async function openLinkedPaper(bibcode) {
+  setSourceView('add', { historyMode: 'none' });
+  showPanel('files', { historyMode: 'none' });
+  state.sourcePaperLink = true;
+  state.activeSourceId = null;
+  state.sourcePaperHistory = [];
+  const request = ++state.sourceDetailRequest;
+  const detailWorkspace = workspaceId;
+  const current = () => state.sourceDetailRequest === request && state.panel === 'files' && workspaceId === detailWorkspace;
+  $('source-search-page').hidden = true;
+  $('source-paper-page').hidden = false;
+  $('source-paper-back').textContent = 'Back to results';
+  $('source-paper-metadata').innerHTML = '';
+  const status = $('source-paper-relations');
+  status.textContent = 'Loading paper details…';
+  $('panel-files').scrollTop = 0;
+  updateSourceSelection();
+  try {
+    const data = await api.searchSources(`bibcode:${bibcode} source:ads`, 1, { filters: { refereed: 'all' } });
+    if (!current()) return;
+    const paper = data.results.find(result => result.bibcode === bibcode);
+    if (!paper) throw new Error(data.warnings?.[0] || 'NASA ADS has no matching paper record.');
+    state.sourcePapers.set(paper.id, paper);
+    if (paper.downloaded) state.selectedSourceIds.delete(paper.id);
+    void showSourceDetail(paper.id, false);
+  } catch (error) {
+    if (current()) status.textContent = `Could not open this paper. ${stripEmoji(error.message)}`;
+  }
 }
 
 async function showSourceDetail(id, remember = true) {
@@ -2048,6 +2082,7 @@ $('panel-files').addEventListener('click', event => {
 $('source-paper-back').addEventListener('click', () => {
   const previous = state.sourcePaperHistory.pop();
   if (previous) void showSourceDetail(previous, false);
+  else if (state.sourcePaperLink) setSourceView('add');
   else closeSourceDetail();
 });
 $('source-paper-import').addEventListener('click', () => { void importSelectedSources(); });
@@ -2370,6 +2405,14 @@ async function handleAppRoute() {
     return true;
   }
   if (handleWikiRoute({ migrateLegacyHash: true })) return true;
+  const paper = /^#sources\/add\/paper\/([^/]+)$/.exec(hash);
+  if (paper) {
+    let bibcode;
+    try { bibcode = decodeURIComponent(paper[1]); } catch { return false; }
+    if (!/^[a-z0-9.&+-]{1,64}$/i.test(bibcode)) return false;
+    await openLinkedPaper(bibcode);
+    return true;
+  }
   if (hash.startsWith('#sources/references/')) {
     let key;
     try { key = decodeURIComponent(hash.slice('#sources/references/'.length)); } catch { return false; }
@@ -2418,6 +2461,15 @@ async function restoreAppRoute(event) {
 }
 window.addEventListener('popstate', restoreAppRoute);
 window.addEventListener('hashchange', restoreAppRoute);
+
+document.addEventListener('click', event => {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const link = event.target.closest('a[href^="/#sources/add/paper/"]');
+  if (!link) return;
+  event.preventDefault();
+  updateAppHistory(link.getAttribute('href'));
+  void restoreAppRoute();
+});
 
 // ── ChatGPT subscription chat ─────────────────────────────────────
 // OAuth credentials stay on the server; this client receives sanitized state.

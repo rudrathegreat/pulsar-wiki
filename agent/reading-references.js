@@ -29,6 +29,10 @@ function escapeMarkdown(value) {
   return String(value).replace(/\s+/g, ' ').replace(/([\\`*_{}\[\]<>])/g, '\\$1');
 }
 
+function paperLink(bibcode) {
+  return `/#sources/add/paper/${encodeURIComponent(bibcode)}`;
+}
+
 function renderResearchAnswer(answer, papers, indexes) {
   const entries = [...indexes].map(index => ({ index, ...papers[index] }));
   entries.sort((a, b) => a.authors[0].localeCompare(b.authors[0]) ||
@@ -52,18 +56,18 @@ function renderResearchAnswer(answer, papers, indexes) {
   const seen = new Set();
   const body = answer.replace(PAPER_REFERENCE, (_, id) => {
     const index = Number(id) - 1;
-    const { authors, year, recordUrl } = byIndex.get(index);
+    const { authors, year, bibcode } = byIndex.get(index);
     const names = authors.slice(0, 3).map(name => authorName(name, true));
     const short = authors.length > 3 || (authors.length === 3 && seen.has(index));
     const label = short ? `${names[0]} et al.` : names.join(', ').replace(/, ([^,]+)$/, ' & $1');
     seen.add(index);
-    return `[(${escapeMarkdown(label)} ${year})](${recordUrl})`;
+    return `[(${escapeMarkdown(label)} ${year})](${paperLink(bibcode)})`;
   });
 
-  const references = entries.map(({ authors, year, publication, volume, page, recordUrl }) => {
+  const references = entries.map(({ authors, year, publication, volume, page, bibcode }) => {
     const names = authors.length > 8 ? `${authorName(authors[0])} et al.` : authors.map(name => authorName(name)).join(', ');
     const details = [names, year, publication, volume, page].filter(Boolean).join(', ');
-    return `- [${escapeMarkdown(details)}](${recordUrl})`;
+    return `- [${escapeMarkdown(details)}](${paperLink(bibcode)})`;
   });
   return `${body}\n\n### References\n\n${references.join('\n')}`;
 }

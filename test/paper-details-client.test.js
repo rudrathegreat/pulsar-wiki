@@ -14,6 +14,7 @@ function client(getRelatedSources = async () => ({ groups: [] })) {
   };
   const context = { workspaceId: 'workspace1', state: { sourceResults: [paper], sourcePapers: new Map([[paper.id, paper]]), sourcePaperHistory: [], sourceDetailRequest: 0, selectedSourceIds: new Set() },
     window: {},
+    showPanel(panel) { context.state.panel = panel; },
     api: { getRelatedSources, async getSourceKeywords() { return { keywords: ['Timing'] }; } },
     stripEmoji: String, escHtml: value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'), $: element,
     dom: { sourceResultsSection: element('results-section'), sourceResults: element('results'), sourceSelectedCount: element('count'), sourceImportSelected: element('import') },
@@ -96,6 +97,26 @@ test('direct import uses only the open paper and preserves other selections', as
   await importing;
   assert.equal(c.context.state.selectedSourceIds.has('other'), true);
   assert.equal(c.element('source-paper-import-current').disabled, false);
+});
+
+test('a paper opened from Ask AI shows the matching record and imports it from Sources', async () => {
+  const c = client();
+  const bibcode = '2024A&A...123..456A';
+  const linked = { ...paper, id: 'linked', title: 'Linked pulsar paper', bibcode };
+  c.context.api.searchSources = async (query, limit, { filters }) => {
+    assert.equal(query, `bibcode:${bibcode} source:ads`);
+    assert.equal(limit, 1);
+    assert.equal(filters.refereed, 'all');
+    return { results: [linked] };
+  };
+  await c.context.openLinkedPaper(bibcode);
+  assert.equal(c.context.state.panel, 'files');
+  assert.match(c.element('source-paper-metadata').innerHTML, /Linked pulsar paper/);
+  assert.equal(c.element('source-paper-import-current').disabled, false);
+  let importedIds;
+  c.context.api.importSources = async ids => { importedIds = [...ids]; return { imported: [linked] }; };
+  await c.context.importCurrentSource();
+  assert.deepEqual(importedIds, ['linked']);
 });
 test('direct import follows nested navigation and rejects unavailable papers', async () => {
   const c = client();
