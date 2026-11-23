@@ -157,27 +157,29 @@ test('server remembers selections and isolates simultaneous projects across APIs
   assert.equal((await (await request('/api/workspaces', { id: first.id })).json()).active.path, first.path);
   assert.equal((await (await request('/api/workspaces/open', { method: 'POST', body: { path: firstPath } })).json()).active.id, first.id);
 
-  const explorerFile = 'Field data/run +1 #2.txt';
+  const explorerFile = 'notebooks/Field data/run +1 #2.txt';
   fs.mkdirSync(path.join(firstPath, 'Field data'));
+  fs.mkdirSync(path.join(firstPath, 'notebooks', 'Field data'));
   fs.writeFileSync(path.join(firstPath, explorerFile), 'sample data');
-  fs.writeFileSync(path.join(firstPath, 'AGENTS.md'), 'Agent instructions');
-  fs.writeFileSync(path.join(firstPath, 'CLAUDE.md'), 'Claude instructions');
-  fs.writeFileSync(path.join(firstPath, 'Field data', 'gemini.md'), 'Nested instructions');
-  fs.symlinkSync(secondPath, path.join(firstPath, 'linked-project'), 'junction');
+  fs.writeFileSync(path.join(firstPath, 'Field data', 'outside.txt'), 'outside the explorer');
+  fs.writeFileSync(path.join(firstPath, 'notebooks', 'Field data', 'gemini.md'), 'Nested instructions');
+  fs.symlinkSync(secondPath, path.join(firstPath, 'notebooks', 'linked-project'), 'junction');
   const explorer = (suffix = '', id = first.id) => request('/api/workspaces/explorer' + suffix, { id });
   const rootEntries = (await (await explorer()).json()).entries;
-  assert.ok(rootEntries.some(entry => entry.name === 'Field data' && entry.directory));
-  assert.ok(!rootEntries.some(entry => ['.pulsarwiki', 'linked-project', 'AGENTS.md', 'CLAUDE.md', 'GEMINI.md'].includes(entry.name)));
-  assert.deepEqual((await (await explorer('?path=Field%20data')).json()).entries, [{ name: 'run +1 #2.txt', directory: false }]);
+  assert.deepEqual(rootEntries, ['notebooks', 'raw', 'wiki'].map(name => ({ name, directory: true })));
+  assert.deepEqual((await (await explorer('?path=notebooks')).json()).entries, [{ name: 'Field data', directory: true }]);
+  assert.deepEqual((await (await explorer('?path=notebooks%2FField%20data')).json()).entries, [{ name: 'run +1 #2.txt', directory: false }]);
   const download = `/download?${new URLSearchParams({ path: explorerFile })}`;
   const attachment = await explorer(download);
   assert.match(attachment.headers.get('content-disposition'), /^attachment/);
   assert.equal(await attachment.text(), 'sample data');
   assert.equal((await explorer(download, second.id)).status, 404);
-  for (const name of ['../Project two', '.pulsarwiki', 'linked-project']) {
+  for (const name of ['Field data', 'notebooks/../../Project two', '.pulsarwiki', 'notebooks/linked-project']) {
     assert.equal((await explorer(`?${new URLSearchParams({ path: name })}`)).status, 404);
   }
-  assert.equal((await explorer('/download?path=linked-project%2FGEMINI.md')).status, 404);
+  assert.equal((await explorer('/download?path=Field%20data%2Foutside.txt')).status, 404);
+  assert.equal((await explorer('/download?path=references.bib')).status, 404);
+  assert.equal((await explorer('/download?path=notebooks%2Flinked-project%2FGEMINI.md')).status, 404);
 
   const thread = await (await request('/api/chat/threads', { id: first.id, method: 'POST', body: { title: 'Only project one' } })).json();
   assert.match(JSON.parse(fs.readFileSync(path.join(firstPath, '.pulsarwiki', 'chat', 'threads.json'), 'utf8')).threads[0].instructionSnapshot, /Maintain a source-backed research/);

@@ -29,7 +29,6 @@
   let rootLoading = false;
 
   function fileAction(path) {
-    if (path === 'references.bib') return () => byId('wiki-sidebar-references').click();
     const wiki = /^wiki\/([a-z0-9_+.-]+)\.md$/.exec(path);
     if (wiki && !wiki[1].includes('..')) return () => window.openPage(wiki[1]);
     const source = /^raw\/([^/]+)\.([^.\/]+)$/.exec(path);
