@@ -4,7 +4,7 @@
 
 **Sources**: [README.md](../README.md) (application documentation; no scientific source ingestion).
 
-**Last updated**: 2026-10-28
+**Last updated**: 2026-11-23
 
 ---
 
@@ -36,9 +36,11 @@ Connect to related knowledge checks wiki prose first. If it finds no close match
 
 Add to wiki defaults to the paper summary or filename-based notes page, even when the page does not exist. Select Add to have the connected agent generate and save a concise, cited note automatically. The agent receives explicit instructions to preserve source meaning and uncertainty, distinguish evidence from interpretation, use only selected inputs, and retain existing notes and citations. The application inserts the note into the latest page, creates a missing page when generation succeeds, and updates its sources, date, index, and log together. The helper shows progress and a link to the updated page, without a Markdown editor, diff, or review/publish step. Failed or stopped requests leave the wiki unchanged and offer a retry. (source: [README.md](../README.md))
 
-Reading notes append short sections with descriptive headings and readable filename/page links. Each appended note includes the exact highlighted text as a Markdown blockquote with its source link, followed by a concise explanation. Selections without a transcription are labelled as visual regions. Published pages omit hashes, internal IDs, AI-use declarations and model names. Reviewed artifacts retain selected excerpts and included interpretations, with unsupported interpretations marked as needing verification. Private records preserve earlier selection revisions when a highlight is changed, deleted, or reattached. Back up local reading data separately from Git and retain the original papers. (source: [README.md](../README.md))
+Reading notes append short sections with descriptive headings and readable filename/page links. Each appended note includes the exact highlighted text as a Markdown blockquote with its source link, followed by a concise explanation. Selections without a transcription are labelled as visual regions. Source hashes and internal IDs stay private. The agent instructions require a two-sentence AI declaration at the bottom of the wiki page. Reviewed artifacts retain selected excerpts and included interpretations, with unsupported interpretations marked as needing verification. Private records preserve earlier selection revisions when a highlight is changed, deleted, or reattached. Back up local reading data separately from Git and retain the original papers. (sources: [README.md](../README.md), [GEMINI.md](../GEMINI.md#page-format))
 
 ## Related pages
 
 - [[project-handover]]
 - [[index]]
+
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-23. This update clarified the declaration format for reading notes.

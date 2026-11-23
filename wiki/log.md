@@ -430,3 +430,11 @@ All major updates to the wiki are recorded here.
 | 2026-11-23 | Workspace / application | Removed the parenthetical from the Connect to related knowledge button label. [Reading helper](../public/index.html) |
 
 | 2026-11-23 | Workspace / application | Kept the reading helper the same width when selecting an action and opened its details below the action buttons. [Reading helper layout](../public/reading.css) |
+
+| 2026-11-23 | Agent instructions | Required a short AI declaration at the bottom of each wiki page the agent creates or edits and updated the reading documentation. [Page format](../GEMINI.md#page-format) [[active-reading]] |
+
+| 2026-11-23 | Wiki documentation | Backfilled AI declarations across the wiki and verified that all 41 pages end with a declaration. [[index]] |
+
+| 2026-11-23 | Wiki documentation | Aligned the agent instructions and all 41 wiki declarations with the two-sentence example. [Page format](../GEMINI.md#page-format) |
+
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-23. This update recorded the revision of the instructions and wiki declarations.

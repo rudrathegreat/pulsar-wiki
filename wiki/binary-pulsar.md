@@ -37,3 +37,5 @@ Most binary pulsars have undergone a phase of mass transfer from the companion.
 - [[gravitational-radiation]]
 - [[psr-j0740+6620]]
 - [[x-ray-pulsar]]
+
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-23. This update revised the AI declaration to follow the requested format.

@@ -41,7 +41,7 @@ Markdown tables share the chat style and scroll horizontally when needed; the ch
 
 Reading assistance: The Ask AI answer box shows progress messages on the left and the same closely spaced animated dots as chat on the right. The Stop request button appears below the answer box while the request runs. A concise explanation with citations to selected passages then appears in the same box, with completion status below it. The question and answer appear in closely spaced borderless boxes. Highlight colours appear as individual swatches; assisted highlights show blue as their selected colour and disable other colour choices. Saved responses show the user question, can be expanded from a five-line preview, and can start a new chat with the selected passages and response. [Reading interface](../public/reading.js)
 
-Agent guidance: [GEMINI.md](../GEMINI.md) requires clickable file references in chat and wiki content, including linked source citations.
+Agent guidance requires clickable file references in chat and wiki content, including linked source citations, and a two-sentence AI declaration at the bottom of each wiki page the agent creates or edits. [GEMINI.md](../GEMINI.md)
 
 Ask AI searches the current wiki first. If the wiki answer is incomplete or unavailable, Ask AI searches sciX/NASA ADS for peer-reviewed journal articles that address the missing information. It combines supported wiki and paper findings in one answer with wiki links, linked MNRAS-style paper citations, and a reference list. If ADS cannot fill a gap, Ask AI keeps the supported wiki findings and names the unresolved details. The online search requires an ADS token. [Reading assistance](../agent/reading-service.js)
 
@@ -105,5 +105,9 @@ Ask AI uses the highlight to identify the subject of the question and looks for 
 - [[project-handover]]: A project handover drafted from complete selected file text using backend instructions, displayed as Markdown for researcher review before publication.
 - [[active-reading]]: PDF reading with highlight helpers, AI responses linked to selected passages, wiki notes, and reference discovery.
 
+All 41 wiki pages were updated to use the two-sentence declaration format. [[log]]
+
 ---
 *Last updated: 2026-11-23*
+
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-23. This update documented the declaration format and its use across the wiki.

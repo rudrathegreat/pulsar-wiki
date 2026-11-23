@@ -31,3 +31,5 @@ Pulsars are extremely faint radio sources, requiring some of the world's largest
 - [[pulsar-timing]]
 - [[dispersion-measure]]
 - [[psr-j0740+6620]]
+
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-23. This update revised the AI declaration to follow the requested format.

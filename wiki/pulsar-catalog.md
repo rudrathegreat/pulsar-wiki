@@ -34,3 +34,5 @@ The primary repository for pulsar parameters is the ATNF Pulsar Catalogue. High-
 - [[psr-j0437-4715]]
 - [[vela-pulsar]]
 - [[crab-pulsar]]
+
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-23. This update revised the AI declaration to follow the requested format.
