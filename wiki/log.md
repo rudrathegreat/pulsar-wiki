@@ -416,3 +416,7 @@ All major updates to the wiki are recorded here.
 | 2026-11-23 | Workspace / application | Expanded Edit → Find to run a local keyword search across saved sources, wiki pages, and Jupyter notebooks, with linked snippets and PDF page and notebook cell locations. [Find interface](../public/index.html) [Workspace search](../agent/workspace-search.js) |
 
 | 2026-11-23 | Workspace / application | Centred Find, added live search and autocomplete, and gave each result a filename, source type, highlighted excerpt, and Go to location link. [Find interface](../public/index.html) [Workspace search](../agent/workspace-search.js) |
+
+| 2026-11-23 | Workspace / application | Centred Find vertically, hid the search field clear icon, moved result locations beside linked names, used source display names and extension-free wiki and PDF labels, and switched match highlights to grey in both themes. [Find results](../public/app.js) [Find styles](../public/style.css) |
+
+| 2026-11-23 | Workspace / application | Moved Find back below the top bar and rendered Markdown in search excerpts from wiki pages, Markdown sources, and Markdown notebook cells. [Find results](../public/app.js) [Workspace search](../agent/workspace-search.js) |

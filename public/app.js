@@ -3263,14 +3263,36 @@ function workspaceFindPattern(query) {
   return new RegExp(escaped, 'giu');
 }
 
-function highlightWorkspaceFind(text, query) {
+function highlightWorkspaceFind(text, pattern) {
   let html = '';
   let offset = 0;
-  for (const match of text.matchAll(workspaceFindPattern(query))) {
+  for (const match of text.matchAll(pattern)) {
     html += escapeHtmlText(text.slice(offset, match.index)) + `<mark>${escapeHtmlText(match[0])}</mark>`;
     offset = match.index + match[0].length;
   }
   return html + escapeHtmlText(text.slice(offset));
+}
+
+function renderWorkspaceFindExcerpt(match, pattern) {
+  if (!match.markdown || !window.ActiveReading) {
+    return `<p class="workspace-find-match">${highlightWorkspaceFind(match.text, pattern)}</p>`;
+  }
+
+  const excerpt = document.createElement('div');
+  excerpt.className = 'workspace-find-match md-body';
+  excerpt.innerHTML = renderMd(match.text);
+  typesetMath(excerpt);
+  const walker = document.createTreeWalker(excerpt, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (node.nodeValue.search(pattern) >= 0 && !node.parentElement.closest('.katex')) textNodes.push(node);
+  }
+  const range = document.createRange();
+  for (const node of textNodes) {
+    node.replaceWith(range.createContextualFragment(highlightWorkspaceFind(node.nodeValue, pattern)));
+  }
+  return excerpt.outerHTML;
 }
 
 async function findWorkspaceDocuments() {
@@ -3286,13 +3308,17 @@ async function findWorkspaceDocuments() {
     const summary = results.length ? `${results.length} matching ${results.length === 1 ? 'document' : 'documents'}.` : 'No matching documents.';
     workspaceFindStatus.textContent = `${summary}${unavailable ? ` Text could not be searched in ${unavailable} ${unavailable === 1 ? 'file' : 'files'}.` : ''}`;
     workspaceFindSuggestions.innerHTML = suggestions.map(value => `<option value="${escapeHtmlText(value)}"></option>`).join('');
+    const pattern = workspaceFindPattern(query);
     workspaceFindResults.innerHTML = results.flatMap(result => {
-      const matches = result.matches.length ? result.matches : [{ url: result.url, text: result.matchingName || result.label }];
       const filename = result.name || result.label;
+      const label = result.type === 'Wiki' ? filename.replace(/\.md$/i, '')
+        : result.type === 'Source' ? (result.label || filename).replace(/\.pdf$/i, '') : filename;
+      const matches = result.matches.length ? result.matches : [{ url: result.url, text: label }];
       const type = result.type === 'Source' ? 'Raw source' : result.type;
-      return matches.map(match => `<li><strong>${escapeHtmlText(filename)}</strong>
-        <small>${escapeHtmlText(type)}${match.location ? ` · ${escapeHtmlText(match.location)}` : ''}</small>
-        <p class="workspace-find-match">${highlightWorkspaceFind(match.text, query)}</p>
+      return matches.map(match => `<li><div class="workspace-find-result-heading">
+        <span class="md-body"><a href="${escapeHtmlText(result.url)}">${escapeHtmlText(label)}</a></span>
+        <small>${escapeHtmlText(type)}${match.location ? ` · ${escapeHtmlText(match.location)}` : ''}</small></div>
+        ${renderWorkspaceFindExcerpt(match, pattern)}
         <a class="btn" href="${escapeHtmlText(match.url)}">Go to location</a></li>`);
     }).join('');
     workspaceFindResults.hidden = !results.length;
@@ -3386,9 +3412,11 @@ workspaceFindQuery.addEventListener('compositionend', scheduleWorkspaceFind);
 workspaceFindResults.addEventListener('click', event => {
   const link = event.target.closest('a[href]');
   if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const href = link.getAttribute('href');
+  if (!/^\/(?:wiki\/|#)/.test(href)) return;
   event.preventDefault();
   closeWorkspaceFind(false);
-  updateAppHistory(link.getAttribute('href'));
+  updateAppHistory(href);
   void restoreAppRoute();
 });
 $('workspace-replacement').addEventListener('keydown', event => {

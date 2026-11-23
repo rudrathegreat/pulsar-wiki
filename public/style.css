@@ -109,12 +109,14 @@ body.workspace-ready #workspace-welcome { display: none; }
   color: var(--text-1);
   font: inherit;
 }
+#workspace-find-query::-webkit-search-cancel-button { display: none; }
 #workspace-find-status:not(:empty) { margin-top: 6px; color: var(--text-2); }
 .workspace-find.searching-workspace {
   left: 50%;
   right: auto;
   transform: translateX(-50%);
   width: 560px;
+  background: var(--bg);
 }
 #workspace-find-results {
   max-height: min(55vh, 460px);
@@ -124,10 +126,14 @@ body.workspace-ready #workspace-welcome { display: none; }
   list-style: none;
   overflow-wrap: anywhere;
 }
-#workspace-find-results li { display: grid; gap: 5px; padding: 10px 8px; border-top: 1px solid var(--border); }
+#workspace-find-results > li { display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; padding: 10px 8px; border-top: 1px solid var(--border); }
+.workspace-find-result-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.workspace-find-result-heading small { flex-shrink: 0; text-align: right; }
 .workspace-find-match, #workspace-find-results small { color: var(--text-2); }
-#workspace-find-results a { justify-self: start; text-decoration: none; }
-#workspace-find-results mark, .wiki-find-source mark { background: var(--highlight-yellow); color: #111; }
+.workspace-find-match.md-body > :first-child { margin-top: 0; }
+.workspace-find-match.md-body > :last-child { margin-bottom: 0; }
+#workspace-find-results .btn { justify-self: start; text-decoration: none; }
+#workspace-find-results mark, .wiki-find-source mark { background: var(--find-highlight); color: inherit; }
 .wiki-find-source { margin-top: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 #workspace-current-path {
   min-width: 0;
@@ -179,6 +185,7 @@ body.workspace-loading #workspace-loading { position: fixed; inset: 0; z-index: 
   --button-text: #fff;
   --button-border: #111;
   --focus: #fff;
+  --find-highlight: #222;
   --radius: 8px;
   --radius-sm: 5px;
   --sidebar-w: 260px;
@@ -211,6 +218,7 @@ body.workspace-loading #workspace-loading { position: fixed; inset: 0; z-index: 
   --button-text: #111;
   --button-border: #ccc;
   --focus: #111;
+  --find-highlight: #eee;
 }
 
 [data-theme="light"] #iconbar,

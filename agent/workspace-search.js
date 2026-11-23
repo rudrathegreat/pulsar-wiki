@@ -33,21 +33,23 @@ async function searchWorkspace(workspace, query, { displayNames = {}, signal } =
     }
   }
 
-  function excerpt(text, start, end) {
-    const context = normalize(text.slice(Math.max(0, start - 55), end + 85));
+  function excerpt(text, start, end, markdown) {
+    if (markdown && text.length <= 512) return text;
+    const slice = text.slice(Math.max(0, start - 55), end + 85);
+    const context = markdown ? slice : normalize(slice);
     return `${start > 55 ? '…' : ''}${context}${end + 85 < text.length ? '…' : ''}`;
   }
 
-  function* textSections(text) {
+  function* textSections(text, markdown = false) {
     let start = 0;
     let line = 1;
     for (const breakAt of text.matchAll(/\r?\n[ \t]*\r?\n/g)) {
       const section = text.slice(start, breakAt.index);
-      yield { text: section, start, line };
+      yield { text: section, start, line, markdown };
       start = breakAt.index + breakAt[0].length;
       line += 2 + (section.match(/\n/g) || []).length;
     }
-    yield { text: text.slice(start), start, line };
+    yield { text: text.slice(start), start, line, markdown };
   }
 
   async function collect(directory, type, include, read) {
@@ -73,7 +75,10 @@ async function searchWorkspace(workspace, query, { displayNames = {}, signal } =
               const offset = section.start || 0;
               matchUrl += `${matchUrl.includes('?') ? '&' : '?'}start=${offset + start}&end=${offset + end}`;
             }
-            matches.push({ text: excerpt(section.text, start, end), location, url: matchUrl });
+            matches.push({
+              text: excerpt(section.text, start, end, section.markdown), location, url: matchUrl,
+              ...(section.markdown ? { markdown: true } : {}),
+            });
             if (matches.length === 3 || type === 'Notebook') break;
           }
           if (matches.length === 3) break;
@@ -90,16 +95,17 @@ async function searchWorkspace(workspace, query, { displayNames = {}, signal } =
 
   await collect(workspace.wikiDir, 'Wiki', name => name.endsWith('.md'), async name => {
     const text = await fs.readFile(path.join(workspace.wikiDir, name), 'utf8');
-    return textSections(text);
+    return textSections(text, true);
   });
   await collect(workspace.rawDir, 'Source', () => true, async (name, url) => {
-    if (path.extname(name).toLowerCase() === '.pdf') {
+    const extension = path.extname(name).toLowerCase();
+    if (extension === '.pdf') {
       const { searchPages, labels } = await workspace.readingService.extract(name);
       if (!searchPages.some(text => text.trim())) throw new Error('PDF has no searchable text.');
       return searchPages.map((text, index) => ({ text, location: `Page ${labels[index]}`, url: `${url}?page=${index + 1}` }));
     }
     const text = await workspace.wikiTools.sourceText(name);
-    return textSections(text);
+    return textSections(text, extension === '.md' || extension === '.markdown');
   });
   await collect(path.join(workspace.rootDir, 'notebooks'), 'Notebook', name => name.endsWith('.ipynb') && !path.basename(name).startsWith('.'), async (name, url) => {
     const book = JSON.parse(await fs.readFile(path.join(workspace.rootDir, 'notebooks', name), 'utf8'));
@@ -108,7 +114,7 @@ async function searchWorkspace(workspace, query, { displayNames = {}, signal } =
       const location = `Cell ${index + 1}`;
       const cellUrl = /^[\w-]{1,64}$/.test(cell.id || '') ? `${url}&cell=${encodeURIComponent(cell.id)}` : `${url}&cellIndex=${index}`;
       return [
-        { text: notebookText(cell.source), location, url: cellUrl },
+        { text: notebookText(cell.source), location, url: cellUrl, markdown: cell.cell_type === 'markdown' },
         ...(cell.outputs || []).map(output => ({
           text: notebookText(output.text || output.data?.['text/plain'] || output.traceback?.join('\n') || output.evalue),
           location: `${location} output`, url: cellUrl,
