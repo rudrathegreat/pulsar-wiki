@@ -3253,6 +3253,104 @@ function currentWikiEditAction() {
   return document.querySelector('#panel-wiki.active .wiki-edit-action');
 }
 
+const workspaceOpenDialog = $('workspace-open-dialog');
+const workspaceOpenItem = $('workspace-open-item');
+const workspaceOpenStatus = $('workspace-open-status');
+const workspaceOpenSubmit = $('workspace-open-submit');
+const workspaceOpenActions = {
+  wiki: {
+    title: 'Open wiki file', empty: 'No wiki files found.',
+    list: api.getWikiList, label: page => page.name + '.md', open: page => openPage(page.name),
+  },
+  chat: {
+    title: 'Open chat', empty: 'No saved chats found.',
+    list: api.listThreads, label: thread => thread.title,
+    async open(thread) {
+      if (state.aiRunning && thread.id !== state.activeThreadId) {
+        throw new Error('Wait for the current chat response to finish before opening another chat.');
+      }
+      await selectThread(thread.id);
+      showPanel('chat');
+    },
+  },
+  source: {
+    title: 'Open source', empty: 'No saved sources found.',
+    list: api.getRawList, label: file => file.displayName || file.name,
+    open: file => openRawFile(file.name, file.ext, file),
+  },
+};
+let workspaceOpenRequest = null;
+
+function setWorkspaceOpenStatus(message = '') {
+  workspaceOpenStatus.textContent = stripEmoji(message);
+  workspaceOpenStatus.hidden = !message;
+}
+
+async function chooseWorkspaceItem(action) {
+  const request = { action, items: [], opening: false };
+  workspaceOpenRequest = request;
+  $('workspace-open-title').textContent = action.title;
+  workspaceOpenItem.replaceChildren();
+  workspaceOpenItem.disabled = workspaceOpenSubmit.disabled = true;
+  setWorkspaceOpenStatus('Loading…');
+  workspaceOpenDialog.showModal();
+  try {
+    request.items = await action.list();
+    if (!workspaceOpenDialog.open || workspaceOpenRequest !== request) return;
+    for (const [index, item] of request.items.entries()) {
+      workspaceOpenItem.add(new Option(stripEmoji(action.label(item)), index));
+    }
+    const hasItems = Boolean(request.items.length);
+    workspaceOpenItem.disabled = workspaceOpenSubmit.disabled = !hasItems;
+    setWorkspaceOpenStatus(hasItems ? '' : action.empty);
+    if (hasItems) {
+      workspaceOpenItem.selectedIndex = 0;
+      workspaceOpenItem.focus();
+    }
+  } catch (error) {
+    if (workspaceOpenDialog.open && workspaceOpenRequest === request) setWorkspaceOpenStatus(error.message);
+  }
+}
+
+$('workspace-open-cancel').addEventListener('click', () => workspaceOpenDialog.close());
+$('workspace-open-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const request = workspaceOpenRequest;
+  const item = request?.items[workspaceOpenItem.selectedIndex];
+  if (!item || request.opening) return;
+  request.opening = workspaceOpenSubmit.disabled = $('workspace-open-cancel').disabled = true;
+  workspaceOpenItem.disabled = true;
+  setWorkspaceOpenStatus('Opening…');
+  try {
+    await request.action.open(item);
+    workspaceOpenDialog.close();
+  } catch (error) {
+    setWorkspaceOpenStatus(error.message);
+  } finally {
+    request.opening = workspaceOpenItem.disabled = workspaceOpenSubmit.disabled = $('workspace-open-cancel').disabled = false;
+  }
+});
+workspaceOpenDialog.addEventListener('cancel', event => {
+  if (workspaceOpenRequest?.opening) event.preventDefault();
+});
+
+const workspaceFileActions = {
+  'workspace-new-wiki': () => $('btn-new-page').click(),
+  'workspace-new-chat': async () => {
+    if (state.aiRunning) throw new Error('Wait for the current chat response to finish before starting a new chat.');
+    showPanel('chat');
+    await createThread();
+    dom.chatInput.focus();
+  },
+  'workspace-add-source': () => $('btn-add-sources').click(),
+  'workspace-upload-source': () => {
+    setSourceView('upload');
+    showPanel('files');
+    openUploadModal();
+  },
+  'workspace-new-project': () => window.openWorkspaceCreateDialog(),
+};
+
 workspaceMenus.addEventListener('click', event => {
   const summary = event.target.closest('summary');
   if (summary) {
@@ -3274,6 +3372,20 @@ workspaceMenus.addEventListener('click', event => {
     return;
   }
   closeWorkspaceMenu(true);
+  const openAction = workspaceOpenActions[item.dataset.workspaceOpen];
+  if (openAction) {
+    void chooseWorkspaceItem(openAction);
+    return;
+  }
+  const fileAction = workspaceFileActions[item.id];
+  if (fileAction) {
+    void Promise.resolve().then(fileAction).catch(error => {
+      const status = $('workspace-status');
+      status.textContent = stripEmoji(error.message);
+      status.hidden = false;
+    });
+    return;
+  }
   const panel = item.dataset.workspacePanel;
   if (panel === 'wiki') void openPage(state.currentPage || 'index');
   else if (panel) showPanel(panel);

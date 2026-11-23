@@ -10,6 +10,7 @@ const { pipeline } = require('node:stream/promises');
 const chokidar = require('chokidar');
 const { AsyncLocalStorage } = require('node:async_hooks');
 const { initializeWorkspace, createWorkspace, validateWorkspace, describe } = require('./agent/workspaces');
+const { createWorkspaceZip } = require('./agent/workspace-export');
 const { pickFolder } = require('./agent/folder-picker');
 const { AgentService, AgentServiceError } = require('./agent/agent-service');
 const { ChatGPTAuthError, ChatGPTAuthService } = require('./agent/chatgpt-auth');
@@ -338,6 +339,24 @@ app.use('/api', (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     return workspaceScope.run(workspace, next);
   });
+});
+
+app.get('/api/workspaces/export', async (_req, res) => {
+  const workspace = currentWorkspace();
+  try {
+    const archive = await createWorkspaceZip(workspace.rootDir);
+    if (res.destroyed) {
+      archive.destroy();
+      return;
+    }
+    res.attachment(`${describe(workspace).name}.zip`);
+    await pipeline(archive, res);
+  } catch {
+    if (!res.headersSent && !res.destroyed) {
+      res.removeHeader('Content-Disposition');
+      res.status(500).json({ error: 'The project could not be exported.' });
+    }
+  }
 });
 
 // --- ChatGPT subscription connection and saved chats ---

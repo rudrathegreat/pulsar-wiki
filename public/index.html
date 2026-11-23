@@ -158,7 +158,18 @@
         <details name="workspace-menu">
           <summary>File</summary>
           <div class="workspace-menu-list">
-            <button id="workspace-change" type="button">Change folder</button>
+            <button id="workspace-new-wiki" type="button">New wiki file</button>
+            <button id="workspace-new-chat" type="button">New chat</button>
+            <button id="workspace-add-source" type="button">Add source</button>
+            <button id="workspace-upload-source" type="button">Upload source</button>
+            <hr/>
+            <button type="button" data-workspace-open="wiki">Open wiki file</button>
+            <button type="button" data-workspace-open="chat">Open chat</button>
+            <button type="button" data-workspace-open="source">Open source</button>
+            <hr/>
+            <button id="workspace-new-project" type="button">New project</button>
+            <button id="workspace-change" type="button">Open project</button>
+            <a id="workspace-export" href="/api/workspaces/export" download>Export project</a>
             <button id="workspace-close" type="button">Close folder</button>
           </div>
         </details>
@@ -661,6 +672,23 @@
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /app -->
+
+<dialog id="workspace-open-dialog" class="source-action-dialog" aria-labelledby="workspace-open-title">
+  <h3 id="workspace-open-title"></h3>
+  <form id="workspace-open-form">
+    <select id="workspace-open-item" aria-labelledby="workspace-open-title" size="8"></select>
+    <p id="workspace-open-status" role="status" hidden></p>
+    <div class="modal-actions">
+      <button id="workspace-open-cancel" class="btn" type="button">Cancel</button>
+      <button id="workspace-open-submit" class="btn btn-primary" type="submit" disabled>Open</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="workspace-new-dialog" class="source-action-dialog" aria-labelledby="workspace-new-title">
+  <h3 id="workspace-new-title">New project</h3>
+  <p id="workspace-create-error" role="alert" hidden></p>
+</dialog>
 
 <dialog id="source-action-dialog" class="source-action-dialog" aria-labelledby="source-action-title" aria-describedby="source-action-description">
   <form id="source-action-form">

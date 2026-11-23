@@ -11,7 +11,7 @@ Browser tab: PulsarWiki uses its favicon as the tab icon.
 
 Sidebar navigation: hover or focus an icon to see a shadow-free tooltip explaining what it opens or changes.
 
-The workspace top bar shows the full folder path on the right and has File, Edit, Selection, Go, and Help menus. File contains Change folder and Close folder. [Workspace top bar](../public/index.html)
+The workspace top bar shows the full folder path on the right and has File, Edit, Selection, Go, and Help menus. The File menu creates wiki files and chats, adds or uploads sources, opens saved items and projects, and exports the active project as a ZIP. The ZIP includes the wiki, sources, notebooks, references, instructions, and saved workspace data such as chats and reading notes. [Workspace File menu](../public/index.html) [Project export](../agent/workspace-export.js)
 
 The Edit menu lists Undo, Redo, Cut, Copy, Paste, Find, and Replace with platform-specific shortcuts. Find searches the active text field, paper, or page. Replace edits the active text field. [Workspace Edit menu](../public/index.html)
 

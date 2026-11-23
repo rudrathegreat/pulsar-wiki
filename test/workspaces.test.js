@@ -190,6 +190,28 @@ test('server remembers selections and isolates simultaneous projects across APIs
   assert.equal((await (await request(`/api/reading/export?workspace=${first.id}`)).json()).collections.length, 1);
   assert.equal((await (await request(`/api/reading/export?workspace=${second.id}`)).json()).collections.length, 0);
 
+  // Project downloads use the requesting tab and include saved data without machine-local settings.
+  fs.writeFileSync(path.join(firstPath, '.pulsarwiki', 'source-settings.json'), '{"test":"credential"}');
+  const outside = createFolder(root, 'Outside project');
+  fs.writeFileSync(path.join(outside, 'external.txt'), 'outside the selected workspace');
+  fs.symlinkSync(outside, path.join(firstPath, 'raw', 'external'), process.platform === 'win32' ? 'junction' : 'dir');
+  assert.equal((await fetch(url + `/api/workspaces/export?workspace=${first.id}`)).status, 403);
+  assert.equal((await request('/api/workspaces/export')).status, 409);
+  const exported = await request(`/api/workspaces/export?workspace=${first.id}`, { workspaceCookie: `pulsarwiki_workspace=${second.id}` });
+  assert.equal(exported.status, 200);
+  assert.equal(exported.headers.get('content-type'), 'application/zip');
+  assert.equal(exported.headers.get('content-disposition'), 'attachment; filename="Project one.zip"');
+  assert.equal(exported.headers.get('cache-control'), 'no-store');
+  const firstZip = Buffer.from(await exported.arrayBuffer());
+  assert.equal(firstZip.readUInt32LE(0), 0x04034b50);
+  for (const entry of ['raw/evidence.txt', 'wiki/project-one.md', 'notebooks/', '.pulsarwiki/chat/threads.json', '.pulsarwiki/reading/reading.json']) {
+    assert.ok(firstZip.includes(entry), `Expected ${entry} in the archive`);
+  }
+  assert.ok(!firstZip.includes('source-settings.json'));
+  assert.ok(!firstZip.includes('external.txt'));
+  const secondZip = Buffer.from(await (await request(`/api/workspaces/export?workspace=${second.id}`)).arrayBuffer());
+  assert.ok(!secondZip.includes('raw/evidence.txt'));
+
   // Socket selection is fixed at connection time, independently of the latest cookie.
   const socket = new WebSocket(url.replace('http', 'ws') + `/?workspace=${second.id}`, { headers: { Cookie: cookie + '; ' + workspaceCookie, Origin: url } });
   const result = await new Promise((resolve, reject) => {

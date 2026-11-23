@@ -400,3 +400,5 @@ All major updates to the wiki are recorded here.
 | 2026-11-23 | Workspace / application | Replaced the folder name and tooltip with the full folder path on the right side of the top bar. [Workspace top bar](../public/index.html) |
 
 | 2026-11-23 | Workspace / application | Added Undo, Redo, Cut, Copy, Paste, Find, and Replace to the Edit menu with platform-specific shortcuts. [Workspace Edit menu](../public/index.html) |
+
+| 2026-11-23 | Workspace / application | Expanded the File menu with creation and saved-item actions, renamed Change folder to Open project, and added project ZIP downloads. [Workspace File menu](../public/index.html) [Project export](../agent/workspace-export.js) |
