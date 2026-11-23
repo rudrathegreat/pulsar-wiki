@@ -441,4 +441,6 @@ All major updates to the wiki are recorded here.
 
 | 2026-11-24 | Workspace / application | Moved Project files into the main content area and integrated it with browser navigation. [Project files panel](../public/index.html) [Panel navigation](../public/app.js) |
 
-**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-24. This update recorded the move of Project files into the main content area.
+| 2026-11-24 | Workspace / application | Added folder chevrons and file type icons, removed file row borders, and omitted agent instruction files from the Project files tree. [Project files interface](../public/workspace-explorer.js) [Explorer styles](../public/style.css) [Folder listing](../agent/workspace-files.js) |
+
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-24. This update recorded the appearance and file listing changes in Project files.

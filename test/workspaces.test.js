@@ -160,11 +160,14 @@ test('server remembers selections and isolates simultaneous projects across APIs
   const explorerFile = 'Field data/run +1 #2.txt';
   fs.mkdirSync(path.join(firstPath, 'Field data'));
   fs.writeFileSync(path.join(firstPath, explorerFile), 'sample data');
+  fs.writeFileSync(path.join(firstPath, 'AGENTS.md'), 'Agent instructions');
+  fs.writeFileSync(path.join(firstPath, 'CLAUDE.md'), 'Claude instructions');
+  fs.writeFileSync(path.join(firstPath, 'Field data', 'gemini.md'), 'Nested instructions');
   fs.symlinkSync(secondPath, path.join(firstPath, 'linked-project'), 'junction');
   const explorer = (suffix = '', id = first.id) => request('/api/workspaces/explorer' + suffix, { id });
   const rootEntries = (await (await explorer()).json()).entries;
   assert.ok(rootEntries.some(entry => entry.name === 'Field data' && entry.directory));
-  assert.ok(!rootEntries.some(entry => ['.pulsarwiki', 'linked-project'].includes(entry.name)));
+  assert.ok(!rootEntries.some(entry => ['.pulsarwiki', 'linked-project', 'AGENTS.md', 'CLAUDE.md', 'GEMINI.md'].includes(entry.name)));
   assert.deepEqual((await (await explorer('?path=Field%20data')).json()).entries, [{ name: 'run +1 #2.txt', directory: false }]);
   const download = `/download?${new URLSearchParams({ path: explorerFile })}`;
   const attachment = await explorer(download);

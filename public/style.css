@@ -3682,6 +3682,9 @@ button:disabled {
   border-left: 1px solid var(--border-sub);
 }
 .explorer-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   min-height: 30px;
   padding: 5px 8px;
@@ -3696,10 +3699,33 @@ button:disabled {
   overflow-wrap: anywhere;
   cursor: pointer;
 }
-.explorer-row:hover { background: var(--surface-2); }
+.explorer-file { border: 0 !important; }
+.explorer-row:hover { background: var(--surface-2) !important; }
 .explorer-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
-.explorer-folder::marker { color: var(--text-2); font-size: 11px; }
-.explorer-file { display: block; padding-left: 23px; }
+.explorer-folder { list-style: none; }
+.explorer-folder::-webkit-details-marker { display: none; }
+.explorer-folder::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-inline: 3px 4px;
+  border-right: 1.5px solid var(--text-2);
+  border-bottom: 1.5px solid var(--text-2);
+  transform: rotate(-45deg);
+}
+details[open] > .explorer-folder::before { transform: translateY(-2px) rotate(45deg); }
+.explorer-file-icon {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  color: var(--text-2);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .explorer-status { padding: 6px 8px; color: var(--text-2); font-size: 12px; }
 
 #workspace-open-item {

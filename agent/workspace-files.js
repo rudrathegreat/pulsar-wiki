@@ -3,6 +3,7 @@
 const fs = require('node:fs/promises');
 const { O_RDONLY, O_NOFOLLOW, O_NONBLOCK } = require('node:fs').constants;
 const path = require('node:path');
+const instructionFiles = new Set(['agents.md', 'claude.md', 'gemini.md']);
 
 function visibleName(name) {
   return Boolean(name) && (!name.startsWith('.') || name === '.gitignore')
@@ -31,7 +32,8 @@ async function listProjectFolder(root, relative) {
   // Recheck the directory in case it was replaced while being read.
   await verifyProjectPath(folder);
   return entries
-    .filter(entry => visibleName(entry.name) && (entry.isDirectory() || entry.isFile()))
+    .filter(entry => visibleName(entry.name) && (entry.isDirectory()
+      || (entry.isFile() && !instructionFiles.has(entry.name.toLowerCase()))))
     .map(entry => ({ name: entry.name, directory: entry.isDirectory() }))
     .sort((a, b) => Number(b.directory) - Number(a.directory)
       || a.name.localeCompare(b.name, undefined, { numeric: true }));
