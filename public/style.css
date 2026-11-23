@@ -112,6 +112,8 @@ body.workspace-ready #workspace-welcome { display: none; }
 #workspace-find-query::-webkit-search-cancel-button { display: none; }
 #workspace-find-status:not(:empty) { margin-top: 6px; color: var(--text-2); }
 .workspace-find.searching-workspace {
+  top: calc(100% + 1px);
+  margin-top: 6px;
   left: 50%;
   right: auto;
   transform: translateX(-50%);
