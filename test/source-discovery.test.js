@@ -15,6 +15,20 @@ const {
   safeFileName,
 } = require('../agent/source-discovery');
 
+test('refereed literature search retries a temporary ADS error and skips malformed records', async () => {
+  const record = { bibcode: '2013MNRAS.431.2378S', title: ['Pulsar timing noise'], author: ['Shannon, R. M.'], year: '2013', pub: 'MNRAS', abstract: 'A pulsar timing study.' };
+  const requests = [];
+  const service = new SourceDiscoveryService({ rawDir: os.tmpdir(), adsToken: 'test', async fetchImpl(url) {
+    requests.push(url);
+    if (requests.length === 1) return new Response('', { status: 503 });
+    return Response.json({ response: { docs: [{ ...record, pub: [] }, null, record] } });
+  } });
+  const papers = await service.searchRefereedArticles(['pulsar timing']);
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0], requests[1]);
+  assert.deepEqual(papers.map(paper => paper.title), ['Pulsar timing noise']);
+});
+
 const ARXIV_FEED = `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
   <entry>

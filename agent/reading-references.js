@@ -1,15 +1,20 @@
 'use strict';
 
 const PAPER_REFERENCE = /\[P:([^\]\n]*)\]/g;
+const wikiReferences = text => [...text.matchAll(/\[W:[^\]\n]*\]/g)].map(([reference]) => reference);
 
-function citedPaperIndexes(answer, papers) {
+function citedPaperIndexes(answer, papers, allowedWikiReferences = new Set()) {
   const indexes = new Set();
+  let hasWikiCitation = false;
   for (const paragraph of answer.split(/\n\s*\n/)) {
     const matches = [...paragraph.matchAll(PAPER_REFERENCE)];
-    if (!matches.length || matches.some(([, id]) => !/^[1-9]\d*$/.test(id) || !papers[Number(id) - 1])) return null;
+    const wiki = wikiReferences(paragraph);
+    if ((!matches.length && !wiki.length) || wiki.some(reference => !allowedWikiReferences.has(reference)) ||
+        matches.some(([, id]) => !/^[1-9]\d*$/.test(id) || !papers[Number(id) - 1])) return null;
+    hasWikiCitation ||= wiki.length > 0;
     for (const [, id] of matches) indexes.add(Number(id) - 1);
   }
-  return indexes;
+  return indexes.size && (!allowedWikiReferences.size || hasWikiCitation) ? indexes : null;
 }
 
 function authorName(name, initialsFirst = false) {
@@ -63,4 +68,4 @@ function renderResearchAnswer(answer, papers, indexes) {
   return `${body}\n\n### References\n\n${references.join('\n')}`;
 }
 
-module.exports = { citedPaperIndexes, renderResearchAnswer };
+module.exports = { citedPaperIndexes, renderResearchAnswer, wikiReferences };

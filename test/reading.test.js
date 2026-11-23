@@ -272,22 +272,113 @@ test('Ask AI falls back to refereed articles after the wiki check and renders li
   assert.equal(result.response, `The wiki did not provide a cited answer.\n\nThe residuals reveal noise [(R.M. Shannon & J.M. Cordes 2013)](${url}). Selected passages: [H:${h.id}]\n\n### References\n\n- [Shannon R.M., Cordes J.M., 2013, MNRAS, 431, 2378](${url})`);
 });
 
-test('Ask AI cites relevant wiki context without requesting any online papers', async t => {
+test('Ask AI cites a complete wiki answer without requesting any online papers', async t => {
   const f = fixture(t, { providerFactory: () => ({ async runTurn(input) {
     f.calls.push(input);
     assert.match(input.instructions, /Evaluate the supplied wiki search results/);
     assert.match(input.messages[0].text, /Timing residuals track deviations from the model/);
-    return { text: 'Timing residuals track deviations from the model [W:timing]. The wiki does not quantify the noise.' };
+    return { text: JSON.stringify({ answer: 'Timing residuals track deviations from the model [W:timing].', missing: '' }) };
   } }) });
+  const wikiFile = path.join(f.wikiDir, 'timing.md');
+  fs.writeFileSync(wikiFile, fs.readFileSync(wikiFile, 'utf8').replace('Existing content.', 'Timing residuals track deviations from the model.'));
+  const h = await highlight(f);
+  const task = await f.service.createTask({ highlightIds: [h.id], action: 'question', question: 'What do timing residuals measure?' });
+  const result = await completed(f.service, task.id);
+  assert.equal(result.status, 'completed');
+  assert.equal(f.calls.length, 1);
+  assert.match(result.response, /\[\[timing\]\]/);
+  assert.match(result.response, /track deviations from the model/);
+});
+
+test('Ask AI searches ADS for gaps in a partial wiki answer and cites both sources', async t => {
+  const wikiReply = JSON.stringify({
+    answer: 'Timing residuals track deviations from the model [W:timing].',
+    missing: 'Measured amplitude of pulsar timing noise',
+  });
+  const f = fixture(t, { providerFactory: () => ({ async runTurn(input) {
+    f.calls.push(input);
+    const prompt = input.messages[0].text;
+    assert.match(prompt, /Wiki evidence and coverage assessment.*\n.*Timing residuals track deviations from the model/);
+    assert.match(prompt, /Refereed journal article records retrieved from NASA ADS/);
+    if (!input.messages[1]) return { text: 'The measured timing noise was 2 μs [P:1].' };
+    assert.match(input.messages[1].text, /missing valid citations/);
+    return { text: 'Timing residuals track deviations from the model [W:timing].\n\nThe measured timing noise in the study was 2 μs [P:1].' };
+  } }) });
+  const searches = enableResearch(f, [{
+    bibcode: '2013MNRAS.431.2378S', title: ['Pulsar timing noise'], author: ['Shannon, R. M.'], year: '2013', pub: 'MNRAS',
+    abstract: 'The measured timing noise in the study was 2 μs.',
+  }], { wikiReply, planReply(input) {
+    assert.equal(JSON.parse(input.messages[0].text).missing, 'Measured amplitude of pulsar timing noise');
+    return '["pulsar timing noise amplitude"]';
+  } });
   const wikiFile = path.join(f.wikiDir, 'timing.md');
   fs.writeFileSync(wikiFile, fs.readFileSync(wikiFile, 'utf8').replace('Existing content.', 'Timing residuals track deviations from the model.'));
   const h = await highlight(f);
   const task = await f.service.createTask({ highlightIds: [h.id], action: 'question', question: 'What do timing residuals measure, and how large is the noise?' });
   const result = await completed(f.service, task.id);
-  assert.equal(result.status, 'completed');
-  assert.equal(f.calls.length, 1);
-  assert.match(result.response, /\[\[timing\]\]/);
-  assert.match(result.response, /does not quantify the noise/);
+  assert.equal(result.status, 'completed', result.error);
+  assert.equal(f.calls.length, 2);
+  assert.equal(searches.length, 1);
+  assert.match(searches[0].searchParams.get('q'), /abs:"amplitude"/);
+  assert.match(result.response, /model \[\[timing\]\]/);
+  assert.match(result.response, /2 μs \[\(R\.M\. Shannon 2013\)\]/);
+  assert.match(result.response, /### References/);
+  assert.doesNotMatch(result.response, /\[[WP]:|The wiki did not provide/);
+});
+
+test('Ask AI preserves supported wiki facts and names the gap if ADS has no usable evidence', async t => {
+  const f = fixture(t);
+  const searches = enableResearch(f, [], { wikiReply: JSON.stringify({
+    answer: 'Residuals track deviations from the model [W:timing].',
+    missing: 'Measured amplitude of pulsar timing noise',
+  }) });
+  const h = await highlight(f);
+  const task = await f.service.createTask({ highlightIds: [h.id], action: 'question', question: 'What do timing residuals measure, and how large is the noise?' });
+  const result = await completed(f.service, task.id);
+  assert.equal(result.status, 'completed', result.error);
+  assert.equal(searches.length, 1);
+  assert.match(result.response, /model \[\[timing\]\]/);
+  assert.match(result.response, /Still unresolved:\*\* Measured amplitude of pulsar timing noise/);
+  assert.match(result.response, /No peer-reviewed papers with abstracts were found/);
+});
+
+test('Ask AI keeps a properties question focused on the highlighted pulsar when wiki excerpts only describe its uses', async t => {
+  const f = fixture(t, { providerFactory: () => ({ async runTurn(input) {
+    const prompt = input.messages[0].text;
+    const { instructions } = input;
+    if (instructions.startsWith('Plan a public scientific literature search')) {
+      assert.match(prompt, /"selections":"PSR J0740\+6620"/);
+      return { text: 'No JSON search plan.' };
+    }
+    assert.match(prompt, /Researcher request: Tell me its properties\./);
+    assert.match(instructions, /A description of its scientific uses does not answer a properties question/);
+    if (instructions.includes('Evaluate the supplied wiki search results')) {
+      assert.match(prompt, /\[\{"reference":"\[W:psr-j0740\+6620\]"/);
+      assert.match(prompt, /is used in pulsar timing arrays/);
+      assert.match(instructions, /If no wiki excerpt supports a direct answer .* return exactly NO_WIKI_CONTEXT/);
+      return { text: 'NO_WIKI_CONTEXT' };
+    }
+    assert.match(prompt, /PSR J0740\+6620 has a spin period of 2\.89 ms/);
+    return { text: 'PSR J0740+6620 has a spin period of 2.89 ms [P:1].' };
+  } }) });
+  fs.writeFileSync(path.join(f.rawDir, 'object.txt'), 'PSR J0740+6620');
+  fs.writeFileSync(path.join(f.wikiDir, 'psr-j0740+6620.md'), '# PSR J0740+6620\n\nIt is used in pulsar timing arrays.');
+  fs.writeFileSync(path.join(f.wikiDir, 'pulsar-properties.md'), '# Pulsar properties\n\nPSR J0437-4715 has known properties.');
+  const searches = [];
+  f.service.discovery = {
+    adsToken: 'test-token',
+    async searchRefereedArticles(topics) {
+      searches.push(topics);
+      return [{ title: 'Timing PSR J0740+6620', abstract: 'PSR J0740+6620 has a spin period of 2.89 ms.', authors: ['Example, A.'], year: '2020', publication: 'ApJ', recordUrl: 'https://ui.adsabs.harvard.edu/abs/2020ApJ...900...01U/abstract' }];
+    },
+  };
+  const h = await highlight(f, 'object.txt', 'PSR J0740+6620');
+  const task = await f.service.createTask({ highlightIds: [h.id], action: 'question', question: 'Tell me its properties.' });
+  const result = await completed(f.service, task.id);
+  assert.equal(result.status, 'completed', result.error);
+  assert.deepEqual(searches, [['J0740+6620']]);
+  assert.match(result.response, /spin period of 2\.89 ms/);
+  assert.doesNotMatch(result.response, /timing arrays/);
 });
 
 test('Ask AI searches online when the wiki answer has an invalid citation', async t => {
@@ -295,7 +386,7 @@ test('Ask AI searches online when the wiki answer has an invalid citation', asyn
     f.calls.push(input);
     return { text: 'The residuals reveal noise [P:1].' };
   } }) });
-  const searches = enableResearch(f, undefined, { wikiReply: 'Claim [W:invented].' });
+  const searches = enableResearch(f, undefined, { wikiReply: JSON.stringify({ answer: 'Claim [W:invented].', missing: '' }) });
   const h = await highlight(f);
   const task = await f.service.createTask({ highlightIds: [h.id], action: 'question' });
   const result = await completed(f.service, task.id);
@@ -366,6 +457,27 @@ test('Ask AI reports missing access or evidence without saving an uncited answer
   const invalid = await ask();
   assert.equal(invalid.errorCode, 'research-citations-required');
   assert.equal(invalid.response, '');
+});
+
+test('Ask AI reports denied access and rate limits without retrying ADS', async t => {
+  for (const [status, code, message] of [
+    [401, 'research-access-denied', /refused access/],
+    [429, 'research-rate-limited', /rate-limiting/],
+  ]) {
+    const f = fixture(t);
+    enableResearch(f);
+    let requests = 0;
+    f.service.discovery.fetch = async () => {
+      requests += 1;
+      return new Response('', { status });
+    };
+    const h = await highlight(f);
+    const task = await f.service.createTask({ highlightIds: [h.id], action: 'question' });
+    const result = await completed(f.service, task.id);
+    assert.equal(result.errorCode, code);
+    assert.match(result.error, message);
+    assert.equal(requests, 1);
+  }
 });
 
 test('invalid citations and unsupported image requests fail safely without changing notes', async t => {

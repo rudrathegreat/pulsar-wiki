@@ -380,3 +380,13 @@ All major updates to the wiki are recorded here.
 | 2026-11-23 | Reading / application | Made Ask AI continue to peer-reviewed literature search when the wiki pass cannot produce a valid cited answer. [Reading assistance](../agent/reading-service.js) |
 
 | 2026-11-23 | Reading / application | Added a search-plan retry and a question-keyword fallback for Ask AI literature searches. [Reading assistance](../agent/reading-service.js) |
+
+| 2026-11-23 | Reading / application | Moved Ask AI progress messages and animated dots into the answer box, with the messages on the left and the dots on the right. [Reading interface](../public/reading.js) |
+
+| 2026-11-23 | Reading / application | Moved Stop request below the Ask AI answer box and matched the animated dot spacing in chat. [Reading interface](../public/reading.js) |
+
+| 2026-11-23 | Reading / application | Updated Ask AI to seek direct answers about the highlighted subject and prioritise pulsar designations in literature searches. [Reading assistance](../agent/reading-service.js) |
+
+| 2026-11-23 | Reading / application | Made Ask AI search NASA ADS for gaps in partial wiki answers and combine supported findings with citations to both sources. [Reading assistance](../agent/reading-service.js) |
+
+| 2026-11-23 | Reading / application | Added a retry for temporary ADS failures, skipped malformed paper records, and made Ask AI report the type of ADS failure. [Literature search](../agent/source-discovery.js) [Ask AI errors](../agent/reading-service.js) |

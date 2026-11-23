@@ -25,13 +25,17 @@ Paper discovery: searches use one keyword, sciX review, or AI-ranked research-qu
 
 Markdown tables share the chat style and scroll horizontally when needed; the change log displays its historical entries in a single table.
 
-Reading assistance: Ask AI shows animated dots while generating a concise explanation in one or two paragraphs, with citations to selected passages. The question and answer appear in closely spaced borderless boxes, with completion status below the answer. Highlight colours appear as individual swatches; assisted highlights show blue as their selected colour and disable other colour choices. Saved responses show the user question, can be expanded from a five-line preview, and can start a new chat with the selected passages and response.
+Reading assistance: The Ask AI answer box shows progress messages on the left and the same closely spaced animated dots as chat on the right. The Stop request button appears below the answer box while the request runs. A concise explanation with citations to selected passages then appears in the same box, with completion status below it. The question and answer appear in closely spaced borderless boxes. Highlight colours appear as individual swatches; assisted highlights show blue as their selected colour and disable other colour choices. Saved responses show the user question, can be expanded from a five-line preview, and can start a new chat with the selected passages and response. [Reading interface](../public/reading.js)
 
 Agent guidance: [GEMINI.md](../GEMINI.md) requires clickable file references in chat and wiki content, including linked source citations.
 
-Ask AI searches the current wiki first and links relevant pages in the answer. If the wiki pass cannot produce a valid cited answer, it searches sciX/NASA ADS for peer-reviewed journal articles and includes linked MNRAS-style in-text citations and a reference list. The online search requires an ADS token. [Reading assistance](../agent/reading-service.js)
+Ask AI searches the current wiki first. If the wiki answer is incomplete or unavailable, Ask AI searches sciX/NASA ADS for peer-reviewed journal articles that address the missing information. It combines supported wiki and paper findings in one answer with wiki links, linked MNRAS-style paper citations, and a reference list. If ADS cannot fill a gap, Ask AI keeps the supported wiki findings and names the unresolved details. The online search requires an ADS token. [Reading assistance](../agent/reading-service.js)
 
 Ask AI retries an unusable literature search plan and can search ADS using keywords from the typed question. [Literature search](../agent/reading-service.js)
+
+Ask AI retries temporary NASA ADS connection and server failures once. Messages identify access denial, rate limits, rejected queries, connection failures, and unreadable replies. [Literature search](../agent/source-discovery.js) [Ask AI errors](../agent/reading-service.js)
+
+Ask AI uses the highlight to identify the subject of the question and looks for sources that directly answer it. For a highlighted pulsar’s properties, it prioritises supported measurements and searches the literature by designation when the wiki only describes the pulsar’s uses. [Reading assistance](../agent/reading-service.js)
 
 ## Pillar 1: Foundational Physics
 - [[neutron-star]]: The ultra-dense physical nature of pulsars and the nuclear Equation of State.

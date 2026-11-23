@@ -171,7 +171,10 @@
 .reading-task-box { margin:6px 0; padding:12px 14px; border:0; border-radius:8px; background:var(--reading-card-bg); overflow-wrap:anywhere; }
 .reading-task-box > p:last-child { margin-bottom:0; }
 .reading-task-response pre { white-space:pre-wrap; }
+.reading-task-pending { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+.reading-task-pending[hidden] { display:none; }
 .reading-task-progress { white-space:pre-wrap; max-height:240px; overflow:auto; font-size:12px; }
+.reading-task-dots { flex-shrink:0; white-space:nowrap; }
 .reading-source-link { display:block; margin:8px 0; font-size:12px; }
 @media (max-width:1100px) { #reading-notes { width:300px; flex-basis:300px; } #reading-thumbnails { width:85px; flex-basis:85px; } }
 @media (max-width:780px) { .reading-document-body { flex-direction:column; } #reading-notes { scrollbar-gutter:stable; flex:0 0 42%; width:100%; border-left:0; border-top:1px solid var(--border); } .reading-compose-grid { grid-template-columns:1fr; } #reading-thumbnails { display:none; } }

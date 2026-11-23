@@ -860,7 +860,23 @@
   async function watchTask(task) {
     clearTimeout(r.polling); r.task = task.id;
     const automatic = task.action === 'wiki-note';
-    dialog(automatic ? 'Adding note to wiki' : 'Reading assistance', `${automatic ? `<p class="reading-muted">${e(`Updating ${task.targetPage}?`)}</p>` : `<div class="reading-task-box"><strong>Question</strong><p>${e(task.question || 'Assistance based on your selected passages')}</p></div>`}<p id="reading-task-status" role="status"></p><div class="reading-actions"><button type="button" id="reading-task-cancel">Stop request</button></div><div id="reading-task-live" class="reading-task-progress"></div><div id="reading-task-complete" class="reading-task-response md-body"></div>`);
+    const stop = '<div id="reading-task-controls" class="reading-actions"><button type="button" id="reading-task-cancel">Stop request</button></div>';
+    const result = '<div id="reading-task-complete" class="reading-task-response md-body"></div>';
+    const initialProgress = task.action === 'question' ? 'Checking the wiki…' : 'Generating response…';
+    dialog(automatic ? 'Adding note to wiki' : 'Reading assistance', automatic
+      ? `<p class="reading-muted">${e(`Updating ${task.targetPage}?`)}</p><p id="reading-task-status" role="status"></p>${stop}${result}`
+      : `<div class="reading-task-box"><strong>Question</strong><p>${e(task.question || 'Assistance based on your selected passages')}</p></div>
+        <div class="reading-task-box">
+          <strong>Answer</strong>
+          <div id="reading-task-pending" class="reading-task-pending">
+            <span id="reading-task-live" class="reading-task-progress" role="status">${e(initialProgress)}</span>
+            <span class="reading-task-dots" aria-hidden="true"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></span>
+          </div>
+          ${result}
+          <p id="reading-task-status" class="reading-muted" role="status" hidden></p>
+        </div>
+        ${stop}
+        <div id="reading-task-actions" class="reading-actions" hidden></div>`);
     const helper = activeHelper(); const viewVersion = helper?.viewVersion;
     const isCurrentView = () => helper ? activeHelper() === helper && helper.viewVersion === viewVersion : !activeHelper() && el('reading-dialog').open && Boolean(el('reading-task-status'));
     el('reading-task-cancel').addEventListener('click', guard(async () => { await request(`/tasks/${task.id}`, 'DELETE'); }));
@@ -868,33 +884,48 @@
       try {
         const current = await request(`/tasks/${task.id}`);
         if (r.task !== task.id) return;
-        if (isCurrentView() && el('reading-task-status')) {
-          const status = el('reading-task-status');
-          if (!automatic && ['queued', 'running'].includes(current.status)) {
-            if (!status.querySelector('.typing-dot')) status.innerHTML = `<span aria-label="${current.action === 'question' ? 'Checking the wiki and generating a response' : 'Generating response'}"><span class="typing-dot" aria-hidden="true"></span><span class="typing-dot" aria-hidden="true"></span><span class="typing-dot" aria-hidden="true"></span></span>`;
-          } else status.textContent = `${current.status}${current.model ? ` · ${current.model}` : ''}${current.error ? `: ${current.error}` : ''}`;
+        const running = ['queued', 'running'].includes(current.status);
+        const statusText = `${current.status}${current.model ? ` · ${current.model}` : ''}${current.error ? `: ${current.error}` : ''}`;
+        if (isCurrentView()) {
+          if (automatic) el('reading-task-status').textContent = statusText;
+          else if (running) {
+            const live = el('reading-task-live');
+            const progress = current.progress || initialProgress;
+            if (live.textContent !== progress) {
+              live.textContent = progress;
+              positionHelper();
+            }
+          }
         }
-        if (isCurrentView() && el('reading-task-live')) el('reading-task-live').textContent = automatic ? '' : current.progress || '';
-        if (['queued', 'running'].includes(current.status)) { r.polling = setTimeout(poll, 900); return; }
+        if (running) { r.polling = setTimeout(poll, 900); return; }
         await refresh(); renderWorkspace(); for (const p of r.pages.values()) paintHighlights(p);
         if (r.helper?.highlightId) updateSelectionColors(r.helper.highlightId);
         if (automatic && current.publication) buildSidebar(await api.getWikiList());
         if (!isCurrentView()) return;
-        if (el('reading-task-cancel')) el('reading-task-cancel').parentElement.hidden = true;
-        if (el('reading-task-live')) el('reading-task-live').textContent = '';
-        if (el('reading-task-complete')) {
-          el('reading-task-complete').innerHTML = automatic
-            ? current.publication ? `<p>Note added to <a href="/wiki/${encodeURIComponent(current.publication.page)}">${e(current.publication.page)}</a>.</p>${current.warning ? `<p>${e(current.warning)}</p>` : ''}` : `<p>${e(current.error || 'The wiki was not updated.')}</p><button type="button" id="reading-task-retry">Try again</button>`
-            : current.response ? `<div class="reading-task-box"><strong>Answer</strong>${safeMarkdown(current.response, current.snapshot)}</div><div class="reading-actions"><button type="button" id="reading-task-add-note">Add to wiki</button><button type="button" id="reading-task-new-chat">New chat from response</button></div>` : `<p>${e(current.error || 'The request did not complete.')}</p><button type="button" id="reading-task-retry">Try again</button>`;
-          if (!automatic && current.response) {
-            const status = el('reading-task-status');
-            status.classList.add('reading-muted');
-            el('reading-task-complete').querySelector('.reading-task-box').append(status);
-          }
-          typesetMath(el('reading-task-complete'));
-          if (el('reading-task-retry')) el('reading-task-retry').addEventListener('click', guard(async () => { await watchTask(await request(`/tasks/${task.id}/retry`, 'POST', {})); }));
-          if (!automatic && current.response) el('reading-task-new-chat').addEventListener('click', guard(async () => { await window.createReadingChat(current.id); closeHelper(); if (el('reading-dialog').open) el('reading-dialog').close(); }));
-          if (!automatic && current.response) el('reading-task-add-note').addEventListener('click', guard(async () => {
+        el('reading-task-controls').hidden = true;
+        const complete = el('reading-task-complete');
+        const retry = '<button type="button" id="reading-task-retry">Try again</button>';
+        if (automatic) {
+          complete.innerHTML = current.publication
+            ? `<p>Note added to <a href="/wiki/${encodeURIComponent(current.publication.page)}">${e(current.publication.page)}</a>.</p>${current.warning ? `<p>${e(current.warning)}</p>` : ''}`
+            : `<p>${e(current.error || 'The wiki was not updated.')}</p>${retry}`;
+        } else {
+          el('reading-task-pending').hidden = true;
+          const status = el('reading-task-status');
+          status.hidden = false;
+          status.textContent = current.response || current.error ? statusText : 'The request did not complete.';
+          if (current.response) complete.innerHTML = safeMarkdown(current.response, current.snapshot);
+          const actions = el('reading-task-actions');
+          actions.innerHTML = current.response
+            ? '<button type="button" id="reading-task-add-note">Add to wiki</button><button type="button" id="reading-task-new-chat">New chat from response</button>'
+            : retry;
+          actions.hidden = false;
+        }
+        typesetMath(complete);
+        el('reading-task-retry')?.addEventListener('click', guard(async () => { await watchTask(await request(`/tasks/${task.id}/retry`, 'POST', {})); }));
+        if (!automatic && current.response) {
+          el('reading-task-new-chat').addEventListener('click', guard(async () => { await window.createReadingChat(current.id); closeHelper(); if (el('reading-dialog').open) el('reading-dialog').close(); }));
+          el('reading-task-add-note').addEventListener('click', guard(async () => {
             r.assistanceIds.add(current.id);
             await newArtifactDialog();
           }));

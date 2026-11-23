@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { setTimeout: delay } = require('node:timers/promises');
 const { normalize: normalizeOrcid, matchAuthors } = require('../public/orcid');
 const { parse, text } = require('../public/bibtex');
 
@@ -303,7 +304,7 @@ class SourceDiscoveryService {
     const timeout = AbortSignal.timeout(15000);
     const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
     const response = await this.fetch(url, { ...options, signal });
-    if (!response.ok) throw new Error(`${label} returned ${response.status}.`);
+    if (!response.ok) throw Object.assign(new Error(`${label} returned ${response.status}.`), { status: response.status });
     return response.text();
   }
 
@@ -318,16 +319,27 @@ class SourceDiscoveryService {
       rows: '12',
       sort: 'score desc',
     });
-    const payload = JSON.parse(await this.fetchText(`${ADS_API}?${params}`, {
-      headers: { Authorization: `Bearer ${this.adsToken}` }, signal,
-    }, 'NASA ADS'));
-    const papers = parseAdsResponse(payload);
-    return deduplicate(papers.flatMap((paper, index) => {
-      const doc = payload.response.docs[index];
-      if (!paper.recordUrl || !doc.title?.length || !doc.pub?.trim() || !paper.abstract?.trim() ||
-          !paper.authors[0]?.trim() || !/^\d{4}$/.test(doc.year)) return [];
+    const url = `${ADS_API}?${params}`;
+    const options = { headers: { Authorization: `Bearer ${this.adsToken}` }, signal };
+    let body;
+    try {
+      body = await this.fetchText(url, options, 'NASA ADS');
+    } catch (error) {
+      signal?.throwIfAborted();
+      if (!(error instanceof TypeError || error.name === 'TimeoutError' || [500, 502, 503, 504].includes(error.status))) throw error;
+      await delay(250, undefined, { signal });
+      body = await this.fetchText(url, options, 'NASA ADS');
+    }
+    const payload = JSON.parse(body);
+    if (!Array.isArray(payload?.response?.docs)) throw new SyntaxError('NASA ADS returned an invalid search response.');
+    const docs = payload.response.docs.filter(doc => doc && Array.isArray(doc.author) && doc.author.length &&
+      [doc.bibcode, Array.isArray(doc.title) ? doc.title[0] : doc.title, doc.pub, doc.abstract, ...doc.author]
+        .every(value => typeof value === 'string' && value.trim()) && /^\d{4}$/.test(doc.year));
+    const papers = parseAdsResponse({ response: { docs } });
+    return deduplicate(papers.map((paper, index) => {
+      const doc = docs[index];
       const page = Array.isArray(doc.page) ? doc.page[0] : doc.page;
-      return [{ ...paper, year: String(doc.year), volume: doc.volume, page: doc.eid || page }];
+      return { ...paper, year: String(doc.year), volume: doc.volume, page: doc.eid || page };
     }));
   }
 

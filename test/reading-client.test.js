@@ -318,15 +318,20 @@ test('clicking a saved PDF highlight opens its helper and Ask AI reuses it witho
   assert.ok(calls.every(call => call.method === 'GET'));
 });
 
-test('Send submits AI inputs directly and keeps the completed response in the expanded helper', async () => {
+test('Ask AI shows progress and the completed response in the same answer box', async () => {
   const c = client(); populate(c); c.context.state.panel = 'document';
   c.openHighlightHelper('highlight-one', 150, 180);
-  let submitted;
+  let submitted, poll;
+  c.context.setTimeout = (callback, delay) => {
+    assert.equal(delay, 900);
+    poll = callback;
+  };
   const snapshot = { highlights: structuredClone([c.r.data.highlights[0]]), documents: c.r.data.documents, annotations: [], wikiPages: [], discoveries: [], responses: [] };
   const task = { id: 'task-inline', action: 'question', status: 'completed', response: 'The inline timing explanation.', snapshot };
+  let current = { ...task, status: 'queued', response: '' };
   c.context.fetch = async (url, options) => {
-    if (url === '/api/reading/tasks' && options.method === 'POST') { submitted = JSON.parse(options.body); c.r.data.tasks.push(task); }
-    return { ok: true, json: async () => url.includes('/tasks') ? task : c.r.data };
+    if (url === '/api/reading/tasks' && options.method === 'POST') submitted = JSON.parse(options.body);
+    return { ok: true, json: async () => url.includes('/tasks') ? current : c.r.data };
   };
   await c.saveSelection('yellow', 'ask');
   c.document.getElementById('reading-ai-question').value = 'Why are these residuals important?';
@@ -336,8 +341,25 @@ test('Send submits AI inputs directly and keeps the completed response in the ex
   assert.equal(submitted.action, 'question');
   assert.equal(submitted.question, 'Why are these residuals important?');
   assert.deepEqual(submitted.wikiPages, []); assert.deepEqual(submitted.highlightIds, ['highlight-one']);
+  const helper = c.nodes.get('reading-helper-body');
+  const answerMarkup = helper.innerHTML;
+  assert.match(answerMarkup, /<p id="reading-task-status"[^>]*><\/p>\s*<\/div>\s*<div id="reading-task-controls"[^>]*><button[^>]*>Stop request<\/button>/);
+  assert.match(answerMarkup, /class="reading-task-box">\s*<strong>Answer<\/strong>\s*<div id="reading-task-pending"[^>]*>\s*<span id="reading-task-live"[^>]*>[^<]+<\/span>\s*<span class="reading-task-dots"[^>]*>(?:<span class="typing-dot"><\/span>){3}<\/span>\s*<\/div>\s*<div id="reading-task-complete"/);
+  assert.equal(c.nodes.get('reading-task-live').textContent, 'Checking the wiki…');
+  const progress = 'The wiki did not provide a cited answer. Searching peer-reviewed papers…';
+  current = { ...current, status: 'running', progress };
+  await poll();
+  assert.equal(c.nodes.get('reading-task-live').textContent, progress);
+
+  current = task;
+  c.r.data.tasks.push(task);
+  await poll();
+  assert.equal(helper.innerHTML, answerMarkup);
+  assert.equal(c.nodes.get('reading-task-pending').hidden, true);
+  assert.equal(c.nodes.get('reading-task-controls').hidden, true);
   assert.match(c.nodes.get('reading-task-complete').innerHTML, /inline timing explanation/);
-  assert.match(c.nodes.get('reading-task-complete').innerHTML, /Would you like to add this explanation/);
+  assert.equal(c.nodes.get('reading-task-status').textContent, 'completed');
+  assert.match(c.nodes.get('reading-task-actions').innerHTML, /Add to wiki.*New chat from response/);
   c.context.api = { getWikiList: async () => [{ name: 'paper' }] };
   await c.nodes.get('reading-task-add-note').listeners.click();
   assert.ok(c.r.assistanceIds.has(task.id));
@@ -887,7 +909,7 @@ test('automatic wiki-note progress hides generated Markdown and offers retry aft
   const task = { id: 'note-failed', action: 'wiki-note', targetPage: 'paper', status: 'failed', error: 'Could not connect.', progress: '### Partial generated Markdown', response: '', snapshot: { highlights: [c.r.data.highlights[0]], documents: c.r.data.documents, annotations: [], wikiPages: [], discoveries: [], responses: [] } };
   c.context.fetch = async url => ({ ok: true, json: async () => url.includes('/tasks/') ? task : c.r.data });
   await c.watchTask(task);
-  assert.equal(c.nodes.get('reading-task-live').textContent, '');
+  assert.equal(c.document.getElementById('reading-task-live'), null);
   assert.match(c.nodes.get('reading-task-complete').innerHTML, /Could not connect/);
   assert.match(c.nodes.get('reading-task-complete').innerHTML, /Try again/);
   assert.doesNotMatch(c.nodes.get('reading-helper-body').innerHTML, /reading-artifact-editor|Markdown draft/);
