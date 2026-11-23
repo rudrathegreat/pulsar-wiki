@@ -408,3 +408,7 @@ All major updates to the wiki are recorded here.
 | 2026-11-23 | Workspace / application | Added a disabled pulsar wiki docs button to the Help menu. [Workspace Help menu](../public/index.html) |
 
 | 2026-11-23 | Workspace / application | Renamed the Help menu placeholder to PulsarWiki Docs. [Workspace Help menu](../public/index.html) |
+
+| 2026-11-23 | Workspace / application | Positioned all five workspace menus below the top bar, including when the folder path wraps. [Top bar layout](../public/style.css) |
+
+| 2026-11-23 | Workspace / application | Added a 6 px gap between the top bar and its dropdown menus. [Top bar layout](../public/style.css) |
