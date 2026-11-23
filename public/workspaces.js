@@ -114,8 +114,7 @@
         window.setWorkspaceLoading(false); return false;
       }
       workspaceId = info.active.id; sessionStorage.setItem('pw-workspace', workspaceId);
-      $('workspace-current-name').textContent = info.active.name;
-      $('workspace-current-path').textContent = info.active.path; $('workspace-current-path').title = info.active.path;
+      $('workspace-current-path').textContent = info.active.path;
       document.title = `${info.active.name} — PulsarWiki`;
       document.body.classList.add('workspace-ready');
       return true;

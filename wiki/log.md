@@ -394,3 +394,7 @@ All major updates to the wiki are recorded here.
 | 2026-11-23 | Reading / application | Linked Ask AI paper citations and references to the Sources paper detail view with its import action. [Citation links](../agent/reading-references.js) [Sources interface](../public/app.js) |
 
 | 2026-11-23 | Sources / application | Cancelled obsolete paper detail and author profile requests, removed the old-results reload when starting a search, and gave SciX searches a longer second attempt after temporary failures. [Sources interface](../public/app.js) [Literature search](../agent/source-discovery.js) |
+
+| 2026-11-23 | Workspace / application | Added File, Edit, Selection, Go, and Help menus, moved folder actions into File, and displayed the full path below the right-aligned folder name on hover or focus. [Workspace top bar](../public/index.html) |
+
+| 2026-11-23 | Workspace / application | Replaced the folder name and tooltip with the full folder path on the right side of the top bar. [Workspace top bar](../public/index.html) |

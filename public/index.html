@@ -153,7 +153,50 @@
 
   <!-- Main -->
   <div id="main">
-    <header class="workspace-titlebar"><span id="workspace-current-name"></span><span id="workspace-current-path"></span><button id="workspace-change" type="button">Change folder</button><button id="workspace-close" type="button" title="Return to welcome screen">Close folder</button></header>
+    <header class="workspace-titlebar">
+      <nav id="workspace-menus" aria-label="Workspace menus">
+        <details name="workspace-menu">
+          <summary>File</summary>
+          <div class="workspace-menu-list">
+            <button id="workspace-change" type="button">Change folder</button>
+            <button id="workspace-close" type="button">Close folder</button>
+          </div>
+        </details>
+        <details name="workspace-menu">
+          <summary>Edit</summary>
+          <div class="workspace-menu-list">
+            <button id="workspace-edit-page" type="button" disabled>Edit wiki page</button>
+          </div>
+        </details>
+        <details name="workspace-menu">
+          <summary>Selection</summary>
+          <div class="workspace-menu-list">
+            <button id="workspace-select-text" type="button">Select all page text</button>
+            <button id="workspace-clear-selection" type="button">Clear selection</button>
+          </div>
+        </details>
+        <details name="workspace-menu">
+          <summary>Go</summary>
+          <div class="workspace-menu-list">
+            <button type="button" data-workspace-panel="wiki">Wiki</button>
+            <button type="button" data-workspace-panel="chat">Chat</button>
+            <button type="button" data-workspace-panel="graph">Graph</button>
+            <button type="button" data-workspace-panel="files">Sources</button>
+            <button type="button" data-workspace-panel="notebooks">Research notebooks</button>
+            <button type="button" data-workspace-panel="handover">Project handover</button>
+            <button type="button" data-workspace-panel="settings">Settings</button>
+          </div>
+        </details>
+        <details name="workspace-menu">
+          <summary>Help</summary>
+          <div class="workspace-menu-list">
+            <a class="wiki-link" data-page="index" href="/wiki/index">Wiki index</a>
+            <a class="wiki-link" data-page="log" href="/wiki/log">Change log</a>
+          </div>
+        </details>
+      </nav>
+      <span id="workspace-current-path"></span>
+    </header>
     <!-- Content area -->
     <div id="content">
 

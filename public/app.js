@@ -3072,6 +3072,56 @@ dom.chatAbort.addEventListener('click', () => {
 });
 
 // ── Bootstrap ──────────────────────────────────────────────────────
+const workspaceMenus = $('workspace-menus');
+
+function closeWorkspaceMenu(restoreFocus = false) {
+  const menu = workspaceMenus.querySelector('details[open]');
+  if (!menu) return;
+  menu.open = false;
+  if (restoreFocus) menu.querySelector('summary').focus();
+}
+
+function currentWikiEditAction() {
+  return document.querySelector('#panel-wiki.active .wiki-edit-action');
+}
+
+workspaceMenus.addEventListener('click', event => {
+  const summary = event.target.closest('summary');
+  if (summary) {
+    $('workspace-edit-page').disabled = !currentWikiEditAction();
+    return;
+  }
+  const item = event.target.closest('.workspace-menu-list > :is(button, a)');
+  if (!item) return;
+  if (item.dataset.page) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    closeWorkspaceMenu(true);
+    void openPage(item.dataset.page);
+    return;
+  }
+  closeWorkspaceMenu(true);
+  const panel = item.dataset.workspacePanel;
+  if (panel === 'wiki') void openPage(state.currentPage || 'index');
+  else if (panel) showPanel(panel);
+  else if (item.id === 'workspace-edit-page') currentWikiEditAction()?.click();
+  else if (item.id === 'workspace-clear-selection') window.getSelection()?.removeAllRanges();
+  else if (item.id === 'workspace-select-text') {
+    const activePanel = document.querySelector('#content > .panel.active');
+    if (activePanel) window.getSelection()?.selectAllChildren(activePanel);
+  }
+});
+
+document.addEventListener('click', event => {
+  if (!workspaceMenus.contains(event.target)) closeWorkspaceMenu();
+});
+document.addEventListener('focusin', event => {
+  if (!workspaceMenus.contains(event.target)) closeWorkspaceMenu();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeWorkspaceMenu(workspaceMenus.contains(document.activeElement));
+});
+
 (async function init() {
   if (!await initializeWorkspaceUi()) return;
   try {

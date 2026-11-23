@@ -11,6 +11,8 @@ Browser tab: PulsarWiki uses its favicon as the tab icon.
 
 Sidebar navigation: hover or focus an icon to see a shadow-free tooltip explaining what it opens or changes.
 
+The workspace top bar shows the full folder path on the right and has File, Edit, Selection, Go, and Help menus. File contains Change folder and Close folder. [Workspace top bar](../public/index.html)
+
 Settings updates appear in a dismissible notification that follows the active theme, names the new settings, and links to Settings. To announce a future addition, give its heading or label a unique `data-settings-update` value. [Settings markup](../public/index.html)
 
 Saving a different ChatGPT subscription model shows a Settings updated notification with the saved model name. [Model save flow](../public/app.js)
