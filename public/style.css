@@ -794,12 +794,6 @@ body {
   overflow-y: auto;
 }
 
-#panel-document.active {
-  display: flex !important;
-  flex-direction: column;
-  overflow: hidden;
-}
-
 /* ── Wiki Panel ──────────────────────────────────────────────────── */
 #panel-wiki {
   width: 100%;

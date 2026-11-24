@@ -461,4 +461,8 @@ All major updates to the wiki are recorded here.
 
 | 2026-11-24 | Workspace / application | Removed the manual Refresh button and project folder name from the sticky Project Files header. [Project files panel](../public/index.html) |
 
-**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-24. This update recorded the simplified Project Files header.
+- 2026-11-24: Automatically added reading note to 1007-0933; operation: 85d209d3-f909-4fc0-8f6c-ca0726facb8d; sources: 1007.0933.pdf.
+- 2026-11-25: Extended the reading workspace’s PDF and comments panes to the bottom and removed the extra space after the final PDF page. [Reading workspace styles](../public/reading.css)
+- 2026-11-25: Kept hidden equation markup inside the comments pane so reopening a paper at its saved page no longer scrolls the entire reading workspace. [Reading workspace styles](../public/reading.css)
+
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-25. This update recorded the reading workspace layout and equation overflow fixes.
