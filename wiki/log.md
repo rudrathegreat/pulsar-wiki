@@ -449,4 +449,12 @@ All major updates to the wiki are recorded here.
 
 | 2026-11-24 | Workspace / application | Applied the grey hover highlight to folder rows in Project files. [Explorer styles](../public/style.css) |
 
-**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-24. This update recorded the grey hover highlight on folder rows in Project files.
+| 2026-11-24 | Workspace / application | Applied the grey hover highlight to wiki page and saved source rows in the sidebar. [Sidebar styles](../public/style.css) |
+
+| 2026-11-24 | Workspace / application | Rounded the hover highlight on wiki and source rows and inset it from both sidebar edges. [Sidebar styles](../public/style.css) |
+
+| 2026-11-24 | Workspace / application | Added spacing between wiki rows, tightened source row spacing, and confined the source highlight to the filename and icon. [Sidebar styles](../public/style.css) |
+
+| 2026-11-24 | Workspace / application | Extended the source hover highlight to fill the filename area up to the More options button. [Sidebar styles](../public/style.css) |
+
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-24. This update recorded the wider hover highlight for saved sources in the sidebar.

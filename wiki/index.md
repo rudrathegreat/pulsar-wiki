@@ -11,7 +11,7 @@ Saved wiki connections in the reading sidebar share the link styling used in cha
 
 Browser tab: PulsarWiki uses its favicon as the tab icon.
 
-Sidebar navigation: hover or focus an icon to see a shadow-free tooltip explaining what it opens or changes.
+Sidebar navigation: hover or focus an icon to see a shadow-free tooltip explaining what it opens or changes. Hover over a wiki page or saved source to see a rounded grey highlight. For a saved source, the highlight fills the filename area up to the gap before the options button. [Sidebar styles](../public/style.css)
 
 Select the sidebar folder icon to open **Project files** in the main content area. The tree starts with `raw`, `wiki`, and `notebooks`. Select a folder chevron to browse its contents, and use the file icons to identify file types. Hover over a file or folder to highlight its row in grey. Open wiki pages, sources, and notebooks in their PulsarWiki views, or download other files from these folders. Use File → Open project to switch projects. [Project files interface](../public/workspace-explorer.js) [Folder listing](../agent/workspace-files.js)
 
@@ -112,4 +112,4 @@ All 41 wiki pages were updated to use the two-sentence declaration format. [[log
 ---
 *Last updated: 2026-11-24*
 
-**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-24. This update documented the grey hover highlight on file and folder rows in Project files.
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-24. This update documented the full-width filename highlight for saved sources in the sidebar.
