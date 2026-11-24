@@ -2954,6 +2954,7 @@ function scheduleWorkspaceRefresh() {
       while (workspaceRefreshPending) {
         workspaceRefreshPending = false;
         const tasks = [refreshWiki(), loadFiles()];
+        if (state.panel === 'explorer') tasks.push(window.WorkspaceExplorer.refresh());
         if (state.panel === 'files' && state.sourceView === 'references') {
           tasks.push(window.ReferencesEditor?.open());
         }

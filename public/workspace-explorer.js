@@ -1,9 +1,7 @@
 (() => {
   'use strict';
 
-  const byId = id => document.getElementById(id);
-  const root = byId('workspace-explorer-entries');
-  const refresh = byId('workspace-explorer-refresh');
+  const root = document.getElementById('workspace-explorer-entries');
   const endpoint = '/api/workspaces/explorer';
   const fileSymbols = new Map(Object.entries({
     pdf: 'M6 14c2-2 4-5 3-6s-1 4 3 5c1 .3-2-2-6 1Z',
@@ -25,8 +23,6 @@
     jpg: 'png', jpeg: 'png', gif: 'png', svg: 'png', webp: 'png', ico: 'png',
     jpg: 'png', jpeg: 'png', gif: 'png', svg: 'png', webp: 'png', ico: 'png',
   }));
-  let rootLoaded = false;
-  let rootLoading = false;
 
   function fileAction(path) {
     const wiki = /^wiki\/([a-z0-9_+.-]+)\.md$/.exec(path);
@@ -75,15 +71,10 @@
     const children = document.createElement('ul');
     children.className = 'explorer-list';
     folder.append(summary, children);
-    let loaded = false;
-    let loading = false;
-    folder.addEventListener('toggle', async () => {
-      if (!folder.open || loaded || loading) return;
-      loading = true;
-      loaded = await loadFolder(children, path);
-      loading = false;
-    });
-    return folder;
+    const refreshChildren = folderLoader(children, path);
+    const refreshOpenFolder = () => folder.open ? refreshChildren() : undefined;
+    folder.addEventListener('toggle', refreshOpenFolder);
+    return { element: folder, refresh: refreshOpenFolder };
   }
 
   function showStatus(list, message, alert = false) {
@@ -94,42 +85,64 @@
     list.replaceChildren(status);
   }
 
-  async function loadFolder(list, path) {
-    showStatus(list, 'Loading folder…');
-    try {
-      const response = await window.WorkspaceSession.fetch(`${endpoint}?${new URLSearchParams({ path })}`);
-      const { name, entries } = await readJsonResponse(response, 'Project files');
-      if (!path) byId('workspace-explorer-name').textContent = name;
-      if (!entries.length) {
-        showStatus(list, 'This folder is empty.');
-        return true;
+  function folderLoader(list, path) {
+    let rows = new Map();
+    let pending = Promise.resolve();
+
+    async function load() {
+      if (!list.firstElementChild) showStatus(list, 'Loading folder…');
+      let entries;
+      try {
+        const response = await window.WorkspaceSession.fetch(`${endpoint}?${new URLSearchParams({ path })}`);
+        const listing = await readJsonResponse(response, 'Project files');
+        entries = listing.entries;
+      } catch (error) {
+        if (!rows.size) showStatus(list, error.message, true);
+        return;
       }
-      const fragment = document.createDocumentFragment();
+
+      if (!entries.length) {
+        if (rows.size || list.firstElementChild?.textContent !== 'This folder is empty.') {
+          showStatus(list, 'This folder is empty.');
+        }
+        rows.clear();
+        return;
+      }
+
+      const nextRows = new Map();
       for (const entry of entries) {
         const relative = path ? `${path}/${entry.name}` : entry.name;
-        const item = document.createElement('li');
-        item.append(entry.directory ? makeFolder(entry, relative) : makeFile(entry, relative));
-        fragment.append(item);
+        const key = entry.directory ? `${entry.name}/` : entry.name;
+        let row = rows.get(key);
+        if (!row) {
+          const folder = entry.directory ? makeFolder(entry, relative) : null;
+          const item = document.createElement('li');
+          item.append(folder ? folder.element : makeFile(entry, relative));
+          row = { item, folder };
+        }
+        nextRows.set(key, row);
       }
-      list.replaceChildren(fragment);
-      return true;
-    } catch (error) {
-      showStatus(list, error.message, true);
-      return false;
+
+      if (!rows.size) list.replaceChildren();
+      for (const [key, row] of rows) {
+        if (!nextRows.has(key)) row.item.remove();
+      }
+      let nextItem = list.firstElementChild;
+      for (const { item } of nextRows.values()) {
+        if (item === nextItem) nextItem = item.nextElementSibling;
+        else list.insertBefore(item, nextItem);
+      }
+      rows = nextRows;
+      await Promise.all([...rows.values()].map(row => row.folder?.refresh()));
     }
+
+    // A change arriving during a request needs a fresh listing after it finishes.
+    return () => {
+      pending = pending.then(load);
+      return pending;
+    };
   }
 
-  async function loadRoot() {
-    if (rootLoading) return;
-    rootLoading = true;
-    rootLoaded = await loadFolder(root, '');
-    rootLoading = false;
-  }
-
-  window.WorkspaceExplorer = {
-    show() {
-      if (!rootLoaded) void loadRoot();
-    },
-  };
-  refresh.addEventListener('click', () => { void loadRoot(); });
+  const refreshTree = folderLoader(root, '');
+  window.WorkspaceExplorer = { show: refreshTree, refresh: refreshTree };
 })();

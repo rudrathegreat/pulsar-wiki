@@ -457,4 +457,8 @@ All major updates to the wiki are recorded here.
 
 | 2026-11-24 | Workspace / application | Extended the source hover highlight to fill the filename area up to the More options button. [Sidebar styles](../public/style.css) |
 
-**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-24. This update recorded the wider hover highlight for saved sources in the sidebar.
+| 2026-11-24 | Workspace / application | Made the Project Files tree refresh automatically while preserving expanded folders. [Project files interface](../public/workspace-explorer.js) [Workspace watcher](../server.js) |
+
+| 2026-11-24 | Workspace / application | Removed the manual Refresh button and project folder name from the sticky Project Files header. [Project files panel](../public/index.html) |
+
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-24. This update recorded the simplified Project Files header.

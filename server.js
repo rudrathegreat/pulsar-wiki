@@ -76,7 +76,10 @@ function openWorkspace(folder) {
   workspace.handoverService = new HandoverService({ wikiTools: workspace.wikiTools, notebookService: workspace.notebookService, authService: chatgptAuth });
   workspace.notebookRouter = createNotebookRouter({ service: workspace.notebookService, requireLocalSession, requireLocalMutation });
   let referenceKeys = new Set(parseBibtex(workspace.references.read().content).entries.map(entry => entry.key));
-  workspace.watcher = chokidar.watch([wikiDir, rawDir, path.join(rootDir, 'references.bib')], { ignoreInitial: true }).on('all', (event, filePath) => {
+  const watchedPaths = [wikiDir, rawDir, path.join(rootDir, 'notebooks'), workspace.references.file];
+  workspace.watcher = chokidar.watch(watchedPaths, { ignoreInitial: true, followSymlinks: false }).on('all', (event, filePath) => {
+    // Notebook saves change the contents only. The explorer lists names and types.
+    if (event === 'change' && path.relative(rootDir, filePath).split(path.sep, 1)[0] === 'notebooks') return;
     if (filePath === workspace.references.file && event !== 'unlink') {
       try {
         const parsed = parseBibtex(workspace.references.read().content);

@@ -257,8 +257,11 @@ test('reference watcher reports new keys once and only within their workspace', 
   const received = [], other = [];
   const { parse, text } = require('../public/bibtex');
   vm.runInNewContext(server.slice(start, end), {
-    workspace, wikiDir: 'wiki', rawDir: 'raw', rootDir: '.', path: { join: () => 'references.bib' },
-    chokidar: { watch: () => ({ on: (_event, fn) => { callback = fn; } }) },
+    workspace, wikiDir: 'wiki', rawDir: 'raw', rootDir: '.', path,
+    chokidar: { watch: paths => {
+      assert.ok(paths.includes('notebooks'));
+      return { on: (_event, fn) => { callback = fn; } };
+    } },
     parseBibtex: parse, bibtexText: text, WebSocket: { OPEN: 1 },
     wss: { clients: [
       { workspace, readyState: 1, send: data => received.push(JSON.parse(data)) },
@@ -268,6 +271,11 @@ test('reference watcher reports new keys once and only within their workspace', 
   content += '\n@article{new, title={New paper}}\n@misc{another, title={Another}}';
   callback('change', 'references.bib');
   callback('change', 'references.bib');
+  const notebook = path.join('notebooks', 'analysis', 'study.ipynb');
+  callback('add', notebook);
+  callback('change', notebook);
+  callback('unlink', notebook);
   assert.deepEqual(received.filter(event => event.type === 'reference-added').map(event => event.key), ['new', 'another']);
+  assert.deepEqual(received.filter(event => event.path === notebook).map(event => event.event), ['add', 'unlink']);
   assert.equal(other.length, 0);
 });

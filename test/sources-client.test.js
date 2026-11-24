@@ -17,6 +17,7 @@ function client() {
   const sockets = [];
   let wikiRefreshes = 0;
   let referenceRefreshes = 0;
+  let explorerRefreshes = 0;
   let wikiFailure = null;
   let files = [{ name: 'timing.pdf', ext: 'pdf', size: 1024 }, { name: 'notes & "ideas".md', ext: 'md', size: 20 }];
   let failure = null;
@@ -52,6 +53,7 @@ function client() {
     stripEmoji: value => String(value),
     escHtml: value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
   };
+  context.window.WorkspaceExplorer = { async refresh() { explorerRefreshes++; } };
   vm.createContext(context);
   const sourceViewStart = source.indexOf('function setSourceView(');
   const sourceView = source.slice(sourceViewStart, source.indexOf('\n}', sourceViewStart) + 2);
@@ -66,6 +68,7 @@ function client() {
   `, context);
   return { ...context.client, element, opened, context, sockets,
     get wikiRefreshes() { return wikiRefreshes; }, get referenceRefreshes() { return referenceRefreshes; },
+    get explorerRefreshes() { return explorerRefreshes; },
     failWiki(value) { wikiFailure = value; },
     async flushRefresh() { const callbacks = [...timers.values()]; timers.clear(); await Promise.all(callbacks.map(callback => callback())); },
     setFiles(value) { files = value; }, fail(value) { failure = value; } };
@@ -179,6 +182,28 @@ test('socket reconnection catches up sources and references even if the wiki ref
   assert.match(c.element('source-sidebar-list').innerHTML, /added-while-offline.pdf/);
   assert.equal(c.referenceRefreshes, 2);
   assert.equal(c.state.sourceView, 'references');
+});
+
+test('live file events update the open Project Files explorer once per burst and after reconnecting', async () => {
+  const c = client();
+  c.connectDirectAgentWS();
+  const event = { data: JSON.stringify({ type: 'filechange', event: 'add', path: 'notebooks/analysis/study.ipynb' }) };
+  c.state.panel = 'chat';
+  c.sockets[0].onmessage(event);
+  await c.flushRefresh();
+  assert.equal(c.explorerRefreshes, 0);
+
+  c.state.panel = 'explorer';
+  c.sockets[0].onmessage(event);
+  c.sockets[0].onmessage(event);
+  await c.flushRefresh();
+  assert.equal(c.explorerRefreshes, 1);
+
+  c.sockets[0].onclose();
+  await c.flushRefresh();
+  c.sockets[1].onopen();
+  await c.flushRefresh();
+  assert.equal(c.explorerRefreshes, 2);
 });
 
 
