@@ -285,7 +285,7 @@
     r.viewportFrame = null; r.scrolling = false; r.nearPages = new Set();
     for (const job of renderQueue.values()) job.resolve();
     renderQueue.clear();
-    for (const p of r.pages.values()) { p.task?.cancel(); p.buildingTextLayer?.cancel(); p.textLayer?.cancel(); void p.textReader?.cancel().catch(() => {}); }
+    for (const p of r.pages.values()) { p.task?.cancel(); p.buildingTextLayer?.cancel(); p.textLayer?.cancel?.(); void p.textReader?.cancel().catch(() => {}); }
     if (r.pdf) { const previous = r.pdf; r.pdf = null; void previous.destroy().catch(() => {}); }
     r.pages.clear(); r.document = null; r.pending = null; r.historical = null; r.findText = null;
     el('panel-document').classList.remove('reading-text-document');

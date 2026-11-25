@@ -52,6 +52,38 @@ test('workspace Find selects a PDF passage across a line break using text-layer 
   assert.equal(ranges.length, 1);
 });
 
+test('the reader can switch from a plain text source to a Markdown source', async () => {
+  const c = client();
+  const reader = c.context.window.ActiveReading;
+  const sources = [{ id: 'plain', currentName: 'notes.txt' }, { id: 'markdown', currentName: 'summary.md' }];
+  const createElement = c.document.createElement;
+  c.document.createElement = tag => {
+    const node = createElement(tag);
+    if (tag === 'div') {
+      const children = new Map(['span', '.textLayer', '.reading-overlays'].map(selector => [selector, createElement('div')]));
+      node.querySelector = selector => children.get(selector);
+    }
+    return node;
+  };
+  c.context.fetch = async (url, { body }) => {
+    const data = url === '/api/reading/documents'
+      ? { document: sources.find(source => source.currentName === JSON.parse(body).name), changedDocuments: [] }
+      : url === '/api/reading' ? { documents: sources } : { text: url.includes('/plain/') ? 'Text notes' : '# Summary' };
+    return { ok: true, json: async () => data };
+  };
+
+  c.context.state.documentSession = 1;
+  await reader.openText('notes.txt', 1);
+  assert.equal(c.r.pages.get(1).text, 'Text notes');
+
+  reader.close();
+  c.context.state.documentSession = 2;
+  await reader.openText('summary.md', 2);
+  assert.equal(c.r.document.id, 'markdown');
+  assert.equal(c.r.pages.get(1).text, '# Summary');
+  reader.close();
+});
+
 test('selection toolbar shows blue only for a passage with completed AI assistance', () => {
   const c = client(); populate(c);
   const inputs = ['yellow', 'green', 'pink', 'blue'].map(color => ({ dataset: { selectionColor: color }, checked: false }));

@@ -465,4 +465,6 @@ All major updates to the wiki are recorded here.
 - 2026-11-25: Extended the reading workspace’s PDF and comments panes to the bottom and removed the extra space after the final PDF page. [Reading workspace styles](../public/reading.css)
 - 2026-11-25: Kept hidden equation markup inside the comments pane so reopening a paper at its saved page no longer scrolls the entire reading workspace. [Reading workspace styles](../public/reading.css)
 
-**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-25. This update recorded the reading workspace layout and equation overflow fixes.
+- 2026-11-25: Fixed an error when switching to another saved source from a plain-text or Markdown preview. [Reading workspace](../public/reading.js) [Regression test](../test/reading-client.test.js)
+
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-25. This update recorded the source switching fix and its regression test.
