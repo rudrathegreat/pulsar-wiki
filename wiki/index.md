@@ -6,6 +6,8 @@ File navigation: source citations and source lists open saved files in the readi
 
 You can switch directly from an open plain-text or Markdown preview to another saved source. [Reading workspace](../public/reading.js)
 
+Markdown sources open with rendered formatting and equations. Use **Markdown source** to view the original markup and highlight passages. [Reading workspace](../public/reading.js)
+
 Related knowledge: the reading helper opens connection previews with the **Connect to related knowledge** button. Previews show concise AI-generated wiki page summaries with spacing below their titles, render Markdown and use wiki link styling for their titles.
 
 Selecting an action in the reading helper opens its details below the action buttons and keeps the helper the same width. [Reading helper layout](../public/reading.css)
@@ -116,4 +118,4 @@ All 41 wiki pages were updated to use the two-sentence declaration format. [[log
 ---
 *Last updated: 2026-11-25*
 
-**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-25. This update documented switching between saved sources after opening a plain-text or Markdown preview.
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-25. This update documented rendered Markdown previews and how to open the original markup for highlighting.

@@ -52,15 +52,24 @@ test('workspace Find selects a PDF passage across a line break using text-layer 
   assert.equal(ranges.length, 1);
 });
 
-test('the reader can switch from a plain text source to a Markdown source', async () => {
+test('switching to a Markdown source renders Markdown and math and retains source offsets', async () => {
   const c = client();
   const reader = c.context.window.ActiveReading;
+  const markdown = '# Summary\n\n**Period**: $P$';
+  const rendered = '<h1>Summary</h1><p><strong>Period</strong>: $P$</p>';
+  const typeset = [];
+  c.context.renderMd = value => {
+    assert.equal(value, markdown);
+    return rendered;
+  };
+  c.context.typesetMath = node => typeset.push(node);
   const sources = [{ id: 'plain', currentName: 'notes.txt' }, { id: 'markdown', currentName: 'summary.md' }];
   const createElement = c.document.createElement;
   c.document.createElement = tag => {
     const node = createElement(tag);
     if (tag === 'div') {
       const children = new Map(['span', '.textLayer', '.reading-overlays'].map(selector => [selector, createElement('div')]));
+      children.get('span').dataset.textStart = '0';
       node.querySelector = selector => children.get(selector);
     }
     return node;
@@ -68,20 +77,59 @@ test('the reader can switch from a plain text source to a Markdown source', asyn
   c.context.fetch = async (url, { body }) => {
     const data = url === '/api/reading/documents'
       ? { document: sources.find(source => source.currentName === JSON.parse(body).name), changedDocuments: [] }
-      : url === '/api/reading' ? { documents: sources } : { text: url.includes('/plain/') ? 'Text notes' : '# Summary' };
+      : url === '/api/reading' ? { documents: sources }
+        : url.endsWith('/text') ? { pages: [{ page: 1, text: markdown }] }
+          : { text: url.includes('/plain/') ? 'Text notes' : markdown };
     return { ok: true, json: async () => data };
   };
 
   c.context.state.documentSession = 1;
   await reader.openText('notes.txt', 1);
   assert.equal(c.r.pages.get(1).text, 'Text notes');
+  const toggle = c.nodes.get('reading-markdown-source');
+  assert.equal(toggle.hidden, true);
 
   reader.close();
   c.context.state.documentSession = 2;
   await reader.openText('summary.md', 2);
   assert.equal(c.r.document.id, 'markdown');
-  assert.equal(c.r.pages.get(1).text, '# Summary');
+  const page = c.r.pages.get(1);
+  assert.equal(page.preview.innerHTML, rendered);
+  assert.deepEqual(typeset, [page.preview]);
+  assert.equal(page.preview.hidden, false);
+  assert.equal(page.layer.hidden, true);
+  assert.equal(toggle.hidden, false);
+  assert.equal(toggle.attributes['aria-pressed'], 'false');
+
+  toggle.listeners.click();
+  assert.equal(page.preview.hidden, true);
+  assert.equal(page.layer.hidden, false);
+  assert.equal(toggle.attributes['aria-pressed'], 'true');
+  assert.equal(page.text, markdown);
+  assert.equal(page.textLayer.textDivs[0].textContent, markdown);
+  assert.equal(page.textLayer.textDivs[0].dataset.textLength, String(markdown.length));
+  toggle.listeners.click();
+  assert.equal(page.preview.hidden, false);
+
+  const span = page.textLayer.textDivs[0];
+  span.firstChild = { textContent: markdown };
+  const offsets = [];
+  c.document.createRange = () => ({
+    setStart(node, offset) { offsets.push([node, offset]); },
+    setEnd(node, offset) { offsets.push([node, offset]); },
+    getClientRects() { return []; },
+  });
+  c.context.window.getSelection = () => ({ isCollapsed: true, removeAllRanges() {}, addRange() {} });
+  c.context.state.pdf = { fitWidth: true };
+  page.wrap.scrollIntoView = () => {};
+  c.document.getElementById('reading-find').value = 'Period';
+  await c.findNext();
+  const start = markdown.indexOf('Period');
+  assert.deepEqual(offsets, [[span.firstChild, start], [span.firstChild, start + 'Period'.length]]);
+  assert.equal(page.layer.hidden, false);
+
   reader.close();
+  assert.equal(toggle.hidden, true);
 });
 
 test('selection toolbar shows blue only for a passage with completed AI assistance', () => {

@@ -289,6 +289,7 @@
     if (r.pdf) { const previous = r.pdf; r.pdf = null; void previous.destroy().catch(() => {}); }
     r.pages.clear(); r.document = null; r.pending = null; r.historical = null; r.findText = null;
     el('panel-document').classList.remove('reading-text-document');
+    el('reading-markdown-source').hidden = true;
     closeHelper(); el('reading-notes').hidden = true; el('reading-thumbnails').hidden = true;
     el('document-stage').classList.remove('reading-region-mode', 'reading-highlights-disabled');
   }
@@ -343,11 +344,33 @@
     wrap.innerHTML = '<div class="reading-overlays"></div><div class="textLayer"><pre><span data-text-start="0"></span></pre></div>';
     const span = wrap.querySelector('span'); span.textContent = content.unsupported ? 'Preview and text extraction are not available for this file type.' : content.text;
     span.dataset.textLength = String(content.text.length);
+    const layer = wrap.querySelector('.textLayer');
+    let preview;
+    if (!content.unsupported && /\.(?:md|markdown)$/i.test(name)) {
+      preview = document.createElement('article');
+      preview.className = 'reading-markdown-preview md-body';
+      preview.innerHTML = renderMd(content.text);
+      wrap.append(preview);
+    }
     stage.append(wrap);
     const viewport = { convertToPdfPoint: (x, y) => [x, y], convertToViewportRectangle: rect => rect };
-    r.pages.set(1, { number: 1, wrap, layer: wrap.querySelector('.textLayer'), overlay: wrap.querySelector('.reading-overlays'), text: content.text, textLayer: { textDivs: [span] }, viewport, rendered: true, near: true, textDocument: true });
-    renderWorkspace(); paintHighlights(r.pages.get(1));
+    const page = { number: 1, wrap, layer, preview, overlay: wrap.querySelector('.reading-overlays'), text: content.text, textLayer: { textDivs: [span] }, viewport, rendered: true, near: true, textDocument: true };
+    r.pages.set(1, page);
+    el('reading-markdown-source').hidden = !preview;
+    if (preview) {
+      showMarkdownSource(page, false);
+      typesetMath(preview);
+    } else paintHighlights(page);
+    renderWorkspace();
     if (result.changedDocuments.length) notify('This filename previously contained a different document. Its earlier highlights and notes are preserved locally.', true);
+  }
+  function showMarkdownSource(page, showSource) {
+    if (!page?.preview) return;
+    page.preview.hidden = showSource;
+    page.layer.hidden = !showSource;
+    page.wrap.classList.toggle('reading-markdown-rendered', !showSource);
+    el('reading-markdown-source').setAttribute('aria-pressed', String(showSource));
+    paintHighlights(page);
   }
   function layout() {
     if (!r.pdf || !r.defaultSize) return;
@@ -516,7 +539,7 @@
   function paintHighlights(p) {
     if (!p?.viewport || !r.document || p.near === false && !pageHasSelection(p)) return;
     p.overlay.innerHTML = ''; p.overlay.hidden = true;
-    if (!r.highlightsEnabled) return;
+    if (!r.highlightsEnabled || (p.preview && !p.preview.hidden)) return;
     const highlights = live('highlights').filter(h => h.documentId === r.document.id && h.id !== r.historical?.highlight.id);
     if (r.historical?.highlight.documentId === r.document.id) highlights.push(r.historical.highlight);
     for (const h of highlights) {
@@ -687,6 +710,7 @@
     else showPanel('document');
     r.active = id; r.filter.document = doc.id; r.historical = passage.historical ? passage : null;
     history.replaceState(null, '', `/#reading/${doc.id}/${id}?revision=${h.revision}`);
+    showMarkdownSource(r.pages.get(h.anchors[0].page), true);
     await navigate(h.anchors[0].page, state.pdf.fitWidth);
     for (const p of r.pages.values()) paintHighlights(p);
     renderWorkspace();
@@ -767,6 +791,7 @@
       }
     }
     if (!begin || !finish) return false;
+    showMarkdownSource(page, true);
     const range = document.createRange();
     range.setStart(begin.node, begin.offset);
     range.setEnd(finish.node, finish.offset);
@@ -1105,6 +1130,13 @@
   el('reading-region').addEventListener('click', () => { if (!r.highlightsEnabled) return; r.region = !r.region; el('document-stage').classList.toggle('reading-region-mode', r.region); el('reading-region').setAttribute('aria-pressed', String(r.region)); if (r.region) notify('Drag a rectangle around an equation, figure, or scanned passage.'); });
   el('reading-rotate').addEventListener('click', guard(async () => { r.rotation = (r.rotation + 90) % 360; await navigate(state.pdf.page); }));
   el('reading-highlights-toggle').addEventListener('click', () => setHighlightsEnabled(!r.highlightsEnabled));
+  el('reading-markdown-source').addEventListener('click', () => {
+    const page = r.pages.get(1);
+    if (!page?.preview) return;
+    closeHelper();
+    window.getSelection()?.removeAllRanges();
+    showMarkdownSource(page, page.layer.hidden);
+  });
   el('reading-notes-toggle').addEventListener('click', guard(async () => { el('reading-notes').hidden = !el('reading-notes').hidden; el('reading-notes-toggle').setAttribute('aria-expanded', String(!el('reading-notes').hidden)); await navigate(state.pdf.page); }));
   el('reading-thumbnails-toggle').addEventListener('click', guard(async () => {
     const nav = el('reading-thumbnails'); nav.hidden = !nav.hidden; el('reading-thumbnails-toggle').setAttribute('aria-pressed', String(!nav.hidden));

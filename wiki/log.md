@@ -467,4 +467,6 @@ All major updates to the wiki are recorded here.
 
 - 2026-11-25: Fixed an error when switching to another saved source from a plain-text or Markdown preview. [Reading workspace](../public/reading.js) [Regression test](../test/reading-client.test.js)
 
-**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-25. This update recorded the source switching fix and its regression test.
+- 2026-11-25: Rendered Markdown and LaTeX by default for saved Markdown sources in the reading workspace and kept the original markup available for highlights and search matches. [Reading workspace](../public/reading.js) [Regression test](../test/reading-client.test.js)
+
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-25. This update recorded the Markdown source preview fix and its regression test.

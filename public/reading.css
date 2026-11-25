@@ -95,6 +95,9 @@
 .reading-text-page .textLayer { position:relative; inset:auto; overflow:visible; line-height:1.6; }
 .reading-page.reading-text-page .textLayer pre { white-space:pre-wrap; overflow-wrap:anywhere; margin:0; font:inherit; transform:none; }
 .reading-text-page .textLayer pre span { position:static; color:inherit; white-space:pre-wrap; font:inherit; transform:none; }
+.reading-page.reading-markdown-rendered { background:var(--surface); color:var(--text-1); cursor:auto; }
+.reading-markdown-preview { overflow-wrap:anywhere; }
+#reading-markdown-source[hidden] { display:none; }
 .reading-mark { position:absolute; border:0; border-radius:1px; opacity:1; pointer-events:none; }
 [data-color="yellow"], [data-selection-color="yellow"] { --mark:var(--highlight-yellow); }
 [data-color="green"], [data-selection-color="green"] { --mark:var(--highlight-green); }
