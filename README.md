@@ -1,14 +1,13 @@
 # PulsarWiki
 
-PulsarWiki is a local browser interface for source-backed research workspaces. Open any local folder for a separate project, or continue using the included pulsar astronomy wiki. Its chat uses an eligible ChatGPT subscription, while wiki files and saved conversations remain on the local machine.
+PulsarWiki is a local browser interface for source-backed research workspaces. Open any local folder for a separate project, or continue using the included pulsar astronomy wiki. Choose ChatGPT or Google Antigravity for AI features. PulsarWiki keeps its wiki files and saved conversation history on the local machine.
 
 ## Requirements
 
 - Node.js 20.19.0 or newer
-- An eligible ChatGPT subscription
-- Permission to grant PulsarWiki direct ChatGPT plan usage during sign-in
+- For AI features, either an eligible ChatGPT subscription with direct plan usage enabled for PulsarWiki or a Gemini API key that can access Google Antigravity
 
-Research notebooks additionally need a local Python environment with JupyterLab 4, `ipykernel`, `nbformat`, and `nbclient`. Plotting and widget packages are optional. Notebook editing and execution do not require a ChatGPT connection; AI recall does.
+Research notebooks additionally need a local Python environment with JupyterLab 4, `ipykernel`, `nbformat`, and `nbclient`. Plotting and widget packages are optional. AI recall requires a connected provider. Notebook editing and execution run locally.
 
 ChatGPT subscription sharing is currently a preview feature. Eligibility, model availability, and usage limits are determined by the connected ChatGPT account and workspace.
 
@@ -32,7 +31,7 @@ Each selected folder holds its own `wiki/`, immutable `raw/` sources, `.pulsarwi
 
 An animated loading screen appears while a project opens and its initial data loads, including the first opening of a new folder. It follows the current theme and respects reduced-motion preferences. If opening fails, the loading screen clears and the error is displayed.
 
-The selected folder is remembered throughout the running browser/server session, including refreshes, direct page links, and the ChatGPT sign-in round trip. Each tab pins its own workspace, so different projects can be open in separate tabs. Recent paths remain in this browser for reopening after a server restart. ChatGPT account settings are shared across projects.
+The selected folder is remembered throughout the running browser/server session, including refreshes, direct page links, and the ChatGPT sign-in round trip. Each tab pins its own workspace, so different projects can be open in separate tabs. Recent paths remain in this browser for reopening after a server restart. AI provider settings are shared across projects.
 
 In **Settings**, paste your **NASA ADS API token** and choose **Save token** to enable ADS literature searches immediately. The token is stored on this computer in the application's Git-ignored `.pulsarwiki/source-settings.json` and shared across workspaces. **Remove saved token** deletes it; the server's `NASA_ADS_API_TOKEN`, if set, remains the fallback. Settings only returns whether a token is configured, and the saved token is never filled back into the browser input.
 
@@ -46,14 +45,24 @@ Hover over a graph node to keep that page, its directly linked pages (incoming o
 
 ## Connect ChatGPT
 
-1. Select **Connect ChatGPT** in the top-right corner.
+1. Open **Settings** in the top-right corner and select **ChatGPT** as the AI provider. Select **Save provider** if switching from Antigravity.
 2. Choose **Continue with ChatGPT** and complete the OpenAI authorization page.
 3. Grant the requested ChatGPT plan-usage permission.
 4. Choose one of the subscription models returned for that account and save it.
 
 PulsarWiki displays model names from the connected account and submits their catalog slugs. It automatically selects the first available model after the initial connection, keeps a saved selection while it remains available, and falls back to the new first model if availability changes.
 
-There is no API-key or alternate-provider fallback. Usage is charged against the connected ChatGPT plan and is subject to that plan's limits. The settings dialog links to the ChatGPT usage page.
+Usage is charged against the connected ChatGPT plan and is subject to that plan's limits.
+
+## Connect Google Antigravity
+
+1. Create or retrieve a Gemini API key in [Google AI Studio](https://aistudio.google.com/api-keys).
+2. Open **Settings**, select **Google Antigravity** as the AI provider, and paste the key.
+3. Select **Save provider**. PulsarWiki checks the key with a test request before switching. The selection applies to new AI requests across workspaces.
+
+PulsarWiki uses Google's [managed Antigravity agent](https://aistudio.google.com/docs/antigravity-agent) with Gemini 4 Hydrogen. Usage counts against the Gemini API project's quota and may incur charges. Google stores chat interactions that allow wiki tools so PulsarWiki can return tool results to the same interaction. See [Google's retention documentation](https://aistudio.google.com/docs/interactions-overview#data-storage-retention).
+
+PulsarWiki saves the key in `ai-settings.json` in the same operating system directory as its ChatGPT credentials. Select **Remove saved key** in Settings to remove it and switch back to ChatGPT. For PDF bibliography extraction, PulsarWiki sends extracted text and images of up to the first three pages to Antigravity.
 
 ## Credentials and disconnection
 
@@ -69,7 +78,7 @@ The file is written atomically and uses owner-only permissions where the operati
 
 ## Saved chats and agent context
 
-Chats are stored in local application data at `.pulsarwiki/chat/` inside the selected workspace (ignored by Git in the included project). Each Responses API request uses `store: false`, streams its result, and resends the complete local conversation transcript. Saved chats remain available across ChatGPT disconnects and account changes.
+Chats are stored in local application data at `.pulsarwiki/chat/` inside the selected workspace (ignored by Git in the included project). Saved chats remain available when you switch providers. PulsarWiki sends the saved conversation context to the active provider for each new chat turn. ChatGPT Responses API requests use `store: false`.
 
 The selected folder's `GEMINI.md` is loaded when that workspace first opens in a server session and becomes the canonical instruction snapshot for new chats. Restart the server after editing it to create chats using the new instruction version.
 
@@ -122,7 +131,7 @@ The notebook service's export API downloads the current `.ipynb`, or a JSON bund
 
 ### Recall earlier work
 
-The notebook service supports recall requests about earlier assumptions, exclusions, decisions, limitations or observations. Requests can search the current notebook or all notebooks in the active workspace, including historical cells. Only matching saved code, Markdown and text-output excerpts are sent through the existing ChatGPT connection. Recall records retain the exact evidence excerpts used. Responses must cite supplied evidence; unknown or missing references fail safely. Evidence links open the original read-only notebook revision and cell, with an option to return to the current notebook. No match produces a local answer without an AI request.
+The notebook service supports recall requests about earlier assumptions, exclusions, decisions, limitations or observations. Requests can search the current notebook or all notebooks in the active workspace, including historical cells. Only matching saved code, Markdown and text-output excerpts are sent to the active AI provider. Recall records retain the exact evidence excerpts used. Responses must cite supplied evidence; unknown or missing references fail safely. Evidence links open the original read-only notebook revision and cell, with an option to return to the current notebook. No match produces a local answer without an AI request.
 
 Recall distinguishes recorded statements from AI inference and reports insufficient evidence. It does not insert cells, run code, generate an analysis, or publish results. Requests can be cancelled and explicitly retried with their original preserved evidence; a server restart marks unfinished requests as interrupted. Notebook content is treated as evidence, never as instructions to the AI.
 
@@ -183,7 +192,7 @@ Run `npm test` (or `npm.cmd test` in PowerShell). Tests cover persistence and ro
 
 ## Troubleshooting
 
-If sign-in is declined or expires, open the ChatGPT settings dialog and reconnect. If plan permission is missing, reconnect and approve direct plan usage. Ineligible subscriptions and usage limits cannot fall back to API-key billing; check the account or its [ChatGPT usage page](https://chatgpt.com/settings/usage).
+If ChatGPT sign-in is declined or expires, open Settings and reconnect. If plan permission is missing, reconnect and approve direct plan usage. Check subscription eligibility and limits in the account's [ChatGPT usage page](https://chatgpt.com/settings/usage). For Google Antigravity key errors, check the key and project permissions in [Google AI Studio](https://aistudio.google.com/api-keys), then replace the saved key in Settings.
 
 Temporary OpenAI failures leave the saved registration intact so reconnection can be retried. A terminal refresh failure clears the active session and asks you to sign in again.
 

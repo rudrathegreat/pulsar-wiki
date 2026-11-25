@@ -1929,6 +1929,8 @@ body {
 }
 
 .chatgpt-field select,
+.ai-provider-settings select,
+.ai-provider-settings input,
 .ads-settings input {
   width: 100%;
   margin-top: 6px;
@@ -1942,21 +1944,27 @@ body {
 }
 
 .chatgpt-field select:focus,
+.ai-provider-settings select:focus,
+.ai-provider-settings input:focus,
 .ads-settings input:focus {
   border-color: var(--text-2);
 }
 
-.ads-settings {
+.ads-settings,
+.ai-provider-settings {
   margin: 20px 0;
   padding-top: 4px;
   border-top: 1px solid var(--border);
 }
 
-.ads-settings p {
+.ads-settings p,
+.ai-provider-settings p {
   margin: 8px 0;
   color: var(--text-2);
   font-size: 12px;
 }
+
+.settings-shell [hidden] { display: none; }
 
 
 .chatgpt-account {

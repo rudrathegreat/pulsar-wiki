@@ -194,4 +194,4 @@ function createChatGPTAdapter({ accessToken, client } = {}) {
   };
 }
 
-module.exports = { MAX_RESPONSE_STEPS, ProviderError, createChatGPTAdapter, messageText, providerFailure, toOpenAITools };
+module.exports = { MAX_RESPONSE_STEPS, ProviderError, callTool, createChatGPTAdapter, messageText, providerFailure, toOpenAITools };

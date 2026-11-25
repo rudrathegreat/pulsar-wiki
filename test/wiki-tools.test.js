@@ -6,6 +6,8 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const { WikiTools, WikiToolError } = require('../agent/wiki-tools');
+const { PaperMetadata } = require('../agent/paper-metadata');
+const { ANTIGRAVITY_MODEL } = require('../agent/antigravity');
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pulsarwiki-tools-'));
@@ -94,6 +96,24 @@ test('PDF source extraction loads standard fonts without warnings and preserves 
   assert.deepEqual(warnings, [], 'PDF extraction must load bundled font data without warnings');
   assert.deepEqual(fs.readFileSync(file), bytes);
   assert.equal((await tools.readSource({ name: 'standard-font.pdf' })).content, extracted.content);
+
+  let antigravityRequest;
+  t.mock.method(globalThis, 'fetch', async (_url, { body }) => {
+    antigravityRequest = JSON.parse(body);
+    const events = [
+      { event_type: 'step.delta', delta: { type: 'text', text: '{"title":"Standard font paper"}' } },
+      { event_type: 'interaction.completed', interaction: { status: 'completed' } },
+    ];
+    return new Response(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join(''));
+  });
+  const metadata = new PaperMetadata({ rawDir: raw, authService: {
+    inferenceConfig: async () => ({ provider: 'antigravity', apiKey: 'test-key', model: ANTIGRAVITY_MODEL }),
+  } });
+  assert.deepEqual(await metadata.extract('standard-font.pdf'), { title: 'Standard font paper' });
+  assert.match(antigravityRequest.input[1].text, /Standard font paper/);
+  assert.equal(antigravityRequest.input[2].mime_type, 'image/jpeg');
+  assert.ok(antigravityRequest.input[2].data.startsWith('/9j/'));
+  assert.deepEqual(fs.readFileSync(file), bytes);
 });
 
 test('wiki writes require an index update, preserve raw, append log, and roll back a failed batch', t => {

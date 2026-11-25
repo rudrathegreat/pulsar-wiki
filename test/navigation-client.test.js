@@ -37,7 +37,7 @@ function client(initial = '/wiki/timing') {
       replaceState(_state, _title, url) { entries[position] = url; visit(url); },
     },
     api: { getRawList: async () => [{ name: 'paper ?#.md', ext: 'md' }] },
-    renderChatGPTSettings() {}, refreshChatGPTStatus: async () => {}, refreshAdsSettings: async () => {},
+    renderChatGPTSettings() {}, refreshChatGPTStatus: async () => {}, refreshInferenceSettings: async () => {}, refreshAdsSettings: async () => {},
     renderSourceSidebar() {}, loadFiles: async () => {}, showGraph() {}, loadHandoverWorkspace() {}, highlightSidebarItem() {},
     async openPage(page, options = {}) {
       opened.push(options.matchRange ? [page, options.matchRange.start, options.matchRange.end] : page);

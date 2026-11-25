@@ -3,7 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { ReadingError, COLORS, ARTIFACT_TYPES, anchors, ids, text, imageData, hash } = require('./reading-store');
-const { createChatGPTAdapter } = require('./providers');
+const { inferenceAdapter } = require('./inference-settings');
 const { citedPaperIndexes, renderResearchAnswer, wikiReferences } = require('./reading-references');
 
 const EXTRACTION_VERSION = `pdfjs-${require('pdfjs-dist/package.json').version}-text-items-v1`;
@@ -70,7 +70,7 @@ function sourceCitations(content) {
 }
 
 class ReadingService {
-  constructor({ store, wikiTools, authService, discovery, instructions = '', providerFactory = createChatGPTAdapter, now = () => new Date().toISOString() }) {
+  constructor({ store, wikiTools, authService, discovery, instructions = '', providerFactory, now = () => new Date().toISOString() }) {
     Object.assign(this, { store, wikiTools, authService, discovery, instructions, providerFactory, now });
     this.extractions = new Map();
     this.extractionJobs = new Map();
@@ -386,7 +386,7 @@ class ReadingService {
       if (controller.signal.aborted) return;
       task = this.store.update('tasks', id, task.revision, { status: 'running' });
       const connection = await this.authService.inferenceConfig();
-      const adapter = this.providerFactory({ accessToken: connection.accessToken });
+      const adapter = inferenceAdapter(connection, this.providerFactory);
       const snapshot = task.snapshot;
       const artifact = task.artifactId ? this.store.get('artifacts', task.artifactId) : null;
       const taskGuidance = {
@@ -836,7 +836,7 @@ class ReadingService {
     if (semantic) {
       try {
         const connection = await this.authService.inferenceConfig();
-        const adapter = this.providerFactory({ accessToken: connection.accessToken });
+        const adapter = inferenceAdapter(connection, this.providerFactory);
         // Include every page within a bounded context, not just lexical matches: paraphrases
         // may share no keywords with the highlighted passage.
         const candidates = pages.map(page => {

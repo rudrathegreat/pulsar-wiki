@@ -78,7 +78,7 @@
     <button class="icon-btn chatgpt-settings-icon" id="chatgpt-settings-button" data-panel="settings" type="button" data-tooltip="Open settings" aria-label="Settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06-2 2-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V20h-3v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06-2-2 .06-.06A1.65 1.65 0 0 0 7.4 15a1.65 1.65 0 0 0-1.51-1H5.8v-3h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06 2-2 .06.06A1.65 1.65 0 0 0 10.89 6.5h.01A1.65 1.65 0 0 0 12 5V4.8h3V5a1.65 1.65 0 0 0 1 1.5 1.65 1.65 0 0 0 1.82-.33l.06-.06 2 2-.06.06A1.65 1.65 0 0 0 19.5 10v.01A1.65 1.65 0 0 0 21 11h.2v3H21a1.65 1.65 0 0 0-1.6 1z"/></svg>
       <span class="dot-online" id="ws-dot"></span>
-      <span class="sr-only" id="chatgpt-settings-label">Connect ChatGPT</span>
+      <span class="sr-only" id="chatgpt-settings-label">Configure an AI provider</span>
     </button>
     <div class="icon-spacer"></div>
     <button class="icon-btn" id="ib-theme" data-tooltip="Toggle light or dark theme" aria-label="Toggle theme">
@@ -271,7 +271,7 @@
           <div class="chat-msg ai">
             <div class="chat-avatar">AI</div>
             <div class="chat-bubble">
-              <strong>Connect your ChatGPT subscription to get started.</strong><br>
+              <strong>Connect an AI provider in Settings to get started.</strong><br>
               Ask about your research or build on the sources and notes in this workspace.
             </div>
           </div>
@@ -654,17 +654,42 @@
       <div class="panel" id="panel-settings">
         <section class="settings-shell" aria-labelledby="chatgpt-settings-title">
           <h2 id="chatgpt-settings-title" tabindex="-1">Settings</h2>
-          <h3>ChatGPT</h3>
-          <div class="chatgpt-account" id="chatgpt-account"></div>
-          <p class="chatgpt-connection-status" id="chatgpt-connection-status"></p>
-          <div class="chatgpt-connect-actions">
-            <button class="btn btn-primary" id="chatgpt-connect" type="button">Continue with ChatGPT</button>
-            <button class="btn" id="chatgpt-new-account" type="button">Use another account</button>
+          <form id="ai-provider-form" class="ai-provider-settings">
+            <label class="chatgpt-field" for="ai-provider">AI provider</label>
+            <select id="ai-provider" disabled>
+              <option value="chatgpt">ChatGPT</option>
+              <option value="antigravity">Google Antigravity</option>
+            </select>
+            <div id="antigravity-settings" hidden>
+              <label class="chatgpt-field" for="antigravity-key">Gemini API key</label>
+              <input id="antigravity-key" type="password" autocomplete="off" spellcheck="false" maxlength="4096" aria-describedby="antigravity-key-note" disabled/>
+              <p id="antigravity-key-note">Get a key from <a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener noreferrer">Google AI Studio</a>. AI requests use your Gemini API project and may incur charges. Google stores chat requests that allow wiki tools so the agent can continue after a tool call.</p>
+            </div>
+            <p id="ai-provider-status" role="status"></p>
+            <div class="setup-error" id="ai-provider-error" role="alert"></div>
+            <div class="chatgpt-connect-actions">
+              <button class="btn btn-primary" id="ai-provider-save" type="submit" disabled>Save provider</button>
+              <button class="btn" id="antigravity-key-remove" type="button" hidden>Remove saved key</button>
+            </div>
+          </form>
+          <div id="chatgpt-settings">
+            <h3>ChatGPT</h3>
+            <div class="chatgpt-account" id="chatgpt-account"></div>
+            <p class="chatgpt-connection-status" id="chatgpt-connection-status"></p>
+            <div class="chatgpt-connect-actions">
+              <button class="btn btn-primary" id="chatgpt-connect" type="button">Continue with ChatGPT</button>
+              <button class="btn" id="chatgpt-new-account" type="button">Use another account</button>
+            </div>
+            <label class="chatgpt-field" id="chatgpt-model-field">Subscription model
+              <select id="chatgpt-model"></select>
+            </label>
+            <div class="setup-error" id="chatgpt-error" role="alert"></div>
+            <div class="setup-actions">
+              <button class="btn btn-danger" id="chatgpt-forget" type="button">Forget account</button>
+              <button class="btn" id="chatgpt-disconnect" type="button">Disconnect</button>
+              <button class="btn btn-primary" id="chatgpt-model-save" type="button">Save model</button>
+            </div>
           </div>
-          <label class="chatgpt-field" id="chatgpt-model-field">Subscription model
-            <select id="chatgpt-model"></select>
-          </label>
-          <div class="setup-error" id="chatgpt-error" role="alert"></div>
           <form id="ads-settings-form" class="ads-settings">
             <label class="chatgpt-field" for="ads-token" data-settings-update="nasa-ads-api-token">NASA ADS API token</label>
             <input id="ads-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your token" aria-describedby="ads-token-note ads-token-status" required maxlength="4096"/>
@@ -675,11 +700,6 @@
               <button class="btn" id="ads-token-remove" type="button" disabled>Remove saved token</button>
             </div>
           </form>
-          <div class="setup-actions">
-            <button class="btn btn-danger" id="chatgpt-forget" type="button">Forget account</button>
-            <button class="btn" id="chatgpt-disconnect" type="button">Disconnect</button>
-            <button class="btn btn-primary" id="chatgpt-model-save" type="button">Save model</button>
-          </div>
         </section>
       </div>
 

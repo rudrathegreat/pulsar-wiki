@@ -148,8 +148,21 @@ function workspaceUrl(url) {
 }
 if (typeof window !== 'undefined') window.WorkspaceSession = { fetch: workspaceFetch, url: workspaceUrl };
 
-// Local browser API. ChatGPT credentials never enter this client.
+// Local browser API. Saved credentials are never returned to the browser.
 const api = {
+  async getInferenceSettings() {
+    return readJsonResponse(await workspaceFetch('/api/settings/ai'), 'AI provider settings');
+  },
+  async saveInferenceSettings(provider, apiKey) {
+    return readJsonResponse(await workspaceFetch('/api/settings/ai', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider, apiKey }),
+    }), 'AI provider settings');
+  },
+  async removeAntigravityKey() {
+    return readJsonResponse(await workspaceFetch('/api/settings/ai/key', { method: 'DELETE' }), 'Gemini API key');
+  },
   async getChatGPTStatus() {
     return readJsonResponse(await workspaceFetch('/api/chatgpt/status'), 'ChatGPT status');
   },
@@ -300,6 +313,7 @@ const state = {
   backendReady: false,
   aiRunning: false,
   chatgpt: null,
+  inferenceSettings: null,
   threads: [],
   activeThreadId: null,
   searchTimer: null,
@@ -386,7 +400,10 @@ function showPanel(name, { historyMode = 'push' } = {}) {
   if (name !== 'document') updateAppHistory(panelUrl(name), historyMode);
   if (name !== state.panel) {
     window.ActiveReading?.closeHelper();
-    if (state.panel === 'settings') $('ads-token').value = '';
+    if (state.panel === 'settings') {
+      $('ads-token').value = '';
+      $('antigravity-key').value = '';
+    }
   }
   state.panel = name;
   document.body.classList.toggle('notebook-mode', name === 'notebooks');
@@ -399,6 +416,7 @@ function showPanel(name, { historyMode = 'push' } = {}) {
   document.querySelectorAll('.icon-btn[data-panel]').forEach(button => button.classList.toggle('active', button.dataset.panel === navigationPanel));
   if (name === 'settings') {
     renderChatGPTSettings();
+    void refreshInferenceSettings({ syncSelection: true });
     void refreshChatGPTStatus();
     void refreshAdsSettings();
   }
@@ -1174,6 +1192,10 @@ function renderSavedFiles() {
 }
 
 // Project handover
+function inferenceReady() {
+  if (state.inferenceSettings?.provider === 'antigravity') return state.inferenceSettings.antigravityConfigured;
+  return state.chatgpt?.ready;
+}
 const HANDOVER_SELECTORS = { wiki: 'wiki', raw: 'file', notebook: 'notebook' };
 
 function renderHandoverSelector(type) {
@@ -1361,9 +1383,9 @@ async function generateHandover() {
     setHandoverStatus('Select at least one workspace item.', true);
     return;
   }
-  if (!state.chatgpt?.ready) {
-    setHandoverStatus('Connect your ChatGPT subscription before generating a draft.', true);
-    void refreshChatGPTStatus({ open: true, message: 'Connect ChatGPT to generate a project handover.' });
+  if (!inferenceReady()) {
+    setHandoverStatus('Connect an AI provider in Settings before generating a draft.', true);
+    showPanel('settings');
     return;
   }
 
@@ -2107,7 +2129,7 @@ function monitorSourceJob(id) {
       const messages = {
         queued: 'PDF saved. Background wiki review is queued.',
         running: 'PDF saved. AI is reviewing the source in the background.',
-        'awaiting-connection': 'PDF saved. Connect ChatGPT to start the background wiki review.',
+        'awaiting-connection': 'PDF saved. Connect an AI provider in Settings to start the background wiki review.',
         completed: 'Background wiki review is ready in Saved chats.',
         failed: job.error || 'The PDF was saved, but the background wiki review failed.',
       };
@@ -2565,7 +2587,7 @@ document.addEventListener('click', event => {
   void restoreAppRoute();
 });
 
-// ── ChatGPT subscription chat ─────────────────────────────────────
+// ── Saved chat ────────────────────────────────────────────────────
 // OAuth credentials stay on the server; this client receives sanitized state.
 let aiTarget = null;
 
@@ -2579,24 +2601,31 @@ function resizeTextarea() {
 }
 
 function agentReady() {
-  return Boolean(state.chatgpt?.ready && state.wsReady && state.backendReady && state.activeThreadId);
+  return Boolean(inferenceReady() && state.wsReady && state.backendReady && state.activeThreadId);
+}
+
+function inferenceProviderName() {
+  return state.inferenceSettings?.provider === 'antigravity' ? 'Google Antigravity' : 'ChatGPT';
 }
 
 function updateAgentUi() {
   const status = state.chatgpt || {};
+  const ready = inferenceReady();
+  const google = state.inferenceSettings?.provider === 'antigravity';
+  const provider = inferenceProviderName();
+  const model = google ? state.inferenceSettings.antigravityModel : status.selectedModel;
   const backendConnected = Boolean(state.wsReady && state.backendReady);
-  dom.chatgptSettingsLabel.textContent = stripEmoji(status.ready
-    ? `ChatGPT · ${status.selectedModel}`
-    : (status.savedAccount ? 'Reconnect ChatGPT' : 'Connect ChatGPT'));
-  dom.wsDot.classList.toggle('active', Boolean(status.ready && backendConnected));
-  dom.wsDot.title = status.ready
-    ? (backendConnected ? 'ChatGPT and agent service connected' : 'Agent service disconnected')
-    : 'ChatGPT subscription not connected';
+  dom.chatgptSettingsLabel.textContent = stripEmoji(ready ? `${provider} · ${model}` : `Configure ${provider}`);
+  dom.wsDot.classList.toggle('active', Boolean(ready && backendConnected));
+  dom.wsDot.title = ready
+    ? (backendConnected ? `${provider} and agent service connected` : 'Agent service disconnected')
+    : `${provider} disconnected`;
   dom.chatInput.disabled = !agentReady() || state.aiRunning;
   dom.chatSend.disabled = !agentReady() || state.aiRunning;
   if (!state.aiRunning) {
-    if (!status.ready) {
-      dom.chatStatus.textContent = status.planEnabled === false && status.connected
+    if (!ready) {
+      dom.chatStatus.textContent = google ? 'Add a Gemini API key in Settings to chat.'
+        : status.planEnabled === false && status.connected
         ? 'Reconnect ChatGPT and allow subscription use to chat.'
         : (status.savedAccount ? 'Reconnect the saved ChatGPT account to chat.' : 'Connect an eligible ChatGPT subscription to chat.');
     } else if (!state.activeThreadId) {
@@ -2697,9 +2726,9 @@ function clearChatMessages() {
 function renderThread(thread) {
   clearChatMessages();
   if (!thread.messages?.length) {
-    appendChatMsg('ai', state.chatgpt?.ready
+    appendChatMsg('ai', inferenceReady()
       ? '**A new saved chat is ready.**\n\nAsk a question about the PulsarWiki, or tell the agent what to update.'
-      : '**Connect ChatGPT to get started.**\n\nYour conversations are saved locally.');
+      : '**Connect an AI provider in Settings to get started.**\n\nYour conversations are saved locally.');
   } else {
     for (const message of thread.messages) appendChatMsg(message.role, message.text);
   }
@@ -2871,6 +2900,66 @@ async function refreshChatGPTStatus({ open = false, message = '' } = {}) {
   }
 }
 
+let inferenceSaving = false;
+
+function renderInferenceSettings({ syncSelection = false } = {}) {
+  const status = state.inferenceSettings;
+  const select = $('ai-provider');
+  const key = $('antigravity-key');
+  if (syncSelection) select.value = status?.provider || 'chatgpt';
+  const showGoogle = select.value === 'antigravity';
+  const configured = Boolean(status?.antigravityConfigured);
+  select.disabled = !status || inferenceSaving;
+  key.disabled = !showGoogle || inferenceSaving;
+  key.required = showGoogle && !configured;
+  key.placeholder = configured ? 'Enter a new key to replace the saved key' : 'Paste your Gemini API key';
+  $('ai-provider-save').disabled = select.disabled;
+  $('antigravity-settings').hidden = !showGoogle;
+  $('chatgpt-settings').hidden = showGoogle;
+  const remove = $('antigravity-key-remove');
+  remove.hidden = !showGoogle || !configured;
+  remove.disabled = inferenceSaving;
+  $('ai-provider-status').textContent = status?.provider === 'antigravity'
+    ? `Active provider: Google Antigravity (${status.antigravityModel}).`
+    : status ? 'Active provider: ChatGPT.' : '';
+}
+
+async function refreshInferenceSettings({ syncSelection = false } = {}) {
+  const previous = state.inferenceSettings;
+  try {
+    const status = await api.getInferenceSettings();
+    if (inferenceSaving || state.inferenceSettings !== previous) return;
+    state.inferenceSettings = status;
+    renderInferenceSettings({ syncSelection: syncSelection || !previous || previous.provider !== status.provider });
+    updateAgentUi();
+  } catch (error) {
+    $('ai-provider-error').textContent = stripEmoji(error.message);
+  }
+}
+
+async function saveInferenceSettings({ remove = false } = {}) {
+  if (inferenceSaving) return;
+  const key = $('antigravity-key');
+  const provider = $('ai-provider').value;
+  const apiKey = provider === 'antigravity' ? key.value.trim() || undefined : undefined;
+  inferenceSaving = true;
+  $('ai-provider-error').textContent = '';
+  renderInferenceSettings();
+  if (apiKey && !remove) $('ai-provider-status').textContent = 'Checking the Gemini API key…';
+  try {
+    state.inferenceSettings = remove ? await api.removeAntigravityKey() : await api.saveInferenceSettings(provider, apiKey);
+    key.value = '';
+    $('ai-provider').value = state.inferenceSettings.provider;
+    updateAgentUi();
+    if (state.inferenceSettings.provider === 'chatgpt') void refreshChatGPTStatus();
+  } catch (error) {
+    $('ai-provider-error').textContent = stripEmoji(error.message);
+  } finally {
+    inferenceSaving = false;
+    renderInferenceSettings();
+  }
+}
+
 let modelUpdateNotice;
 
 async function saveChatGPTModel() {
@@ -3017,7 +3106,7 @@ function sendChat() {
   dom.chatInput.disabled = true;
   dom.chatSend.disabled = true;
   dom.chatAbort.style.display = 'flex';
-  dom.chatStatus.textContent = 'ChatGPT is thinking...';
+  dom.chatStatus.textContent = `${inferenceProviderName()} is thinking...`;
   const message = document.createElement('div');
   message.className = 'chat-msg ai';
   message.innerHTML = '<div class="chat-avatar">AI</div><div class="chat-bubble"><div class="chat-activity is-active" hidden><details><summary><span class="chat-activity-heading"><span class="chat-activity-title">Wiki activity</span><span class="chat-activity-dots" aria-hidden="true"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></span></span></summary><ol></ol></details></div><div class="chat-response"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>';
@@ -3069,15 +3158,23 @@ function handleAiError(message) {
   const text = '> ' + stripEmoji(message.text || 'The agent request failed.');
   if (aiTarget) handleAiChunk('\n\n' + text);
   else appendChatMsg('ai', text);
-  if (['reauthorization-required', 'plan-permission-required'].includes(message.code)) {
-    void refreshChatGPTStatus();
+  const googleKeyError = ['antigravity-key-required', 'antigravity-key-invalid', 'antigravity-access-denied'].includes(message.code);
+  if (googleKeyError || ['reauthorization-required', 'plan-permission-required'].includes(message.code)) {
+    if (!googleKeyError) void refreshChatGPTStatus();
     if (aiTarget && !aiTarget.recoveryShown) {
       aiTarget.recoveryShown = true;
       const action = document.createElement('button');
       action.type = 'button';
       action.className = 'btn chat-recovery';
-      action.textContent = 'Reconnect ChatGPT';
-      action.addEventListener('click', () => openChatGPTSettings(message.text || 'Sign in again to continue.'));
+      action.textContent = googleKeyError ? 'Open AI settings' : 'Reconnect ChatGPT';
+      action.addEventListener('click', () => {
+        if (googleKeyError) {
+          showPanel('settings');
+          $('ai-provider-error').textContent = stripEmoji(message.text || '');
+        } else {
+          openChatGPTSettings(message.text || 'Sign in again to continue.');
+        }
+      });
       aiTarget.el.appendChild(action);
     }
   }
@@ -3125,6 +3222,17 @@ dom.chatgptConnect.addEventListener('click', () => { window.location.assign('/au
 dom.chatgptNewAccount.addEventListener('click', () => { void useAnotherChatGPTAccount(); });
 dom.chatgptDisconnect.addEventListener('click', () => { void disconnectChatGPT(); });
 dom.chatgptForget.addEventListener('click', () => { void forgetChatGPTAccount(); });
+$('ai-provider').addEventListener('change', () => {
+  $('ai-provider-error').textContent = '';
+  $('antigravity-key').value = '';
+  renderInferenceSettings();
+});
+$('ai-provider-form').addEventListener('submit', event => {
+  event.preventDefault();
+  void saveInferenceSettings();
+});
+$('antigravity-key-remove').addEventListener('click', () => { void saveInferenceSettings({ remove: true }); });
+window.addEventListener('focus', () => { void refreshInferenceSettings(); });
 dom.chatNewThread.addEventListener('click', () => { void createThread(); });
 dom.chatMessages.addEventListener('click', handleChatWikiLink);
 dom.chatInput.addEventListener('input', () => {
@@ -3613,7 +3721,10 @@ document.addEventListener('keydown', event => {
 
     const callbackCode = new URLSearchParams(location.search).get('chatgpt');
     const callbackMessage = callbackCode ? (CHATGPT_CALLBACK_MESSAGES[callbackCode] || 'ChatGPT connection status changed.') : '';
-    await refreshChatGPTStatus({ open: Boolean(callbackCode), message: callbackMessage });
+    await refreshInferenceSettings({ syncSelection: true });
+    if (callbackCode || state.inferenceSettings?.provider !== 'antigravity') {
+      await refreshChatGPTStatus({ open: Boolean(callbackCode), message: callbackMessage });
+    }
     if (callbackCode) history.replaceState(null, '', location.pathname + location.hash);
 
     try {

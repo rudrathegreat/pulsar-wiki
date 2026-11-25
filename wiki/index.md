@@ -2,6 +2,8 @@
 
 Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pulsar science, observational tools, and relativistic physics.
 
+AI provider: choose ChatGPT or Google Antigravity in **Settings**. Antigravity requires a Gemini API key from Google AI Studio. [Setup instructions](../README.md#connect-google-antigravity)
+
 File navigation: source citations and source lists open saved files in the reading workspace; wiki page references in pages and chat link to their pages and share the same link styling, including pulsar names containing plus signs and standalone references formatted as inline code.
 
 You can switch directly from an open plain-text or Markdown preview to another saved source. [Reading workspace](../public/reading.js)
@@ -118,4 +120,4 @@ All 41 wiki pages were updated to use the two-sentence declaration format. [[log
 ---
 *Last updated: 2026-11-25*
 
-**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-25. This update documented rendered Markdown previews and how to open the original markup for highlighting.
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-25. This update documented the Google Antigravity provider option and linked to the application setup instructions.

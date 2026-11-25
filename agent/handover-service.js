@@ -1,7 +1,7 @@
 'use strict';
 
 const { AgentServiceError } = require('./agent-service');
-const { createChatGPTAdapter } = require('./providers');
+const { inferenceAdapter } = require('./inference-settings');
 
 // Keep the entire evidence set in one request. Reject oversized sets instead of
 // silently dropping the ends of files or asking the model to choose what to read.
@@ -42,7 +42,7 @@ function field(value, fallback, limit) {
 const text = value => Array.isArray(value) ? value.join('') : String(value || '');
 
 class HandoverService {
-  constructor({ wikiTools, notebookService, authService, providerFactory = createChatGPTAdapter }) {
+  constructor({ wikiTools, notebookService, authService, providerFactory }) {
     Object.assign(this, { wikiTools, notebookService, authService, providerFactory });
   }
 
@@ -95,14 +95,14 @@ class HandoverService {
     }
     signal.throwIfAborted();
     const connection = await this.authService.inferenceConfig();
-    const result = await this.providerFactory({ accessToken: connection.accessToken }).runTurn({
+    const result = await inferenceAdapter(connection, this.providerFactory).runTurn({
       model: connection.model, instructions: HANDOVER_INSTRUCTIONS,
       messages: [{ role: 'user', text: JSON.stringify(bundle) }],
       tools: [], executeTool() { throw new Error('No tools are available for handover drafting.'); }, signal,
     });
     signal.throwIfAborted();
     const draft = typeof result?.text === 'string' ? result.text.trim().replace(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/i, '$1').trim() : '';
-    if (!draft || !/^# Project Handover\s*$/m.test(draft)) throw new AgentServiceError('ChatGPT did not return a usable Markdown handover. Try generating again.', 'empty-response');
+    if (!draft || !/^# Project Handover\s*$/m.test(draft)) throw new AgentServiceError('The AI provider did not return a usable Markdown handover. Try generating again.', 'empty-response');
     return { draft, requiresReview: true, selected: { pages, sources, notebooks } };
   }
 }

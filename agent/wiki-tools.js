@@ -14,6 +14,23 @@ class WikiToolError extends Error {
   }
 }
 
+async function openSourcePdf(bytes) {
+  let pdfjs;
+  try {
+    pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  } catch {
+    throw new WikiToolError('The local PDF text extractor is unavailable.', 'pdf-extractor-unavailable');
+  }
+  const pdfRoot = path.dirname(require.resolve('pdfjs-dist/package.json'));
+  return pdfjs.getDocument({
+    data: new Uint8Array(bytes),
+    isEvalSupported: false,
+    standardFontDataUrl: path.join(pdfRoot, 'standard_fonts').replace(/\\/g, '/') + '/',
+    cMapUrl: path.join(pdfRoot, 'cmaps').replace(/\\/g, '/') + '/',
+    cMapPacked: true,
+  }).promise;
+}
+
 const TOOL_DEFINITIONS = Object.freeze([
   {
     name: 'list_wiki_pages',
@@ -221,23 +238,9 @@ class WikiTools {
     const stat = this.fs.statSync(filePath);
     const cached = this.pdfCache.get(filePath);
     if (cached && cached.modifiedMs === stat.mtimeMs) return cached.text;
-    let pdfjs;
-    try {
-      pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    } catch {
-      throw new WikiToolError('The local PDF text extractor is unavailable.', 'pdf-extractor-unavailable');
-    }
     let document;
     try {
-      const data = new Uint8Array(this.fs.readFileSync(filePath));
-      const pdfRoot = path.dirname(require.resolve('pdfjs-dist/package.json'));
-      document = await pdfjs.getDocument({
-        data,
-        isEvalSupported: false,
-        standardFontDataUrl: path.join(pdfRoot, 'standard_fonts').replace(/\\/g, '/') + '/',
-        cMapUrl: path.join(pdfRoot, 'cmaps').replace(/\\/g, '/') + '/',
-        cMapPacked: true,
-      }).promise;
+      document = await openSourcePdf(this.fs.readFileSync(filePath));
       const pages = [];
       for (let number = 1; number <= document.numPages; number += 1) {
         const page = await document.getPage(number);
@@ -248,6 +251,7 @@ class WikiTools {
       this.pdfCache.set(filePath, { modifiedMs: stat.mtimeMs, text });
       return text;
     } catch (error) {
+      if (error instanceof WikiToolError) throw error;
       throw new WikiToolError('PulsarWiki could not extract text from that PDF.', 'pdf-extraction-failed');
     } finally {
       if (document) await document.destroy();
@@ -315,4 +319,4 @@ class WikiTools {
   }
 }
 
-module.exports = { WikiTools, WikiToolError, TOOL_DEFINITIONS };
+module.exports = { WikiTools, WikiToolError, TOOL_DEFINITIONS, openSourcePdf };

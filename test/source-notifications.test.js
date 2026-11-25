@@ -187,7 +187,7 @@ test('ingest completion broadcasts only to clients in the source workspace', asy
   const received = [], other = [], disconnected = [];
   const workspace = { agentService: { createThread: () => ({ id: 'review-1' }), runTurn: async () => {} } };
   const context = {
-    chatgptAuth: { status: async () => ({ ready: true }) }, currentWorkspace: () => workspace,
+    inferenceSettings: { readiness: async () => ({ ready: true }) }, currentWorkspace: () => workspace,
     CHAT_TIMEOUT_MS: 1000, AbortSignal, WebSocket: { OPEN: 1 },
     wss: { clients: [
       { workspace, readyState: 1, send: payload => received.push(JSON.parse(payload)) },

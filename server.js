@@ -19,6 +19,7 @@ const { ChatGPTAuthError, ChatGPTAuthService } = require('./agent/chatgpt-auth')
 const { ThreadStore, ThreadStoreError } = require('./agent/thread-store');
 const { WikiTools, WikiToolError } = require('./agent/wiki-tools');
 const { ProviderError } = require('./agent/providers');
+const { InferenceSettings } = require('./agent/inference-settings');
 const { FILTERS: SOURCE_FILTERS, SourceDiscoveryService } = require('./agent/source-discovery');
 const { SourceSettings } = require('./agent/source-settings');
 const { PaperKeywords } = require('./agent/paper-keywords');
@@ -53,6 +54,7 @@ const CHAT_TIMEOUT_MS = 120000;
 let boundPort = null;
 
 const chatgptAuth = new ChatGPTAuthService();
+const inferenceSettings = new InferenceSettings({ chatgptAuth });
 const sourceSettings = new SourceSettings({ dataDir: path.join(ROOT_DIR, '.pulsarwiki') });
 
 function openWorkspace(folder) {
@@ -63,17 +65,17 @@ function openWorkspace(folder) {
   if (cached) return cached;
   const workspace = initializeWorkspace(folder);
   const { rootDir, wikiDir, rawDir, dataDir, instructions } = workspace;
-  workspace.references = new References({ rootDir, rawDir, metadata: new PaperMetadata({ rawDir, authService: chatgptAuth }) });
+  workspace.references = new References({ rootDir, rawDir, metadata: new PaperMetadata({ rawDir, authService: inferenceSettings }) });
   workspace.wikiTools = new WikiTools({ rootDir, wikiDir, rawDir, dataDir });
-  workspace.agentService = new AgentService({ threadStore: new ThreadStore({ dataDir: path.join(dataDir, 'chat') }), authService: chatgptAuth, wikiTools: workspace.wikiTools, instructions });
-  workspace.sourceDiscovery = new SourceDiscoveryService({ rawDir, references: workspace.references, adsToken: sourceSettings.token, paperRanking: new PaperRanking({ authService: chatgptAuth }), onImport: item => workspace.references.enrich([{ ...item.source, name: item.name }]) });
-  workspace.paperKeywords = new PaperKeywords({ authService: chatgptAuth });
-  workspace.readingService = new ReadingService({ store: new ReadingStore({ dataDir: path.join(dataDir, 'reading') }), wikiTools: workspace.wikiTools, authService: chatgptAuth, discovery: workspace.sourceDiscovery, instructions });
+  workspace.agentService = new AgentService({ threadStore: new ThreadStore({ dataDir: path.join(dataDir, 'chat') }), authService: inferenceSettings, wikiTools: workspace.wikiTools, instructions });
+  workspace.sourceDiscovery = new SourceDiscoveryService({ rawDir, references: workspace.references, adsToken: sourceSettings.token, paperRanking: new PaperRanking({ authService: inferenceSettings }), onImport: item => workspace.references.enrich([{ ...item.source, name: item.name }]) });
+  workspace.paperKeywords = new PaperKeywords({ authService: inferenceSettings });
+  workspace.readingService = new ReadingService({ store: new ReadingStore({ dataDir: path.join(dataDir, 'reading') }), wikiTools: workspace.wikiTools, authService: inferenceSettings, discovery: workspace.sourceDiscovery, instructions });
   workspace.ingestJobs = new Map();
   workspace.readingRouter = createReadingRouter({ service: workspace.readingService, requireLocalSession, requireLocalMutation, onImport: queueSourceIngest });
   const notebookStore = new NotebookStore({ rootDir, dataDir });
-  workspace.notebookService = new NotebookService({ store: notebookStore, runtime: new NotebookRuntime({ store: notebookStore }), wikiTools: workspace.wikiTools, readingService: workspace.readingService, authService: chatgptAuth });
-  workspace.handoverService = new HandoverService({ wikiTools: workspace.wikiTools, notebookService: workspace.notebookService, authService: chatgptAuth });
+  workspace.notebookService = new NotebookService({ store: notebookStore, runtime: new NotebookRuntime({ store: notebookStore }), wikiTools: workspace.wikiTools, readingService: workspace.readingService, authService: inferenceSettings });
+  workspace.handoverService = new HandoverService({ wikiTools: workspace.wikiTools, notebookService: workspace.notebookService, authService: inferenceSettings });
   workspace.notebookRouter = createNotebookRouter({ service: workspace.notebookService, requireLocalSession, requireLocalMutation });
   let referenceKeys = new Set(parseBibtex(workspace.references.read().content).entries.map(entry => entry.key));
   const watchedPaths = [wikiDir, rawDir, path.join(rootDir, 'notebooks'), workspace.references.file];
@@ -120,7 +122,8 @@ function publicIngestJob(job) {
 async function runIngestJob(job) {
   if (!job || ['running', 'completed'].includes(job.status)) return;
   let status;
-  try { status = await chatgptAuth.status(); } catch { status = null; }
+  try { status = await inferenceSettings.readiness(); } catch { status = null; }
+  if (['running', 'completed'].includes(job.status)) return;
   if (!status?.ready) {
     job.status = 'awaiting-connection';
     job.updatedAt = new Date().toISOString();
@@ -333,6 +336,33 @@ app.delete('/api/settings/ads', requireLocalMutation, (_req, res) => {
     res.json(status);
   } catch {
     res.status(500).json({ error: 'The NASA ADS token could not be removed.' });
+  }
+});
+
+app.get('/api/settings/ai', requireLocalSession, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(inferenceSettings.status());
+});
+
+app.put('/api/settings/ai', requireLocalMutation, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    res.json(await inferenceSettings.save(req.body || {}));
+    resumePendingIngestJobs();
+  } catch (error) {
+    const known = error instanceof TypeError || error instanceof ProviderError;
+    res.status(error instanceof TypeError ? 400 : error instanceof ProviderError ? 502 : 500)
+      .json({ error: known ? error.message : 'AI settings could not be saved.' });
+  }
+});
+
+app.delete('/api/settings/ai/key', requireLocalMutation, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    res.json(inferenceSettings.removeKey());
+    resumePendingIngestJobs();
+  } catch {
+    res.status(500).json({ error: 'The Gemini API key could not be removed.' });
   }
 });
 
@@ -784,7 +814,7 @@ app.get('/api/search', (req, res) => {
   return res.json(results);
 });
 
-// --- WebSocket: ChatGPT subscription threaded chat ---
+// --- WebSocket: saved threaded chat ---
 wss.on('connection', (ws, request) => {
   const workspace = requestWorkspace(request);
   ws.workspace = workspace;

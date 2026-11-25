@@ -126,7 +126,7 @@ test('frontend surfaces safe server failures', async () => {
 
 test('subscription UI covers connect, reconnect, selection, disconnect, and replacement states', () => {
   for (const id of [
-    'chatgpt-settings-modal', 'chatgpt-connect', 'chatgpt-new-account', 'chatgpt-model',
+    'chatgpt-settings', 'chatgpt-connect', 'chatgpt-new-account', 'chatgpt-model',
     'chatgpt-model-save', 'chatgpt-disconnect', 'chatgpt-forget',
   ]) {
     assert.match(indexSource, new RegExp(`id="${id}"`));
@@ -137,7 +137,7 @@ test('subscription UI covers connect, reconnect, selection, disconnect, and repl
   assert.match(appSource, /plan permission is missing/i);
   assert.match(appSource, /sign-in request expired/i);
   assert.match(appSource, /sign-in was declined/i);
-  assert.doesNotMatch(indexSource, /API key|agent-provider|agent-model/);
+  assert.match(indexSource, /<input id="antigravity-key" type="password"/);
   assert.doesNotMatch(appSource, /getAgentSettings|saveAgentSettings|FALLBACK_PROVIDERS/);
 });
 
@@ -279,7 +279,7 @@ test('project handover is a selection-based, review-gated wiki workflow', () => 
   ]) assert.match(indexSource, new RegExp(`id="${id}"`));
   assert.match(indexSource, /I have reviewed this handover/);
   assert.match(indexSource, /<label for="handover-file-input">Sources<\/label>/);
-  assert.match(appSource, /if \(!state\.chatgpt\?\.ready\)/);
+  assert.match(appSource, /if \(!inferenceReady\(\)\)/);
   assert.match(appSource, /handover-reviewed'[\s\S]*handover-publish/);
   assert.match(serverSource, /app\.post\('\/api\/handover\/generate', requireLocalMutation/);
   assert.match(serverSource, /handoverService\.generate\(req\.body \|\| \{\}\)/);
