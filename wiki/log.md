@@ -471,4 +471,6 @@ All major updates to the wiki are recorded here.
 
 - 2026-11-25: Added Google Antigravity as an AI provider, with Gemini API key setup and shared routing for chat, reading, source tools, notebook recall, and handover. [Settings](../public/index.html) [Antigravity adapter](../agent/antigravity.js) [Setup instructions](../README.md#connect-google-antigravity)
 
-**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-25. This update recorded the Google Antigravity integration and linked to its implementation and setup instructions.
+- 2026-11-26: Added Antigravity error messages for failed requests, project requirements, billing, service availability, and network errors. [Antigravity adapter](../agent/antigravity.js) · [Regression tests](../test/antigravity.test.js)
+
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-26. This update recorded the Antigravity error reporting changes and linked to their implementation and tests.

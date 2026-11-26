@@ -2,7 +2,7 @@
 
 Welcome to the **Pulsar Astronomy Wiki**, a comprehensive knowledge base for pulsar science, observational tools, and relativistic physics.
 
-AI provider: choose ChatGPT or Google Antigravity in **Settings**. Antigravity requires a Gemini API key from Google AI Studio. [Setup instructions](../README.md#connect-google-antigravity)
+AI provider: choose ChatGPT or Google Antigravity in **Settings**. Antigravity requires a Gemini API key from Google AI Studio. PulsarWiki checks the connection before saving a new key and reports why validation failed when Google returns a recognised error. [Setup instructions](../README.md#connect-google-antigravity) · [Connection check](../agent/inference-settings.js) · [Antigravity errors](../agent/antigravity.js)
 
 File navigation: source citations and source lists open saved files in the reading workspace; wiki page references in pages and chat link to their pages and share the same link styling, including pulsar names containing plus signs and standalone references formatted as inline code.
 
@@ -118,6 +118,6 @@ Ask AI uses the highlight to identify the subject of the question and looks for 
 All 41 wiki pages were updated to use the two-sentence declaration format. [[log]]
 
 ---
-*Last updated: 2026-11-25*
+*Last updated: 2026-11-26*
 
-**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-25. This update documented the Google Antigravity provider option and linked to the application setup instructions.
+**AI declaration**: This wiki page was updated using GPT-6, a model provided by OpenAI and accessed through Codex, with the latest set of changes applied on 2026-11-26. This update documented how PulsarWiki validates new Google Antigravity keys and reports connection failures.

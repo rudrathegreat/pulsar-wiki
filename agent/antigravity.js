@@ -57,25 +57,38 @@ async function readInteraction(response, onDelta) {
       text += delta.text;
       onDelta?.(delta.text);
     }
-    if (type === 'error') throw new ProviderError('Google Antigravity returned an error. Please try again.');
+    if (type === 'error') throw requestFailure(event.error);
     if (type === 'interaction.completed') interaction = event.interaction;
   }
   return { interaction, environmentId, text, calls: [...calls.values()].filter(call => !executed.has(call.id)) };
 }
 
-async function requestFailure(response) {
-  const body = await response.json().catch(() => null);
-  const reasons = Array.isArray(body?.error?.details) ? body.error.details : [];
-  if (response.status === 401 || reasons.some(detail => detail.reason === 'API_KEY_INVALID')) {
+function requestFailure(error, status) {
+  const code = error?.code;
+  const reasons = Array.isArray(error?.details) ? error.details : [];
+  if (status === 401 || code === 'authentication' || reasons.some(detail => detail?.reason === 'API_KEY_INVALID')) {
     return new ProviderError('Google rejected the Gemini API key. Replace it in Settings.', 'antigravity-key-invalid');
   }
-  if (response.status === 403 || response.status === 404) {
+  if (status === 402 || code === 'payment_required') {
+    return new ProviderError('The Gemini API project is out of prepaid credits. Check billing in Google AI Studio.', 'antigravity-payment-required');
+  }
+  if (status === 403 || status === 404 || code === 'permission_denied' || code === 'not_found' || code === 'model_not_found') {
     return new ProviderError('This Gemini API project cannot access Google Antigravity. Check the key and project access in Google AI Studio.', 'antigravity-access-denied');
   }
-  if (response.status === 429) {
+  if (status === 429 || ['rate_limit_exceeded', 'quota_exceeded', 'too_many_requests'].includes(code)) {
     return new ProviderError('The Google Antigravity quota was reached. Check your Gemini API project usage in Google AI Studio.', 'antigravity-quota');
   }
-  return new ProviderError('Google Antigravity could not complete this request. Please try again.');
+  if (code === 'failed_precondition' || error?.status === 'FAILED_PRECONDITION') {
+    return new ProviderError('The Gemini API project did not meet a requirement for this request. Check project verification and billing in Google AI Studio.', 'antigravity-project-requirement');
+  }
+  if (status === 400 || code === 'invalid_request' || code === 'parameter_unknown') {
+    return new ProviderError('Google rejected the Antigravity request as invalid.', 'antigravity-request-invalid');
+  }
+  if (status === 503 || code === 'service_unavailable') {
+    return new ProviderError('Google Antigravity is temporarily unavailable. Try again shortly.', 'antigravity-unavailable');
+  }
+  const statusLabel = status === undefined ? '' : ` (HTTP ${status})`;
+  return new ProviderError(`Google Antigravity could not complete this request${statusLabel}. Please try again.`);
 }
 
 function createAntigravityAdapter({ apiKey, fetchImpl = globalThis.fetch }) {
@@ -107,8 +120,14 @@ function createAntigravityAdapter({ apiKey, fetchImpl = globalThis.fetch }) {
               ...request,
             }),
             signal,
+          }).catch(error => {
+            if (signal?.aborted) throw error;
+            throw new ProviderError('PulsarWiki could not reach the Gemini API. Check the connection from the computer running PulsarWiki.', 'antigravity-connection');
           });
-          if (!response.ok) throw await requestFailure(response);
+          if (!response.ok) {
+            const body = await response.json().catch(() => null);
+            throw requestFailure(body?.error, response.status);
+          }
           const { interaction, environmentId, text, calls } = await readInteraction(response, onDelta);
           signal?.throwIfAborted();
           if (interaction?.status === 'completed') {

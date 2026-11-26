@@ -107,3 +107,20 @@ test('switching providers persists the verified key and excludes it from public 
   assert.equal(restored.removeKey().provider, 'chatgpt');
   assert.equal(new InferenceSettings(options).status().antigravityConfigured, false);
 });
+
+test('Antigravity reports safe setup diagnostics for HTTP, streaming and connection errors', async () => {
+  const request = { messages: [{ role: 'user', text: 'Connection check' }], tools: [] };
+  const cases = [
+    [() => Response.json({ error: { status: 'FAILED_PRECONDITION' } }, { status: 400 }), 'antigravity-project-requirement'],
+    [() => Response.json({ error: { code: 'parameter_unknown', message: 'private detail' } }, { status: 400 }), 'antigravity-request-invalid'],
+    [() => new Response(null, { status: 402 }), 'antigravity-payment-required'],
+    [() => new Response(null, { status: 503 }), 'antigravity-unavailable'],
+    [() => stream({ event_type: 'error', error: { code: 'authentication', message: 'private detail' } }), 'antigravity-key-invalid'],
+    [() => stream({ event_type: 'error', error: { code: 'rate_limit_exceeded' } }), 'antigravity-quota'],
+    [() => { throw new TypeError('private detail'); }, 'antigravity-connection'],
+  ];
+  for (const [respond, code] of cases) {
+    const adapter = createAntigravityAdapter({ apiKey: 'test-key', fetchImpl: async () => respond() });
+    await assert.rejects(adapter.runTurn(request), error => error.code === code && !error.message.includes('private detail'), code);
+  }
+});
